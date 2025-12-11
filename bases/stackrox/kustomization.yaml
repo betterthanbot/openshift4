@@ -1,0 +1,14 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ./400.9.1-stackrox-central-services-deployment.yaml
+- ./namespace.yaml
+
+namespace: stackrox
+
+# images:
+# - name:
+#   newName:
+#   newTag:
