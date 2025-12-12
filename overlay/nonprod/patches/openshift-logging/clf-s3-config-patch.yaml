@@ -1,0 +1,15 @@
+# This patch targets the ClusterLogForwarder CR
+apiVersion: logging.openshift.io/v1
+kind: ClusterLogForwarder
+metadata:
+  name: instance
+spec:
+  outputs:
+    # We match the specific output definition by ensuring the 'name' field is present.
+    # Kustomize will merge this into the corresponding 's3-forwarder' output in the base.
+    - name: s3-forwarder
+      s3:
+        # **This is the field we are overriding for UAT**
+        bucket: my-nonprod-log-bucket-name
+        # Optionally, override the region too
+        region: us-east-2

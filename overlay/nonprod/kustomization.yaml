@@ -21,3 +21,21 @@ patches:
 #         "value": "policy/v1"
 #       }
 #     ]
+# # Patch the ClusterLogForwarder CR
+# - path: clf-s3-config-patch.yaml
+#   target:
+#     kind: ClusterLogForwarder
+#     name: instance
+
+# # Patch the LokiStack CR
+# - path: lokistack-secret-patch.yaml
+#   target:
+#     kind: LokiStack
+#     name: instance
+
+# # 3. Apply a name suffix to the entire UAT environment
+# nameSuffix: -uat
+
+# # 4. Optional: Add a common label to all resources
+# commonLabels:
+#   env: uat

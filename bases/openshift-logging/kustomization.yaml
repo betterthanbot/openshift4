@@ -1,0 +1,25 @@
+# user@localhost:~/hostshare/03_reusable_templates/openshift4/bases/openshift-logging/kustomization.yaml
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 1. Define the namespace for all resources in this base
+# Note: Operators and core logging components must run in the 'openshift-logging' namespace.
+namespace: openshift-logging
+
+# 2. List all resource files (Operators, CRs, RBAC, etc.)
+resources:
+# Resources for the Logging UI Plugin
+- logging-ui/uiplugin.yaml
+
+# Resources for the Loki Operator (If you are using the separate LokiStack CRD)
+- loki-operator/operatorgroup.yaml
+- loki-operator/subscription.yaml
+- loki-operator/lokistack.yaml
+
+# Resources for the Cluster Logging Operator (CLO)
+- openshift-logging/clusterlogforwarder.yaml
+- openshift-logging/clusterrolebinding.yaml
+- openshift-logging/operatorgroup.yaml
+- openshift-logging/servceaccount.yaml
+- openshift-logging/subscription.yaml
