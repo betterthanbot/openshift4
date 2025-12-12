@@ -1,0 +1,7 @@
+apiVersion: v2
+appVersion: 3.74.9
+description: Helm Chart for StackRox Central Service
+icon: https://raw.githubusercontent.com/stackrox/stackrox/master/image/templates/helm/shared/assets/Red_Hat-Hat_icon.png
+name: stackrox-central-services
+type: application
+version: 74.9.0
