@@ -1,0 +1,9 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - admin-cluster-health.yaml
+  - admin-vpa-table.yaml
+  - rhoai-gpu-utilization--consumption.yaml
+  - rhoai-inference-endpoint-monitoring.yaml
