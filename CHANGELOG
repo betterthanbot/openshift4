@@ -7,6 +7,14 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [0.0.2] - 2026-02-09
+### Added
+- Added Grafana Dashboards
+  - admin-cluster-health.yaml
+  - admin-vpa-table.yaml
+  - rhoai-gpu-utilization--consumption.yaml
+  - rhoai-inference-endpoint-monitoring.yaml
+
 ## [0.0.1] - 2025-12-11
 ### Added
 - k8s deployment skeleton using stackrox

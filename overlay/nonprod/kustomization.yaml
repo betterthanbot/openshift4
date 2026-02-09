@@ -4,6 +4,7 @@ kind: Kustomization
 
 resources:
 - ./../../bases/stackrox/
+# - ./../../bases/grafana/
 - ./vpa/
 
 
