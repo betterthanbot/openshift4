@@ -7,6 +7,13 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [0.0.3] - 2026-02-09
+### Added
+- Added Grafana Dashboards
+  - admin-api--network-analysis.yaml
+  - admin-ocp-cluster-overview.yaml
+  - rhoai-vllm--gpu-master-dashboard.yaml
+
 ## [0.0.2] - 2026-02-09
 ### Added
 - Added Grafana Dashboards
