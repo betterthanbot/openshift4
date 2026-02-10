@@ -6,3 +6,4 @@ resources:
   - rhoai-gpu-utilization--consumption.yaml
   - rhoai-inference-endpoint-monitoring.yaml
   - rhoai-vllm--gpu-master-dashboard.yaml
+  - rhoai-vllm-performance-monitor.yaml
