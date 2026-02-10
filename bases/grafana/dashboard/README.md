@@ -20,9 +20,7 @@ This Grafana dashboard provides a high-level overview of API health, HTTP status
 
 ### 📸 Screenshots
 
-![Dashboard Preview](PLACEHOLDER_FOR_YOUR_SCREENSHOT_HERE)
-
-> *Add your dashboard screenshots here to showcase the view.*
+![Dashboard Preview](images/admin_api_network_dashboard.png)
 
 ### 📊 Metrics & Panels Breakdown
 
@@ -71,9 +69,7 @@ This Grafana dashboard serves as a comprehensive "Single Pane of Glass" for moni
 
 ### 📸 Screenshots
 
-![Cluster Health Preview](PLACEHOLDER_FOR_YOUR_SCREENSHOT_HERE)
-
-> *Add your dashboard screenshots here to showcase the view.*
+![Cluster Health Preview](images/admin_cluster_health_dashboard.png)
 
 ### 📊 Metrics & Panels Breakdown
 
@@ -129,9 +125,7 @@ This Grafana dashboard provides a comprehensive "Infrastructure-First" view of y
 
 ### 📸 Screenshots
 
-![OCP Cluster Overview Preview](PLACEHOLDER_FOR_YOUR_SCREENSHOT_HERE)
-
-> *Add your dashboard screenshots here to showcase the view.*
+![OCP Cluster Overview Preview](images/admin_cluster_overview_dashboard.png)
 
 ### 📊 Metrics & Panels Breakdown
 
@@ -191,9 +185,7 @@ This dashboard provides a deep dive into the performance and health of NVIDIA GP
 
 ### 📸 Screenshots
 
-![RHOAI GPU Preview](PLACEHOLDER_FOR_YOUR_SCREENSHOT_HERE)
-
-> *Add your dashboard screenshots here to showcase the view.*
+![RHOAI GPU Preview](images/admin_gpu_util_dashboard.png)
 
 ### 📊 Metrics & Panels Breakdown
 
@@ -238,9 +230,7 @@ This dashboard provides a dedicated view for monitoring the health and traffic p
 
 ### 📸 Screenshots
 
-![RHOAI Inference Preview](PLACEHOLDER_FOR_YOUR_SCREENSHOT_HERE)
-
-> *Add your dashboard screenshots here to showcase the view.*
+![RHOAI Inference Preview](images/rhoai_inference_endpoint_dashboard.png)
 
 ### 📊 Metrics & Panels Breakdown
 
@@ -285,9 +275,7 @@ This is the ultimate "Single Pane of Glass" for AI Engineers and SREs running La
 
 ### 📸 Screenshots
 
-![vLLM Master Preview](PLACEHOLDER_FOR_YOUR_SCREENSHOT_HERE)
-
-> *Add your dashboard screenshots here to showcase the view.*
+![vLLM Master Preview](images/rhoai_vllm_gpu_dashboard.png)
 
 ### 📊 Metrics & Panels Breakdown
 
@@ -351,9 +339,7 @@ This dashboard provides a detailed, full-stack performance view of your vLLM mod
 
 ### 📸 Screenshots
 
-![vLLM Performance Monitor Preview](PLACEHOLDER_FOR_YOUR_SCREENSHOT_HERE)
-
-> *Add your dashboard screenshots here to showcase the view.*
+![vLLM Performance Monitor Preview](images/rhoai_vllm_performance_dashboard.png)
 
 ### 📊 Metrics & Panels Breakdown
 

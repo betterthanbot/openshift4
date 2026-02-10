@@ -7,6 +7,10 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [0.0.5] - 2026-02-10
+### Changed
+- Updated Grafana/README.md with images
+
 ## [0.0.4] - 2026-02-10
 ### Added
 - Added Grafana Dashboards
