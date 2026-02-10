@@ -7,6 +7,12 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [0.0.4] - 2026-02-10
+### Added
+- Added Grafana Dashboards
+  - rhoai-vllm-performance-monitor.yaml
+- Added grafana dashboard docs
+
 ## [0.0.3] - 2026-02-09
 ### Added
 - Added Grafana Dashboards
