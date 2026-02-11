@@ -4,13 +4,13 @@ This repository contains a suite of 7 production-ready Grafana dashboards design
 
 ## 📑 Table of Contents
 
-1.  [Admin: API & Network Analysis](#1-admin-api--network-analysis-dashboard)
-2.  [Admin: Cluster Health](#2-admin-cluster-health-dashboard)
-3.  [Admin: OCP Cluster Overview](#3-admin-ocp-cluster-overview-dashboard)
-4.  [RHOAI: GPU Utilization & Consumption](#4-rhoai-gpu-utilization--consumption)
-5.  [RHOAI: Inference Endpoint Monitoring](#5-rhoai-inference-endpoint-monitoring)
-6.  [RHOAI: vLLM & GPU Master Dashboard](#6-rhoai-vllm--gpu-master-dashboard)
-7.  [RHOAI: vLLM Performance Monitor](#7-rhoai-vllm-performance-monitor)
+1.  [Admin: API & Network Analysis](#1--admin-api--network-analysis-dashboard)
+2.  [Admin: Cluster Health](#2--admin-cluster-health-dashboard)
+3.  [Admin: OCP Cluster Overview](#3--admin-ocp-cluster-overview-dashboard)
+4.  [RHOAI: GPU Utilization & Consumption](#4--rhoai-gpu-utilization--consumption)
+5.  [RHOAI: Inference Endpoint Monitoring](#5--rhoai-inference-endpoint-monitoring)
+6.  [RHOAI: vLLM & GPU Master Dashboard](#6--rhoai-vllm--gpu-master-dashboard)
+7.  [RHOAI: vLLM Performance Monitor](#7--rhoai-vllm-performance-monitor)
 
 ---
 
