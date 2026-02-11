@@ -7,6 +7,10 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [0.0.7] - 2026-02-11
+### Added
+- Added helm skeleton "my-web-app"
+
 ## [0.0.6] - 2026-02-11
 ### Changed
 - Fix Grafana/README.md table of content link 
