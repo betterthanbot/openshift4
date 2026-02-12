@@ -1,6 +1,0 @@
-central:
-  telemetry:
-    enabled: true
-    storage:
-      endpoint: "https://console.redhat.com/connections/api"
-      key: ""
