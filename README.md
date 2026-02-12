@@ -1,7 +1,7 @@
-# Customer Enablement Hub (Community Repo)
+# OCP (Community Repo)
 
 Welcome! 👋
-This repository is a community-driven collection of **useful enablement resources** I use and share with customers—things like:
+This repository is a community-driven collection of **useful enablement resources** designed to support **peer engineers, open-source practitioners, and platform communities**—things like:
 
 * 📊 Dashboards / dashboarding references
 * 🧭 Tutorials and step-by-step guides
@@ -9,15 +9,16 @@ This repository is a community-driven collection of **useful enablement resource
 * 🧰 Tools, scripts, templates, and examples
 * ✅ Best practices, runbooks, and checklists
 
-The goal: **make it easy for customers (and the wider community) to learn, reuse, and contribute back**.
+The goal: **make it easy for engineers and the open-source community to learn, reuse, collaborate, and contribute back**.
 
 ---
 
-## Who this repo is for
+## Who This Repo Is For
 
-* Customers looking for practical enablement materials
-* Community members who want to share improvements or new content
-* Folks who want a central place to collaborate on reusable knowledge
+* Engineers looking for practical enablement materials
+* Open-source practitioners who want to share knowledge and improvements
+* Platform, DevOps, SRE, and infrastructure teams collaborating on reusable patterns
+* Community members who want a central place to exchange operational and technical practices
 
 ---
 
@@ -38,15 +39,15 @@ The goal: **make it easy for customers (and the wider community) to learn, reuse
 
 1. Browse folders for topics you need.
 2. Follow any README files inside each folder.
-3. Reuse/modify resources for your environment.
+3. Reuse and adapt resources for your own environments.
 4. If you improve something, please contribute back 🙌
 
 ---
 
 # Contribution Instructions
 
-We welcome contributions from the community! 🚀
-This is an **open community repository**, and contributions are highly encouraged.
+We welcome contributions from peers across the engineering and open-source ecosystem! 🚀
+This is an **open community repository**, and knowledge sharing is strongly encouraged.
 
 ---
 
@@ -72,7 +73,7 @@ Example:
 ```
 git checkout main
 git pull
-git checkout -b feature/add-openshift-dashboard-guide
+git checkout -b feature/<branch-name>
 ```
 
 ---
@@ -80,7 +81,7 @@ git checkout -b feature/add-openshift-dashboard-guide
 ### Step 2 — Implement Your Changes
 
 * Add or update content in the relevant folder(s).
-* Ensure documentation is clear and easy to follow.
+* Ensure documentation is clear, structured, and reusable.
 * Assume readers may be new to the topic.
 
 ---
@@ -154,21 +155,23 @@ Please follow these best practices:
 * Prefer Markdown (`.md`) format for documentation and tutorials.
 * Use clear headings, structure, and step-by-step instructions.
 * Avoid including sensitive or internal-only information.
-* Do not include credentials, tokens, private URLs, or customer-specific data.
+* Do not include credentials, tokens, private URLs, or environment-specific secrets.
 * Keep screenshots relevant and optimized for size.
 * Specify version dependencies when applicable.
 
 ---
 
-# Community Expectations
+# Community Culture and Collaboration Principles
 
-This repository is built on collaboration and shared learning.
+This repository is built around open-source engineering culture and peer collaboration.
 
 Please:
 
-* Be respectful and constructive
+* Share knowledge openly and responsibly
 * Keep contributions practical and reusable
 * Maintain clarity and quality in documentation
+* Support and uplift fellow contributors
+* Encourage learning and experimentation
 
 ---
 
@@ -176,4 +179,4 @@ Please:
 
 If you have questions, suggestions, or would like contributor access, please contact me directly if you have my details.
 
-Thank you for helping improve this knowledge hub for the community! 🙏
+Thank you for helping strengthen the shared engineering knowledge community! 🙏
