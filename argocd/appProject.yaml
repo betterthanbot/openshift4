@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
   name: openshift4-community
-  namespace: openshift-gitops-operator
+  namespace: openshift-gitops
 spec:
   description: "Open community GitOps project for shared OpenShift enablement assets"
 

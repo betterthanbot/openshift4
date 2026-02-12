@@ -2,20 +2,12 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: bootstrap
-  namespace: openshift-gitops-operator
+  namespace: openshift-gitops
 spec:
-  project: default
-
-  source:
-    repoURL: https://github.com/betterthanbot/openshift4.git
-    targetRevision: feature/argocd
-    path: argocd
-
   destination:
-    server: https://kubernetes.default.svc
-    namespace: openshift-gitops
-
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+    server: 'https://kubernetes.default.svc'
+  project: default
+  source:
+    repoURL: 'https://github.com/betterthanbot/openshift4.git'
+    path: argocd/
+    targetRevision: feature/argocd
