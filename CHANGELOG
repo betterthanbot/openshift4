@@ -13,9 +13,10 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 - Added ArgoCD ApplicationProject for openshift4-community
 - Added ArgoCD ApplicationSet for openshift4-appset
 - Added ArgoCD Application for my-sno-cluster
+- Added gitignore to ignore all files except tracked files
 
 ### Changed
-- Updated grafana dashboard file names and refereces
+- Updated grafana dashboard file names and references
 - Updated grafana kustomization to set namespace to openshift-operators via kustomization.yaml
 - Updated grafana generate_dashboards.sh to set namespace to grafana
 - Updated README.md with git branch creation instructions

@@ -1,0 +1,1 @@
+# Look into docs to learn more on how argoCD works! :D 
