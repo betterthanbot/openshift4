@@ -7,6 +7,24 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [0.1.0] - 2026-02-12
+### Added
+- Added ArgoCD connectivity to cluster via bootstrap app
+- Added ArgoCD ApplicationProject for openshift4-community
+- Added ArgoCD ApplicationSet for openshift4-appset
+- Added ArgoCD Application for my-sno-cluster
+
+### Changed
+- Updated grafana dashboard file names and refereces
+- Updated grafana kustomization to set namespace to openshift-operators via kustomization.yaml
+- Updated grafana generate_dashboards.sh to set namespace to grafana
+- Updated README.md with git branch creation instructions
+- Updated docs template structure
+
+### Removed
+- Removed stackrox base from my-sno-cluster overlay kustomization.yaml
+- Removed stackrox charts
+
 ## [0.0.7] - 2026-02-11
 ### Added
 - Added helm skeleton "my-web-app"
