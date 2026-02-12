@@ -2,7 +2,7 @@
 
 SOURCE_DIR="./dashboard"
 OUTPUT_DIR="./generated"
-NAMESPACE="openshift-operators" 
+NAMESPACE="grafana" 
 
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
