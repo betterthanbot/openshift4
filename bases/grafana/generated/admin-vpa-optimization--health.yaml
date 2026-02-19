@@ -1,0 +1,351 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: admin-vpa-optimization--health
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana-a
+  json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 2,
+          "panels": [],
+          "title": "🚀 VPA Executive Summary",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": 0 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 7, "w": 6, "x": 0, "y": 1 },
+          "id": 4,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "12.3.0",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+              "editorMode": "code",
+              "expr": "count(max by (verticalpodautoscaler, namespace) (kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_target_cpu{namespace=~\"$namespace\", verticalpodautoscaler=~\"$vpa\"}))",
+              "legendFormat": "Active VPAs",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Total VPAs Monitored",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+              "mappings": [],
+              "unit": "none"
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Auto" }, "properties": [ { "id": "color", "value": "green" } ] },
+              { "matcher": { "id": "byName", "options": "Off" }, "properties": [ { "id": "color", "value": "red" } ] },
+              { "matcher": { "id": "byName", "options": "Recreate" }, "properties": [ { "id": "color", "value": "blue" } ] },
+              { "matcher": { "id": "byName", "options": "Initial" }, "properties": [ { "id": "color", "value": "orange" } ] }
+            ]
+          },
+          "gridPos": { "h": 7, "w": 18, "x": 6, "y": 1 },
+          "id": 6,
+          "options": {
+            "displayLabels": ["name", "percent"],
+            "legend": {
+              "calcs": ["percent", "lastNotNull"],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "values": ["percent", "value"]
+            },
+            "pieType": "pie",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" }
+          },
+          "pluginVersion": "12.3.0",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+              "editorMode": "code",
+              "expr": "sum by (updateMode) (kube_customresource_verticalpodautoscaler_spec_updatepolicy_updatemode{namespace=~\"$namespace\", verticalpodautoscaler=~\"$vpa\"})",
+              "format": "time_series",
+              "instant": true,
+              "legendFormat": "{{updateMode}}",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "title": "VPA Update Mode Distribution",
+          "type": "piechart"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
+          "id": 8,
+          "panels": [],
+          "title": "📈 Resource Recommendations Trends",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "CPU Cores",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "showValues": false,
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 } ] },
+              "unit": "cpu"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+          "id": 10,
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" }
+          },
+          "pluginVersion": "12.3.0",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+              "editorMode": "code",
+              "expr": "max by (verticalpodautoscaler, container) (kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_target_cpu{namespace=~\"$namespace\", verticalpodautoscaler=~\"$vpa\"})",
+              "legendFormat": "{{verticalpodautoscaler}} ({{container}}) - Target",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "CPU Recommendations (Target) Over Time",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "Memory",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "showValues": false,
+                "spanNulls": false,
+                "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 } ] },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+          "id": 12,
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+            "tooltip": { "hideZeros": false, "mode": "single", "sort": "none" }
+          },
+          "pluginVersion": "12.3.0",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+              "editorMode": "code",
+              "expr": "max by (verticalpodautoscaler, container) (kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_target_memory{namespace=~\"$namespace\", verticalpodautoscaler=~\"$vpa\"})",
+              "legendFormat": "{{verticalpodautoscaler}} ({{container}}) - Target",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Memory Recommendations (Target) Over Time",
+          "type": "timeseries"
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+          "id": 14,
+          "panels": [],
+          "title": "📋 Detailed Container Analysis",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "footer": { "reducers": [] }, "inspect": false },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 } ] }
+            },
+            "overrides": [
+              { "matcher": { "id": "byRegexp", "options": ".*CPU.*" }, "properties": [ { "id": "unit", "value": "cpu" }, { "id": "decimals", "value": 3 } ] },
+              { "matcher": { "id": "byRegexp", "options": ".*Mem.*" }, "properties": [ { "id": "unit", "value": "bytes" }, { "id": "decimals", "value": 1 } ] }
+            ]
+          },
+          "gridPos": { "h": 14, "w": 24, "x": 0, "y": 18 },
+          "id": 16,
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true,
+            "sortBy": [ { "desc": false, "displayName": "Namespace" } ]
+          },
+          "pluginVersion": "12.3.0",
+          "targets": [
+            { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "editorMode": "code", "expr": "max by (namespace, verticalpodautoscaler, container) (kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_lowerbound_cpu{namespace=~\"$namespace\", verticalpodautoscaler=~\"$vpa\"})", "format": "table", "instant": true, "legendFormat": "VPA Min (CPU)", "range": false, "refId": "A" },
+            { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "editorMode": "code", "expr": "max by (namespace, verticalpodautoscaler, container) (kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_target_cpu{namespace=~\"$namespace\", verticalpodautoscaler=~\"$vpa\"})", "format": "table", "instant": true, "legendFormat": "VPA Target (CPU)", "range": false, "refId": "B" },
+            { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "editorMode": "code", "expr": "max by (namespace, verticalpodautoscaler, container) (kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_upperbound_cpu{namespace=~\"$namespace\", verticalpodautoscaler=~\"$vpa\"})", "format": "table", "instant": true, "legendFormat": "VPA Max (CPU)", "range": false, "refId": "C" },
+            { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "editorMode": "code", "expr": "max by (namespace, verticalpodautoscaler, container) (kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_lowerbound_memory{namespace=~\"$namespace\", verticalpodautoscaler=~\"$vpa\"})", "format": "table", "instant": true, "legendFormat": "VPA Min (Mem)", "range": false, "refId": "D" },
+            { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "editorMode": "code", "expr": "max by (namespace, verticalpodautoscaler, container) (kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_target_memory{namespace=~\"$namespace\", verticalpodautoscaler=~\"$vpa\"})", "format": "table", "instant": true, "legendFormat": "VPA Target (Mem)", "range": false, "refId": "E" },
+            { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "editorMode": "code", "expr": "max by (namespace, verticalpodautoscaler, container) (kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_upperbound_memory{namespace=~\"$namespace\", verticalpodautoscaler=~\"$vpa\"})", "format": "table", "instant": true, "legendFormat": "VPA Max (Mem)", "range": false, "refId": "F" },
+            { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "editorMode": "code", "expr": "avg by (namespace, verticalpodautoscaler, container) (label_replace(kube_pod_container_resource_requests{resource=\"cpu\", namespace=~\"$namespace\"}, \"verticalpodautoscaler\", \"$1\", \"pod\", \"(.*)-[a-z0-9]+-[a-z0-9]+\"))", "format": "table", "instant": true, "legendFormat": "Actual Request (CPU)", "range": false, "refId": "G" },
+            { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "editorMode": "code", "expr": "avg by (namespace, verticalpodautoscaler, container) (label_replace(kube_pod_container_resource_limits{resource=\"cpu\", namespace=~\"$namespace\"}, \"verticalpodautoscaler\", \"$1\", \"pod\", \"(.*)-[a-z0-9]+-[a-z0-9]+\"))", "format": "table", "instant": true, "legendFormat": "Actual Limit (CPU)", "range": false, "refId": "H" },
+            { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "editorMode": "code", "expr": "avg by (namespace, verticalpodautoscaler, container) (label_replace(kube_pod_container_resource_requests{resource=\"memory\", namespace=~\"$namespace\"}, \"verticalpodautoscaler\", \"$1\", \"pod\", \"(.*)-[a-z0-9]+-[a-z0-9]+\"))", "format": "table", "instant": true, "legendFormat": "Actual Request (Mem)", "range": false, "refId": "I" },
+            { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "editorMode": "code", "expr": "avg by (namespace, verticalpodautoscaler, container) (label_replace(kube_pod_container_resource_limits{resource=\"memory\", namespace=~\"$namespace\"}, \"verticalpodautoscaler\", \"$1\", \"pod\", \"(.*)-[a-z0-9]+-[a-z0-9]+\"))", "format": "table", "instant": true, "legendFormat": "Actual Limit (Mem)", "range": false, "refId": "J" }
+          ],
+          "title": "VPA Recommendations vs Actual Provisioning",
+          "transformations": [
+            { "id": "joinByField", "options": { "byField": "container", "mode": "outer" } },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": { "Time": true, "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true, "Time 6": true, "Time 7": true, "Time 8": true, "Time 9": true, "Time 10": true, "container 1": true, "container 2": true, "container 3": true, "container 4": true, "container 5": true, "container 6": true, "container 7": true, "container 8": true, "container 9": true, "namespace 1": false, "namespace 2": true, "namespace 3": true, "namespace 4": true, "namespace 5": true, "namespace 6": true, "namespace 7": true, "namespace 8": true, "namespace 9": true, "namespace 10": true, "verticalpodautoscaler 1": false, "verticalpodautoscaler 2": true, "verticalpodautoscaler 3": true, "verticalpodautoscaler 4": true, "verticalpodautoscaler 5": true, "verticalpodautoscaler 6": true, "verticalpodautoscaler 7": true, "verticalpodautoscaler 8": true, "verticalpodautoscaler 9": true, "verticalpodautoscaler 10": true },
+                "indexByName": {},
+                "renameByName": { "Value #A": "VPA Min (CPU)", "Value #B": "VPA Target (CPU)", "Value #C": "VPA Max (CPU)", "Value #D": "VPA Min (Mem)", "Value #E": "VPA Target (Mem)", "Value #F": "VPA Max (Mem)", "Value #G": "Actual Request (CPU)", "Value #H": "Actual Limit (CPU)", "Value #I": "Actual Request (Mem)", "Value #J": "Actual Limit (Mem)", "container": "Container", "namespace": "Namespace", "verticalpodautoscaler": "VPA Name" }
+              }
+            }
+          ],
+          "type": "table"
+        }
+      ],
+      "schemaVersion": 42,
+      "tags": ["vpa", "autoscaling", "kubernetes"],
+      "templating": {
+        "list": [
+          {
+            "current": { "text": "prometheus", "value": "prometheus" },
+            "description": "Select Datasource",
+            "hide": 0,
+            "includeAll": false,
+            "label": "Datasource",
+            "name": "DS_PROMETHEUS",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "regex": "",
+            "type": "datasource"
+          },
+          {
+            "current": { "text": "All", "value": [ "$__all" ] },
+            "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+            "definition": "label_values(kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_target_cpu, namespace)",
+            "includeAll": true,
+            "label": "Namespace",
+            "multi": true,
+            "name": "namespace",
+            "options": [],
+            "query": "label_values(kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_target_cpu, namespace)",
+            "refresh": 1,
+            "sort": 1,
+            "type": "query"
+          },
+          {
+            "current": { "text": "All", "value": [ "$__all" ] },
+            "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+            "definition": "label_values(kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_target_cpu{namespace=~\"$namespace\"}, verticalpodautoscaler)",
+            "includeAll": true,
+            "label": "VPA Name",
+            "multi": true,
+            "name": "vpa",
+            "options": [],
+            "query": "label_values(kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_target_cpu{namespace=~\"$namespace\"}, verticalpodautoscaler)",
+            "refresh": 1,
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
+      "time": { "from": "now-6h", "to": "now" },
+      "timezone": "browser",
+      "title": "Admin: VPA Optimization & Health",
+      "uid": "vpa-comprehensive",
+      "version": 1
+    }

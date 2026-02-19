@@ -384,3 +384,49 @@ Correlates model performance with hardware usage.
 
 ### 🏷️ Tags
 `performance`, `triple-split-ns`, `traffic-analysis`, `vllm`
+
+---
+
+## 8. ⚖️ Admin: VPA Optimization & Health
+
+This dashboard provides a comprehensive look at your Kubernetes Vertical Pod Autoscalers (VPA). It allows you to track VPA adoption, visualize how VPA resource recommendations change over time, and compare them directly against your actual Pod limits and requests. 
+
+### 📸 Screenshots
+
+![VPA Comprehensive Preview](PLACEHOLDER_FOR_YOUR_SCREENSHOT_HERE)
+
+> *Add your dashboard screenshots here to showcase the view.*
+
+### 📊 Metrics & Panels Breakdown
+
+#### 🚀 VPA Executive Summary
+A quick snapshot of your autoscaling landscape.
+
+| Panel Name | Metric / Query | Description |
+| :--- | :--- | :--- |
+| **Total VPAs Monitored** | `kube_customresource_verticalpodautoscaler_status_...` | Counts the total number of active VPA objects currently generating recommendations in the selected namespace(s). |
+| **VPA Update Mode Distribution** | `kube_customresource_verticalpodautoscaler_spec_updatepolicy_updatemode` | A pie chart breaking down VPAs by their update mode (`Auto`, `Off`, `Initial`, `Recreate`). Includes percentage calculations. |
+
+#### 📈 Resource Recommendations Trends
+Visualizes how the VPA engine reacts to workload changes over time.
+
+| Panel Name | Metric / Query | Description |
+| :--- | :--- | :--- |
+| **CPU Recommendations (Target)** | `..._containerrecommendations_target_cpu` | Time-series graph tracking the VPA's ideal CPU target for each monitored container. |
+| **Memory Recommendations (Target)** | `..._containerrecommendations_target_memory` | Time-series graph tracking the VPA's ideal RAM target for each monitored container. |
+
+#### 📋 Detailed Container Analysis
+The master data table for pinpointing exact optimization opportunities.
+
+| Panel Name | Metric / Query | Description |
+| :--- | :--- | :--- |
+| **VPA Recommendations vs Actual** | Multi-Query Join | A heavily transformed table that merges VPA `Lowerbound`, `Target`, and `Upperbound` metrics with actual pod `Requests` and `Limits`. Allows SREs to spot over-provisioned (waste) or under-provisioned (risk) containers at a glance. |
+
+### 🛠️ Prerequisites
+
+1.  **Prometheus Datasource:** The dashboard expects a datasource named `prometheus` (or selects one via the `$DS_PROMETHEUS` variable).
+2.  **kube-state-metrics:** Must be updated to a version that exports Kubernetes Custom Resources (specifically the VPA types).
+3.  **VPA Deployed:** The Vertical Pod Autoscaler infrastructure must be deployed and actively generating recommendation objects on your cluster.
+
+### 🏷️ Tags
+`vpa`, `autoscaling`, `kubernetes`, `optimization`, `finops`

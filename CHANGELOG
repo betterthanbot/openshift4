@@ -10,6 +10,8 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [0.2.0] - 2026-02-19
 ### Added
 - Added Kyverno Operator
+- Added ClusterPolicy to automatically generate VPA objects for namespaces
+- Added VPA Dashboard
 
 ## [0.1.0] - 2026-02-12
 ### Added
