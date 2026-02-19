@@ -7,6 +7,10 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [0.2.0] - 2026-02-19
+### Added
+- Added Kyverno Operator
+
 ## [0.1.0] - 2026-02-12
 ### Added
 - Added ArgoCD connectivity to cluster via bootstrap app

@@ -4,12 +4,12 @@ kind: Kustomization
 
 resources:
 - ./../../bases/grafana/
-# - ./../../bases/grafana/
+- ./../../bases/kyverno/
 # - ./vpa/
 
 
 patches:
-# - path: ./patches/stackrox/psm.yaml
+- path: ./patches/kyverno/psm.yaml
 # - target:
 #     group: policy
 #     version: v1beta1
