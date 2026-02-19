@@ -1,0 +1,32 @@
+### 01. Kyverno Images from Registry reg.kyverno.io
+reg.kyverno.io:
+  images:
+    kyverno/kyvernopre:
+      - v1.17.0
+    kyverno/kyverno:
+      - v1.17.0
+    kyverno/background-controller:
+      - v1.17.0
+    kyverno/cleanup-controller:
+      - v1.17.0
+    kyverno/reports-controller:
+      - v1.17.0
+    kyverno/kyverno-cli:
+      - v1.17.0
+  tls_verify: true
+
+### 03. Kyverno Images from Registry ghcr.io
+ghcr.io:
+  images:
+    kyverno/readiness-checker:
+      - v0.1.0
+    kyverno/policy-reporter:
+      - 3.7.2
+  tls_verify: true
+
+### 03. Kyverno Images from Registry docker.io
+registry.k8s.io:
+  images:
+    kubectl:
+      - 1.34.3
+  tls_verify: true

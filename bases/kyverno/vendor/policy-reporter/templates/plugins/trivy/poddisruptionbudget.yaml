@@ -1,0 +1,16 @@
+{{- if .Values.plugin.trivy.enabled -}}
+{{- if (gt (int .Values.plugin.trivy.replicaCount) 1) }}
+apiVersion: {{ include "policyreporter.podDisruptionBudget.apiVersion" . }}
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "trivy-plugin.fullname" . }}
+  namespace: {{ include "policyreporter.namespace" . }}
+  labels:
+    {{- include "trivy-plugin.labels" . | nindent 4 }}
+spec:
+{{- include "trivy-plugin.podDisruptionBudget" . | indent 2 }}
+  selector:
+    matchLabels:
+      {{- include "trivy-plugin.selectorLabels" . | nindent 6 }}
+{{- end }}
+{{- end }}

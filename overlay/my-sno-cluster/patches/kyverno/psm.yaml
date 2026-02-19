@@ -1,0 +1,8 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: kyverno
+  labels:
+    openshift.io/cluster-monitoring: 'true'
+  annotations:
+    openshift.io/display-name: kyverno

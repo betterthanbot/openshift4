@@ -1,0 +1,16 @@
+{{- if .Values.plugin.kyverno.enabled -}}
+{{- if (gt (int .Values.plugin.kyverno.replicaCount) 1) }}
+apiVersion: {{ include "policyreporter.podDisruptionBudget.apiVersion" . }}
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "kyverno-plugin.fullname" . }}
+  namespace: {{ include "policyreporter.namespace" . }}
+  labels:
+    {{- include "kyverno-plugin.labels" . | nindent 4 }}
+spec:
+{{- include "kyverno-plugin.podDisruptionBudget" . | indent 2 }}
+  selector:
+    matchLabels:
+      {{- include "kyverno-plugin.selectorLabels" . | nindent 6 }}
+{{- end }}
+{{- end }}

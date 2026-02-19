@@ -1,0 +1,16 @@
+{{- if .Values.ui.enabled -}}
+{{- if (gt (int .Values.ui.replicaCount) 1) }}
+apiVersion: {{ include "policyreporter.podDisruptionBudget.apiVersion" . }}
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "ui.fullname" . }}
+  namespace: {{ include "policyreporter.namespace" . }}
+  labels:
+    {{- include "ui.labels" . | nindent 4 }}
+spec:
+{{- include "ui.podDisruptionBudget" . | indent 2 }}
+  selector:
+    matchLabels:
+      {{- include "ui.selectorLabels" . | nindent 6 }}
+{{- end }}
+{{- end }}

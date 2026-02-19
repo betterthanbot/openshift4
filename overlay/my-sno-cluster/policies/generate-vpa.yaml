@@ -1,0 +1,49 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: generate-vpa-for-workloads
+  annotations:
+    policies.kyverno.io/title: Automatically Generate VPA
+    policies.kyverno.io/description: >-
+      Automatically generates a VerticalPodAutoscaler in 'Off' mode for every 
+      new Deployment, StatefulSet, or DaemonSet to collect sizing recommendations.
+spec:
+  # Do not block workloads if the policy fails, just audit/log it
+  validationFailureAction: Audit
+  rules:
+    - name: generate-vpa
+      match:
+        any:
+        - resources:
+            kinds:
+              - Deployment
+              - StatefulSet
+              - DaemonSet
+      # We exclude namespaces like kube-system or openshift-* to avoid touching core infrastructure
+      exclude:
+        any:
+        - resources:
+            namespaces:
+              - kube-system
+              - openshift-*
+              - kyverno
+      generate:
+        apiVersion: autoscaling.k8s.io/v1
+        kind: VerticalPodAutoscaler
+        # Names the VPA after the workload (e.g., "my-webapp-vpa")
+        name: "{{request.object.metadata.name}}-vpa"
+        namespace: "{{request.namespace}}"
+        # Synchronize means if the Deployment is deleted, Kyverno deletes the VPA too.
+        synchronize: true 
+        data:
+          metadata:
+            labels:
+              app.kubernetes.io/managed-by: kyverno
+          spec:
+            # Dynamically links the VPA to the workload that triggered this policy
+            targetRef:
+              apiVersion: "{{request.object.apiVersion}}"
+              kind: "{{request.object.kind}}"
+              name: "{{request.object.metadata.name}}"
+            updatePolicy:
+              updateMode: "Off"
