@@ -7,6 +7,12 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [0.2.1] - 2026-03-03
+### Removed
+- Remove Docs
+###Changed
+- Update cluster health dashboard
+
 ## [0.2.0] - 2026-02-19
 ### Added
 - Added Kyverno Operator
