@@ -1,4 +1,5 @@
 resources:
+  # - acm-right-sizing-namespace.yaml
   - admin-api--network-analysis.yaml
   - admin-cluster-health.yaml
   - admin-ocp-cluster-overview.yaml
