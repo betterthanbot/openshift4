@@ -10,4 +10,7 @@ spec:
   source:
     repoURL: 'https://github.com/betterthanbot/openshift4.git'
     path: argocd/
-    targetRevision: feature/argocd
+    targetRevision: main
+
+
+

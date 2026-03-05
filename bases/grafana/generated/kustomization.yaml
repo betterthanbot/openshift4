@@ -1,5 +1,5 @@
 resources:
-  # - acm-right-sizing-namespace.yaml
+  - acm-right-sizing-namespace.yaml
   - admin-api--network-analysis.yaml
   - admin-cluster-health.yaml
   - admin-ocp-cluster-overview.yaml
@@ -8,3 +8,4 @@ resources:
   - rhoai-inference-endpoint-monitoring.yaml
   - rhoai-vllm--gpu-master-dashboard.yaml
   - rhoai-vllm-performance-monitor.yaml
+  - vllm-advanced-performance-dashboard.yaml
