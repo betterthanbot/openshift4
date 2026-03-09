@@ -755,3 +755,319 @@ spec:
         resources:
           requests:
             storage: 10Gi
+---
+# Source: litemaas/templates/frontend-route.yaml
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: litemaas
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: web
+spec:
+  to:
+    kind: Service
+    name: litemaas
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+---
+# Source: litemaas/templates/litellm-route.yaml
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: litemaas-litellm
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: ai-proxy
+spec:
+  to:
+    kind: Service
+    name: litemaas-litellm
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+---
+# Source: litemaas/templates/hook-rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: litemaas-hook
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+---
+# Source: litemaas/templates/hook-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: litemaas-hook
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: ["route.openshift.io"]
+    resources: ["routes"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch"]
+---
+# Source: litemaas/templates/hook-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: litemaas-hook
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+subjects:
+  - kind: ServiceAccount
+    name: litemaas-hook
+    namespace: litemaas
+roleRef:
+  kind: Role
+  name: litemaas-hook
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: litemaas/templates/hook-patch-oauth.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: litemaas-oauth-setup
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: litemaas-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/part-of: litemaas
+        app.kubernetes.io/version: "0.3.1"
+    spec:
+      serviceAccountName: litemaas-hook
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: oauth-setup
+          image: "bitnami/kubectl:latest"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: ROUTE_NAME
+              value: "litemaas"
+            - name: SA_NAME
+              value: "litemaas"
+            - name: SECRET_NAME
+              value: "litemaas-backend"
+            - name: DEPLOY_NAME
+              value: "litemaas-backend"
+            - name: NAMESPACE
+              value: "litemaas"
+            - name: HAS_EXISTING_SECRET
+              value: "false"
+            - name: EXPLICIT_ISSUER
+              value: ""
+            - name: EXPLICIT_CALLBACK
+              value: ""
+            - name: CONFIGMAP_NAME
+              value: litemaas-backend-config
+            - name: LITELLM_ROUTE_NAME
+              value: "litemaas-litellm"
+            - name: LITELLM_ROUTE_ENABLED
+              value: "true"
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+
+              echo "=== LiteMaaS OAuth Setup Hook ==="
+              echo "Route:      $ROUTE_NAME"
+              echo "SA:         $SA_NAME"
+              echo "Secret:     $SECRET_NAME"
+              echo "Deployment: $DEPLOY_NAME"
+              echo ""
+
+              # ── Step 1: Wait for Route hostname ──────────────────────────
+              echo "Step 1: Waiting for Route hostname..."
+              ROUTE_HOST=""
+              attempts=0
+              max_attempts=30
+
+              while [ -z "$ROUTE_HOST" ]; do
+                  if [ "$attempts" -ge "$max_attempts" ]; then
+                      echo "ERROR: Route host not assigned after $max_attempts attempts"
+                      exit 1
+                  fi
+                  ROUTE_HOST=$(kubectl get route "$ROUTE_NAME" -n "$NAMESPACE" \
+                      -o jsonpath='{.spec.host}' 2>/dev/null || true)
+                  if [ -z "$ROUTE_HOST" ]; then
+                      echo "  Waiting... (attempt $((attempts + 1))/$max_attempts)"
+                      sleep 2
+                      attempts=$((attempts + 1))
+                  fi
+              done
+              echo "  Found: $ROUTE_HOST"
+              echo ""
+
+              # ── Step 2: Derive values ────────────────────────────────────
+              CALLBACK_URL="https://${ROUTE_HOST}/api/auth/callback"
+              CORS_ORIGIN="https://${ROUTE_HOST}"
+
+              # Use explicit values when provided
+              if [ -n "$EXPLICIT_CALLBACK" ]; then
+                  CALLBACK_URL="$EXPLICIT_CALLBACK"
+              fi
+
+              # Derive OAuth issuer from the auto-generated hostname
+              # OpenShift format: <route-name>-<namespace>.<apps-domain>
+              OAUTH_ISSUER="$EXPLICIT_ISSUER"
+              if [ -z "$OAUTH_ISSUER" ]; then
+                  PREFIX="${ROUTE_NAME}-${NAMESPACE}."
+                  APPS_DOMAIN="${ROUTE_HOST#${PREFIX}}"
+                  if [ "$APPS_DOMAIN" != "$ROUTE_HOST" ]; then
+                      OAUTH_ISSUER="https://oauth-openshift.${APPS_DOMAIN}"
+                      echo "  Detected apps domain: $APPS_DOMAIN"
+                  else
+                      echo "  WARNING: Could not derive apps domain from hostname."
+                      echo "  Set oauth.issuer explicitly if OAuth login fails."
+                  fi
+              fi
+
+              echo "Step 2: Values:"
+              echo "  Callback URL:  $CALLBACK_URL"
+              echo "  CORS origin:   $CORS_ORIGIN"
+              echo "  OAuth issuer:  ${OAUTH_ISSUER:-(not resolved)}"
+              echo ""
+
+              # ── Step 3: Patch ServiceAccount ─────────────────────────────
+              echo "Step 3: Patching ServiceAccount annotation..."
+              kubectl annotate serviceaccount "$SA_NAME" -n "$NAMESPACE" \
+                  "serviceaccounts.openshift.io/oauth-redirecturi.litemaas=${CALLBACK_URL}" \
+                  --overwrite
+              echo "  Done."
+              echo ""
+
+              # ── Step 4: Patch backend Secret ─────────────────────────────
+              NEED_RESTART="false"
+              if [ "$HAS_EXISTING_SECRET" = "true" ]; then
+                  echo "Step 4: Skipped (using existingSecret)."
+                  echo "  Ensure your Secret has correct cors-origin, oauth-issuer,"
+                  echo "  and oauth-callback-url values."
+              else
+                  echo "Step 4: Patching backend Secret..."
+                  CORS_B64=$(printf '%s' "$CORS_ORIGIN" | base64 | tr -d '\n')
+                  CALLBACK_B64=$(printf '%s' "$CALLBACK_URL" | base64 | tr -d '\n')
+
+                  if [ -n "$OAUTH_ISSUER" ]; then
+                      ISSUER_B64=$(printf '%s' "$OAUTH_ISSUER" | base64 | tr -d '\n')
+                      kubectl patch secret "$SECRET_NAME" -n "$NAMESPACE" --type merge \
+                          -p "{\"data\":{\"cors-origin\":\"${CORS_B64}\",\"oauth-callback-url\":\"${CALLBACK_B64}\",\"oauth-issuer\":\"${ISSUER_B64}\"}}"
+                  else
+                      kubectl patch secret "$SECRET_NAME" -n "$NAMESPACE" --type merge \
+                          -p "{\"data\":{\"cors-origin\":\"${CORS_B64}\",\"oauth-callback-url\":\"${CALLBACK_B64}\"}}"
+                  fi
+                  echo "  Done."
+                  NEED_RESTART="true"
+              fi
+              echo ""
+
+              # ── Step 4b: Patch LiteLLM URL in ConfigMap ─────────────────
+              if [ "$LITELLM_ROUTE_ENABLED" = "true" ]; then
+                  echo "Step 4b: Checking LiteLLM Route..."
+                  LITELLM_HOST=""
+                  if kubectl get route "$LITELLM_ROUTE_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+                      LITELLM_HOST=$(kubectl get route "$LITELLM_ROUTE_NAME" -n "$NAMESPACE" \
+                          -o jsonpath='{.spec.host}' 2>/dev/null || true)
+                  fi
+                  if [ -n "$LITELLM_HOST" ]; then
+                      LITELLM_URL="https://${LITELLM_HOST}"
+                      echo "  Patching LITELLM_API_URL → $LITELLM_URL"
+                      kubectl patch configmap "$CONFIGMAP_NAME" -n "$NAMESPACE" --type merge \
+                          -p "{\"data\":{\"LITELLM_API_URL\":\"${LITELLM_URL}\"}}"
+                      NEED_RESTART="true"
+                      echo "  Done."
+                  else
+                      echo "  LiteLLM Route host not found; keeping template-time URL."
+                  fi
+              else
+                  echo "Step 4b: Skipped (LiteLLM Route not enabled)."
+              fi
+              echo ""
+
+              # ── Step 5: Restart backend ──────────────────────────────────
+              if [ "$NEED_RESTART" = "true" ]; then
+                  echo "Step 5: Restarting backend deployment..."
+                  kubectl rollout restart deployment/"$DEPLOY_NAME" -n "$NAMESPACE"
+                  echo "  Done."
+              else
+                  echo "Step 5: Skipped (no Secret changes)."
+              fi
+
+              echo ""
+              echo "=== OAuth setup complete ==="
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "25m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
