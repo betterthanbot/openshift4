@@ -25,17 +25,17 @@ metadata:
     app.kubernetes.io/component: api
 type: Opaque
 stringData:
-  database-url: "postgresql://litemaas_admin:changeme@litemaas-postgresql:5432/litemaas_db?sslmode=disable"
+  database-url: "postgresql://litemaas_admin:tBwJDvtAMbTzzg9T7Ki935RzhDHE9ZRHiv/SmhvWdLI=@litemaas-postgresql:5432/litemaas_db?sslmode=disable"
   cors-origin: "*"
-  jwt-secret: "changeme"
+  jwt-secret: "tBwJDvtAMbTzzg9T7Ki935RzhDHE9ZRHiv/SmhvWdLI="
   oauth-client-id: "system:serviceaccount:litemaas:litemaas"
   oauth-client-secret: ""
   oauth-issuer: ""
   oauth-callback-url: ""
-  admin-api-keys: "changeme"
-  litellm-api-key: "changeme"
-  litellm-master-key: "changeme"
-  litellm-database-url: "postgresql://litemaas_admin:changeme@litemaas-postgresql:5432/litellm_db"
+  admin-api-keys: "tBwJDvtAMbTzzg9T7Ki935RzhDHE9ZRHiv/SmhvWdLI="
+  litellm-api-key: "sk-very-secure-password"
+  litellm-master-key: "sk-very-secure-password"
+  litellm-database-url: "postgresql://litemaas_admin:tBwJDvtAMbTzzg9T7Ki935RzhDHE9ZRHiv/SmhvWdLI=@litemaas-postgresql:5432/litellm_db"
 ---
 # Source: litemaas/templates/litellm-secret.yaml
 apiVersion: v1
@@ -52,10 +52,10 @@ metadata:
     app.kubernetes.io/component: ai-proxy
 type: Opaque
 stringData:
-  database-url: "postgresql://litemaas_admin:changeme@litemaas-postgresql:5432/litellm_db"
-  master-key: "changeme"
+  database-url: "postgresql://litemaas_admin:tBwJDvtAMbTzzg9T7Ki935RzhDHE9ZRHiv/SmhvWdLI=@litemaas-postgresql:5432/litellm_db"
+  master-key: "sk-very-secure-password"
   ui-username: "admin"
-  ui-password: "changeme"
+  ui-password: "admin"
 ---
 # Source: litemaas/templates/oauth-token-secret.yaml
 apiVersion: v1
@@ -90,7 +90,7 @@ metadata:
 type: Opaque
 stringData:
   username: "litemaas_admin"
-  password: "changeme"
+  password: "tBwJDvtAMbTzzg9T7Ki935RzhDHE9ZRHiv/SmhvWdLI="
 ---
 # Source: litemaas/templates/backend-configmap.yaml
 apiVersion: v1
