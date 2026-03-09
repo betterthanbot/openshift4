@@ -5,7 +5,7 @@ postgresql:
 
 litellm:
   auth:
-    masterKey: "sk-very-secure-password"     # Must start with sk-
+    masterKey: "sk-masterKey"     # Must start with sk-
     uiUsername: "admin"
     uiPassword: "admin"
 
@@ -13,4 +13,4 @@ backend:
   auth:
     jwtSecret: "tBwJDvtAMbTzzg9T7Ki935RzhDHE9ZRHiv/SmhvWdLI="        # openssl rand -base64 32
     adminApiKeys: "tBwJDvtAMbTzzg9T7Ki935RzhDHE9ZRHiv/SmhvWdLI="     # openssl rand -base64 32
-    litellmApiKey: "sk-very-secure-password" # Must match litellm.auth.masterKey
+    litellmApiKey: "sk-masterKey" # Must match litellm.auth.masterKey

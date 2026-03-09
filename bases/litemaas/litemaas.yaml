@@ -33,8 +33,8 @@ stringData:
   oauth-issuer: ""
   oauth-callback-url: ""
   admin-api-keys: "tBwJDvtAMbTzzg9T7Ki935RzhDHE9ZRHiv/SmhvWdLI="
-  litellm-api-key: "sk-very-secure-password"
-  litellm-master-key: "sk-very-secure-password"
+  litellm-api-key: "sk-masterKey"
+  litellm-master-key: "sk-masterKey"
   litellm-database-url: "postgresql://litemaas_admin:tBwJDvtAMbTzzg9T7Ki935RzhDHE9ZRHiv/SmhvWdLI=@litemaas-postgresql:5432/litellm_db"
 ---
 # Source: litemaas/templates/litellm-secret.yaml
@@ -53,7 +53,7 @@ metadata:
 type: Opaque
 stringData:
   database-url: "postgresql://litemaas_admin:tBwJDvtAMbTzzg9T7Ki935RzhDHE9ZRHiv/SmhvWdLI=@litemaas-postgresql:5432/litellm_db"
-  master-key: "sk-very-secure-password"
+  master-key: "sk-masterKey"
   ui-username: "admin"
   ui-password: "admin"
 ---
