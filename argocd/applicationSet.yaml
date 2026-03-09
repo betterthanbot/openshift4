@@ -9,7 +9,7 @@ spec:
         elements:
           - name: my-sno-cluster
             repoURL: https://github.com/betterthanbot/openshift4.git
-            revision: main
+            revision: feature/litemaas
             path: overlay/my-sno-cluster
             destNamespace: default
             destServer: https://kubernetes.default.svc
