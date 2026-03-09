@@ -5,12 +5,14 @@ kind: Kustomization
 resources:
 - ./../../bases/grafana/
 - ./../../bases/kyverno/
+- ./../../bases/litemaas/
 - ./policies/
 # - ./vpa/
 
 
 patches:
 - path: ./patches/kyverno/psm.yaml
+- path: ./patches/litemaas/psm.yaml
 # - target:
 #     group: policy
 #     version: v1beta1
