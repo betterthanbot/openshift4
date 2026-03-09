@@ -1,0 +1,11 @@
+apiVersion: vendir.k14s.io/v1alpha1
+directories:
+- contents:
+  - git:
+      commitTitle: 'Merge pull request #115 from rh-aiservices-bu/dev...'
+      sha: 61b06d5a12b129723dddac5e7a1224906c308a03
+      tags:
+      - v0.3.1
+    path: .
+  path: vendor
+kind: LockConfig

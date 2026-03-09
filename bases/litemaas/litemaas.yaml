@@ -1,0 +1,757 @@
+---
+# Source: litemaas/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: litemaas
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+---
+# Source: litemaas/templates/backend-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: litemaas-backend
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: api
+type: Opaque
+stringData:
+  database-url: "postgresql://litemaas_admin:changeme@litemaas-postgresql:5432/litemaas_db?sslmode=disable"
+  cors-origin: "*"
+  jwt-secret: "changeme"
+  oauth-client-id: "system:serviceaccount:litemaas:litemaas"
+  oauth-client-secret: ""
+  oauth-issuer: ""
+  oauth-callback-url: ""
+  admin-api-keys: "changeme"
+  litellm-api-key: "changeme"
+  litellm-master-key: "changeme"
+  litellm-database-url: "postgresql://litemaas_admin:changeme@litemaas-postgresql:5432/litellm_db"
+---
+# Source: litemaas/templates/litellm-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: litemaas-litellm
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: ai-proxy
+type: Opaque
+stringData:
+  database-url: "postgresql://litemaas_admin:changeme@litemaas-postgresql:5432/litellm_db"
+  master-key: "changeme"
+  ui-username: "admin"
+  ui-password: "changeme"
+---
+# Source: litemaas/templates/oauth-token-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: litemaas-oauth-token
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: oauth
+  annotations:
+    kubernetes.io/service-account.name: litemaas
+type: kubernetes.io/service-account-token
+---
+# Source: litemaas/templates/postgres-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: litemaas-postgresql
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: database
+type: Opaque
+stringData:
+  username: "litemaas_admin"
+  password: "changeme"
+---
+# Source: litemaas/templates/backend-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litemaas-backend-config
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: api
+data:
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  JWT_EXPIRES_IN: "24h"
+  RATE_LIMIT_MAX: "1000"
+  RATE_LIMIT_TIME_WINDOW: "5m"
+  DEFAULT_USER_MAX_BUDGET: "100"
+  DEFAULT_USER_TPM_LIMIT: "100000"
+  DEFAULT_USER_RPM_LIMIT: "120"
+  LITELLM_API_URL: "http://litemaas-litellm:4000"
+  BACKUP_STORAGE_PATH: "/data/backups"
+---
+# Source: litemaas/templates/postgres-init-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litemaas-postgresql-init
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: database
+data:
+  init-db.sh: |
+    #!/bin/bash
+    set -e
+
+    # This script runs as the postgres user during container initialization
+    # It creates additional databases beyond the default POSTGRES_DB
+
+    echo "Creating additional databases..."
+
+    # Create litemaas_db if it doesn't exist
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "postgres" <<-EOSQL
+        SELECT 'CREATE DATABASE litemaas_db'
+        WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'litemaas_db')\gexec
+    EOSQL
+
+    # Create litellm_db if it doesn't exist
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "postgres" <<-EOSQL
+        SELECT 'CREATE DATABASE litellm_db'
+        WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'litellm_db')\gexec
+    EOSQL
+
+    echo "Granting privileges on databases..."
+
+    # Grant all privileges to the postgres user on both databases
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "postgres" <<-EOSQL
+        GRANT ALL PRIVILEGES ON DATABASE litemaas_db TO $POSTGRES_USER;
+        GRANT ALL PRIVILEGES ON DATABASE litellm_db TO $POSTGRES_USER;
+    EOSQL
+
+    echo "Database initialization completed successfully!"
+---
+# Source: litemaas/templates/backend-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: litemaas-backend-backup
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: api
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Source: litemaas/templates/backend-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: litemaas-backend
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: api
+spec:
+  selector:
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP
+---
+# Source: litemaas/templates/frontend-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: litemaas
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: web
+spec:
+  selector:
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP
+---
+# Source: litemaas/templates/litellm-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: litemaas-litellm
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: ai-proxy
+spec:
+  selector:
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: ai-proxy
+  ports:
+    - name: http
+      port: 4000
+      targetPort: 4000
+      protocol: TCP
+  type: ClusterIP
+---
+# Source: litemaas/templates/postgres-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: litemaas-postgresql
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: database
+spec:
+  selector:
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: database
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+  type: ClusterIP
+---
+# Source: litemaas/templates/backend-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litemaas-backend
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: litemaas
+      app.kubernetes.io/instance: litemaas
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: litemaas-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/part-of: litemaas
+        app.kubernetes.io/version: "0.3.1"
+        app.kubernetes.io/name: litemaas
+        app.kubernetes.io/instance: litemaas
+        app.kubernetes.io/component: api
+    spec:
+      serviceAccountName: litemaas
+      initContainers:
+        - name: wait-for-database
+          image: postgres:16-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          command:
+            - sh
+            - -c
+            - |
+              until psql "$DATABASE_URL" -c '\q' 2>/dev/null; do
+                echo "Waiting for database..."
+                sleep 2
+              done
+              echo "Database is ready!"
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-backend
+                  key: database-url
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "25m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+      containers:
+        - name: backend
+          image: "quay.io/rh-aiservices-bu/litemaas-backend:0.3.1"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: litemaas-backend-config
+          env:
+            # Database Configuration
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-backend
+                  key: database-url
+            # CORS Configuration
+            - name: CORS_ORIGIN
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-backend
+                  key: cors-origin
+            # JWT Configuration
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-backend
+                  key: jwt-secret
+            # OAuth Configuration
+            - name: OAUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-backend
+                  key: oauth-client-id
+            - name: OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-oauth-token
+                  key: token
+            - name: OAUTH_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-backend
+                  key: oauth-issuer
+            - name: OAUTH_CALLBACK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-backend
+                  key: oauth-callback-url
+            # Admin Configuration
+            - name: ADMIN_API_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-backend
+                  key: admin-api-keys
+            # LiteLLM Integration
+            - name: LITELLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-backend
+                  key: litellm-api-key
+            - name: LITELLM_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-backend
+                  key: litellm-master-key
+            # Backup & Restore — LiteLLM database direct connection
+            - name: LITELLM_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-backend
+                  key: litellm-database-url
+          volumeMounts:
+            - name: backup-storage
+              mountPath: /data/backups
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health/ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: backup-storage
+          persistentVolumeClaim:
+            claimName: litemaas-backend-backup
+---
+# Source: litemaas/templates/frontend-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litemaas
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: litemaas
+      app.kubernetes.io/instance: litemaas
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: litemaas-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/part-of: litemaas
+        app.kubernetes.io/version: "0.3.1"
+        app.kubernetes.io/name: litemaas
+        app.kubernetes.io/instance: litemaas
+        app.kubernetes.io/component: web
+    spec:
+      serviceAccountName: litemaas
+      initContainers:
+        - name: wait-for-backend
+          image: image-registry.openshift-image-registry.svc:5000/openshift/tools:latest
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for backend to be ready..."
+              until nc -z litemaas-backend 8080; do
+                echo "Backend is not ready yet. Waiting..."
+                sleep 5
+              done
+              echo "Backend is ready! Starting frontend..."
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "25m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+      containers:
+        - name: frontend
+          image: "quay.io/rh-aiservices-bu/litemaas-frontend:0.3.1"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: BACKEND_URL
+              value: "http://litemaas-backend:8080"
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+# Source: litemaas/templates/litellm-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litemaas-litellm
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: ai-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: litemaas
+      app.kubernetes.io/instance: litemaas
+      app.kubernetes.io/component: ai-proxy
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: litemaas-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/part-of: litemaas
+        app.kubernetes.io/version: "0.3.1"
+        app.kubernetes.io/name: litemaas
+        app.kubernetes.io/instance: litemaas
+        app.kubernetes.io/component: ai-proxy
+    spec:
+      serviceAccountName: litemaas
+      initContainers:
+        - name: wait-for-database
+          image: postgres:16-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          command:
+            - sh
+            - -c
+            - |
+              until psql "$DATABASE_URL" -c '\q' 2>/dev/null; do
+                echo "Waiting for database..."
+                sleep 2
+              done
+              echo "Database is ready!"
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-litellm
+                  key: database-url
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "25m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+      containers:
+        - name: litellm
+          image: "ghcr.io/berriai/litellm-non_root:main-v1.81.0-stable"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4000
+              name: http
+          env:
+            # Database Configuration
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-litellm
+                  key: database-url
+            # LiteLLM Configuration
+            - name: LITELLM_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-litellm
+                  key: master-key
+            - name: UI_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-litellm
+                  key: ui-username
+            - name: UI_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-litellm
+                  key: ui-password
+            # Application Configuration
+            - name: LITELLM_MODE
+              value: "PRODUCTION"
+            - name: STORE_MODEL_IN_DB
+              value: "True"
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: 4000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: 4000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+---
+# Source: litemaas/templates/postgres-statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: litemaas-postgresql
+  labels:
+    helm.sh/chart: litemaas-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: litemaas
+    app.kubernetes.io/version: "0.3.1"
+    app.kubernetes.io/name: litemaas
+    app.kubernetes.io/instance: litemaas
+    app.kubernetes.io/component: database
+spec:
+  serviceName: litemaas-postgresql
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: litemaas
+      app.kubernetes.io/instance: litemaas
+      app.kubernetes.io/component: database
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: litemaas-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/part-of: litemaas
+        app.kubernetes.io/version: "0.3.1"
+        app.kubernetes.io/name: litemaas
+        app.kubernetes.io/instance: litemaas
+        app.kubernetes.io/component: database
+    spec:
+      serviceAccountName: litemaas
+      volumes:
+        - name: postgres-init-script
+          configMap:
+            name: litemaas-postgresql-init
+            defaultMode: 0755
+      containers:
+        - name: postgres
+          image: "postgres:16-alpine"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              value: "litemaas_db"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-postgresql
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: litemaas-postgresql
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-init-script
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
