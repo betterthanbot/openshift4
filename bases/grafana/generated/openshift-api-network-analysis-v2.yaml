@@ -2464,7 +2464,7 @@ spec:
       },
       "timepicker": {},
       "timezone": "browser",
-      "title": "OpenShift API Network Analysis",
+      "title": "OpenShift API Network Analysis V2",
       "uid": "openshift-api-network-v2",
       "version": 1
     }
