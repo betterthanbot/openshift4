@@ -7,22 +7,27 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [0.3.0] - 2026-04-10
+### Added
+- Added Gatus Status Page
+
+
 ## [0.2.3] - 2026-03-06
-###Changed
+### Changed
 - Update dashboard README
 - Update file location of argo
 
 ## [0.2.2] - 2026-03-05
-###Added
+### Added
 - Added vLLM Dashboard
-###Changed
+### Changed
 - Update argo to point to main branch
 
 
 ## [0.2.1] - 2026-03-03
 ### Removed
 - Remove Docs
-###Changed
+### Changed
 - Update cluster health dashboard
 
 ## [0.2.0] - 2026-02-19
