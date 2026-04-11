@@ -7,7 +7,7 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
-## [0.3.0] - 2026-04-10
+## [0.3.0] - 2026-04-12
 ### Added
 - Added Gatus for monitoring HTTP/HTTPS endpoints
 - Added Gatus Helm chart to bases
