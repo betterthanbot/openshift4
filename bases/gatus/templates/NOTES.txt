@@ -1,0 +1,54 @@
+╔═══════════════════════════════════════════════════════╗
+║               Gatus deployed successfully!            ║
+╚═══════════════════════════════════════════════════════╝
+
+Release : {{ .Release.Name }}
+Namespace: {{ .Values.namespace }}
+Image   : {{ .Values.image.repository }}:{{ .Values.image.tag }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Access
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{- if .Values.route.enabled }}
+OpenShift Route:
+  oc get route {{ include "gatus.fullname" . }} -n {{ .Values.namespace }} -o jsonpath='{.spec.host}'
+{{- end }}
+{{- if .Values.ingress.enabled }}
+Ingress:
+  kubectl get ingress {{ include "gatus.fullname" . }} -n {{ .Values.namespace }}
+{{- end }}
+
+Port-forward (local access):
+  kubectl port-forward -n {{ .Values.namespace }} \
+    svc/{{ include "gatus.fullname" . }} 8080:{{ .Values.service.port }}
+  Then open: http://localhost:8080
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Endpoints monitored: {{ len .Values.gatus.endpoints }}
+Storage            : {{ .Values.gatus.storage.type }} ({{ .Values.gatus.storage.path }})
+PVC size           : {{ .Values.persistence.size }}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Auto-discovery CronJob: {{ if .Values.discovery.enabled }}ENABLED ({{ .Values.discovery.schedule }}){{ else }}disabled{{ end }}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{- if .Values.discovery.enabled }}
+The CronJob will auto-rewrite the ConfigMap and restart Gatus
+on schedule. To trigger a one-off run immediately:
+
+  kubectl create job --from=cronjob/{{ include "gatus.fullname" . }}-auto-discovery \
+    discovery-manual-$(date +%s) -n {{ .Values.namespace }}
+
+To watch the job logs:
+  kubectl logs -l app.kubernetes.io/component=discovery \
+    -n {{ .Values.namespace }} --follow
+{{- else }}
+Enable auto-discovery in values.yaml:
+  discovery.enabled: true
+  discovery.schedule: "0 * * * *"
+
+Then run: helm upgrade {{ .Release.Name }} ./gatus-helm -n {{ .Values.namespace }}
+{{- end }}
+
+To update the static endpoint list, edit values.yaml → gatus.endpoints
+and run:  helm upgrade {{ .Release.Name }} ./gatus-helm -n {{ .Values.namespace }}

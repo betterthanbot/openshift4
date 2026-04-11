@@ -38,13 +38,13 @@ spec:
           - CreateNamespace=true
           - ApplyOutOfSyncOnly=true
 
-  resourceExclusions: |
-      - apiGroups:
-          - kyverno.io
-        kinds:
-          - AdmissionReport
-          - BackgroundScanReport
-          - ClusterAdmissionReport
-          - ClusterBackgroundScanReport
-        clusters:
-          - '*'
+  # resourceExclusions: |
+  #     - apiGroups:
+  #         - kyverno.io
+  #       kinds:
+  #         - AdmissionReport
+  #         - BackgroundScanReport
+  #         - ClusterAdmissionReport
+  #         - ClusterBackgroundScanReport
+  #       clusters:
+  #         - '*'

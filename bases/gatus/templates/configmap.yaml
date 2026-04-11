@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "gatus.configMapName" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "gatus.labels" . | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  config.yaml: |
+    ui:
+      title: {{ .Values.gatus.ui.title | quote }}
+      header: {{ .Values.gatus.ui.header | quote }}
+      description: {{ .Values.gatus.ui.description | quote }}
+      logo: {{ .Values.gatus.ui.logo | quote }}
+      theme: {{ .Values.gatus.ui.theme | quote }}
+
+    storage:
+      type: {{ .Values.gatus.storage.type }}
+      path: {{ .Values.gatus.storage.path }}
+
+    {{- if .Values.gatus.alerting }}
+    alerting:
+      {{- toYaml .Values.gatus.alerting | nindent 6 }}
+    {{- end }}
+
+    endpoints:
+      {{- range .Values.gatus.endpoints }}
+      {{- include "gatus.endpoint" (dict "ep" . "defaults" $.Values.gatus.endpointDefaults) | nindent 6 }}
+      {{- end }}

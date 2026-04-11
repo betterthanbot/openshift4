@@ -1,0 +1,528 @@
+---
+# Source: gatus/templates/discovery-rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gatus-discovery-sa
+  namespace: gatus
+  labels:
+    helm.sh/chart: gatus-1.0.0
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: gatus/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gatus-config
+  namespace: gatus
+  labels:
+    helm.sh/chart: gatus-1.0.0
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+data:
+  config.yaml: |
+    ui:
+      title: "Platform Status Dashboard"
+      header: "API, Route & Internal Probe Health"
+      description: "Real-time health status of OpenShift services and internal microservices"
+      logo: "https://upload.wikimedia.org/wikipedia/commons/3/3a/OpenShift-LogoType.svg"
+      theme: "dark"
+
+    storage:
+      type: sqlite
+      path: /data/gatus.db
+
+    endpoints:
+      
+      - name: "Example Route Endpoint"
+        group: "Example Group"
+        url: "https://null"
+        interval: 1m
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+---
+# Source: gatus/templates/discovery-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gatus-discovery-script
+  namespace: gatus
+  labels:
+    helm.sh/chart: gatus-1.0.0
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+data:
+  discover.sh: |
+    #!/bin/bash
+    set -e
+
+    NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+    CONFIG_FILE="/tmp/gatus-config-data.yaml"
+    INVALID_LOG="/tmp/gatus-skipped.log"
+    GATUS_DEPLOYMENT=gatus
+    GATUS_CONFIGMAP=gatus-config
+
+    SKIPPED=0
+    ROUTES_ADDED=0
+    PROBES_ADDED=0
+
+    echo "============================================================"
+    echo " Gatus Discovery"
+    echo " Namespace : $NAMESPACE"
+    echo " Target CM : $GATUS_CONFIGMAP"
+    echo " Deployment: $GATUS_DEPLOYMENT"
+    echo "============================================================"
+
+    > $INVALID_LOG
+
+    # Write the Gatus config.yaml content directly to its own file.
+    # Keeping it separate avoids fragile awk extraction later.
+    cat > $CONFIG_FILE << 'CONFIG_EOF'
+    ui:
+      title: "Platform Status Dashboard"
+      header: "API, Route & Internal Probe Health"
+      description: "Real-time health status of OpenShift services and internal microservices"
+      logo: "https://upload.wikimedia.org/wikipedia/commons/3/3a/OpenShift-LogoType.svg"
+      theme: "dark"
+
+    storage:
+      type: sqlite
+      path: /data/gatus.db
+
+    endpoints:
+    CONFIG_EOF
+    echo ""
+    echo "[Routes] Scraping all namespaces..."
+    ROUTE_JSON=$(oc get route --all-namespaces -o json)
+
+    ROUTES_BLOCK=$(echo "$ROUTE_JSON" | jq -r '
+      .items[] |
+      select(.spec.host != null and .spec.host != "") |
+      "      - name: \"\(.metadata.name) (Route)\"\n" +
+      "        group: \"\(.metadata.namespace)\"\n" +
+      "        url: \"\(if .spec.tls != null then "https" else "http" end)://\(.spec.host)\(if .spec.path != null and .spec.path != "" then .spec.path else "" end)\"\n" +
+      "        interval: 1m\n" +
+      "        conditions:\n" +
+      "          - \"[STATUS] >= 200\"\n" +
+      "          - \"[STATUS] <= 499\"\n" +
+      ""
+    ')
+    echo "$ROUTES_BLOCK" >> $CONFIG_FILE
+    ROUTES_ADDED=$(echo "$ROUTES_BLOCK" | grep -c "^      - name:" || true)
+
+    SKIPPED_ROUTES=$(echo "$ROUTE_JSON" | jq -r '
+      .items[] | select(.spec.host == null or .spec.host == "") |
+      "  SKIP (no host): \(.metadata.namespace)/\(.metadata.name)"
+    ')
+    [ -n "$SKIPPED_ROUTES" ] && echo "$SKIPPED_ROUTES" >> $INVALID_LOG
+    echo "[Routes] Added: $ROUTES_ADDED"
+    echo ""
+    echo "[Probes] Scraping deployment readinessProbes..."
+    DEPLOY_JSON=$(oc get deployment --all-namespaces -o json)
+
+    # IMPORTANT: Only include numeric ports.
+    # Named ports (e.g. "healthcheck", "liveness-port", "http") cannot be used
+    # in a URL and cause Gatus to panic on startup. These are filtered here and
+    # also caught again in the pre-patch validation below.
+    PROBES_BLOCK=$(echo "$DEPLOY_JSON" | jq -r '
+      .items[] |
+      .metadata.namespace as $ns |
+      .metadata.name as $app |
+      .spec.template.spec.containers[]? |
+      select(.readinessProbe.httpGet != null) |
+      select((.readinessProbe.httpGet.port | tostring) | test("^[0-9]+$")) |
+      .readinessProbe.httpGet as $probe |
+      (if $probe.scheme then ($probe.scheme | ascii_downcase) else "http" end) as $scheme |
+      ($probe.path | if (. == null or . == "") then "/" elif startswith("/") then . else "/"+. end) as $path |
+      "      - name: \"\($app) (\(.name) Probe)\"\n" +
+      "        group: \"\($ns)\"\n" +
+      "        url: \"\($scheme)://\($app).\($ns).svc.cluster.local:\($probe.port)\($path)\"\n" +
+      "        interval: 1m\n" +
+      "        conditions:\n" +
+      "          - \"[STATUS] >= 200\"\n" +
+      "          - \"[STATUS] <= 499\"\n" +
+      ""
+    ')
+    echo "$PROBES_BLOCK" >> $CONFIG_FILE
+    PROBES_ADDED=$(echo "$PROBES_BLOCK" | grep -c "^      - name:" || true)
+
+    SKIPPED_PROBES=$(echo "$DEPLOY_JSON" | jq -r '
+      .items[] |
+      .metadata.namespace as $ns |
+      .metadata.name as $app |
+      .spec.template.spec.containers[]? |
+      select(.readinessProbe.httpGet != null) |
+      select((.readinessProbe.httpGet.port | tostring) | test("^[0-9]+$") | not) |
+      "  SKIP (named port \"\(.readinessProbe.httpGet.port)\"): \($ns)/\($app)/\(.name)"
+    ')
+    [ -n "$SKIPPED_PROBES" ] && echo "$SKIPPED_PROBES" >> $INVALID_LOG
+    echo "[Probes] Added: $PROBES_ADDED"
+
+    # Skipped summary
+    SKIPPED=$(wc -l < $INVALID_LOG | tr -d ' ')
+    echo ""
+    if [ "$SKIPPED" -gt 0 ]; then
+      echo "------------------------------------------------------------"
+      echo " Skipped endpoints ($SKIPPED) — named/invalid ports excluded:"
+      cat $INVALID_LOG
+      echo "------------------------------------------------------------"
+    else
+      echo "[Validation] No endpoints skipped."
+    fi
+
+    # Safety net: catch any named-port URL that slipped through before patching
+    echo ""
+    echo "[Validation] Checking for invalid port patterns in generated config..."
+    INVALID_URLS=$(grep -E 'url:.*svc\.cluster\.local:([a-zA-Z]|[0-9]+[a-zA-Z])' $CONFIG_FILE || true)
+    if [ -n "$INVALID_URLS" ]; then
+      echo "ERROR: Named-port URLs detected — these would cause Gatus to panic:"
+      echo "$INVALID_URLS"
+      echo "Aborting — ConfigMap will NOT be updated."
+      exit 1
+    fi
+    echo "[Validation] All URLs are valid."
+
+    # Verify the config file has actual content before patching
+    ENDPOINT_COUNT=$(grep -c "^      - name:" $CONFIG_FILE || true)
+    if [ "$ENDPOINT_COUNT" -eq 0 ]; then
+      echo "ERROR: No endpoints were generated. Aborting to avoid pushing an empty config."
+      exit 1
+    fi
+    echo "[Validation] Endpoint count in generated config: $ENDPOINT_COUNT"
+
+    # Patch only the data key — Helm retains ownership of the ConfigMap object
+    echo ""
+    echo "[ConfigMap] Patching ${GATUS_CONFIGMAP}..."
+    CONFIG_JSON=$(jq -Rs . < $CONFIG_FILE)
+    oc patch configmap ${GATUS_CONFIGMAP} -n $NAMESPACE \
+      --type=merge \
+      --patch "{\"data\":{\"config.yaml\":${CONFIG_JSON}}}"
+
+    # Verify the patch actually landed
+    echo "[ConfigMap] Verifying patch..."
+    PATCHED_LINES=$(oc get configmap ${GATUS_CONFIGMAP} -n $NAMESPACE \
+      -o jsonpath='{.data.config\.yaml}' | wc -l | tr -d ' ')
+    if [ "$PATCHED_LINES" -lt 5 ]; then
+      echo "ERROR: ConfigMap config.yaml appears empty after patch ($PATCHED_LINES lines). Aborting rollout."
+      exit 1
+    fi
+    echo "[ConfigMap] Verified — ${PATCHED_LINES} lines written to config.yaml."
+    echo ""
+    echo "[Rollout] Restarting ${GATUS_DEPLOYMENT}..."
+    oc rollout restart deployment/${GATUS_DEPLOYMENT} -n $NAMESPACE
+
+    echo "[Rollout] Waiting for rollout (timeout: 120s)..."
+    if ! oc rollout status deployment/${GATUS_DEPLOYMENT} -n $NAMESPACE --timeout=120s; then
+      echo ""
+      echo "============================================================"
+      echo " ERROR: Rollout failed!"
+      echo "============================================================"
+      echo ""
+      echo "[Debug] Deployment events:"
+      oc describe deployment/${GATUS_DEPLOYMENT} -n $NAMESPACE | grep -A 20 "^Events:"
+      echo ""
+      echo "[Debug] Pod status:"
+      oc get pods -n $NAMESPACE -l app.kubernetes.io/name=gatus -o wide
+      echo ""
+      echo "[Debug] Pod logs (last 50 lines from non-running pods):"
+      for POD in $(oc get pods -n $NAMESPACE -l app.kubernetes.io/name=gatus \
+            --field-selector=status.phase!=Running -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+        echo "--- Logs: $POD ---"
+        oc logs $POD -n $NAMESPACE --previous --tail=50 2>/dev/null || \
+          oc logs $POD -n $NAMESPACE --tail=50 2>/dev/null || \
+          echo "(no logs available)"
+      done
+      echo ""
+      echo "[Debug] Pod describe (first failing pod):"
+      FIRST_BAD=$(oc get pods -n $NAMESPACE -l app.kubernetes.io/name=gatus \
+        --field-selector=status.phase!=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+      [ -n "$FIRST_BAD" ] && oc describe pod/$FIRST_BAD -n $NAMESPACE
+      exit 1
+    fi
+    echo "[Rollout] Deployment is healthy."
+
+    echo ""
+    echo "============================================================"
+    echo " Discovery complete!"
+    echo " Routes added : $ROUTES_ADDED"
+    echo " Probes added : $PROBES_ADDED"
+    echo " Skipped      : $SKIPPED"
+    echo "============================================================"
+---
+# Source: gatus/templates/pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gatus-data
+  namespace: gatus
+  labels:
+    helm.sh/chart: gatus-1.0.0
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Source: gatus/templates/discovery-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gatus-discovery-cluster-role
+  labels:
+    helm.sh/chart: gatus-1.0.0
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups: ["route.openshift.io"]
+    resources: ["routes"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps", "apps.openshift.io"]
+    resources: ["deployments", "deploymentconfigs"]
+    verbs: ["get", "list"]
+---
+# Source: gatus/templates/discovery-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gatus-discovery-cluster-binding
+  labels:
+    helm.sh/chart: gatus-1.0.0
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+subjects:
+  - kind: ServiceAccount
+    name: gatus-discovery-sa
+    namespace: gatus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gatus-discovery-cluster-role
+---
+# Source: gatus/templates/discovery-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gatus-manager-role
+  namespace: gatus
+  labels:
+    helm.sh/chart: gatus-1.0.0
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+---
+# Source: gatus/templates/discovery-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gatus-manager-binding
+  namespace: gatus
+  labels:
+    helm.sh/chart: gatus-1.0.0
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+subjects:
+  - kind: ServiceAccount
+    name: gatus-discovery-sa
+    namespace: gatus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gatus-manager-role
+---
+# Source: gatus/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: gatus
+  namespace: gatus
+  labels:
+    helm.sh/chart: gatus-1.0.0
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/instance: gatus
+---
+# Source: gatus/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gatus
+  namespace: gatus
+  labels:
+    helm.sh/chart: gatus-1.0.0
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gatus
+      app.kubernetes.io/instance: gatus
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gatus
+        app.kubernetes.io/instance: gatus
+    spec:
+      containers:
+        - name: gatus
+          image: "quay.io/rhn-support-gong/gatus:v5.35.0"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config/config.yaml
+              subPath: config.yaml
+            - name: data-volume
+              mountPath: /data
+      volumes:
+        - name: config-volume
+          configMap:
+            name: gatus-config
+        - name: data-volume
+          persistentVolumeClaim:
+            claimName: gatus-data
+---
+# Source: gatus/templates/discovery-cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gatus-auto-discovery
+  namespace: gatus
+  labels:
+    helm.sh/chart: gatus-1.0.0
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  schedule: "0 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: gatus
+            app.kubernetes.io/instance: gatus
+            app.kubernetes.io/component: discovery
+        spec:
+          serviceAccountName: gatus-discovery-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: discovery-job
+              image: "quay.io/rhn-support-gong/gatus-discovery:1.0.0"
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/bash
+                - /scripts/discover.sh
+              resources:
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+              volumeMounts:
+                - name: script-volume
+                  mountPath: /scripts
+          volumes:
+            - name: script-volume
+              configMap:
+                name: gatus-discovery-script
+                defaultMode: 0755
+---
+# Source: gatus/templates/route.yaml
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: gatus
+  namespace: gatus
+  labels:
+    helm.sh/chart: gatus-1.0.0
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: gatus
+    weight: 100
+  wildcardPolicy: None

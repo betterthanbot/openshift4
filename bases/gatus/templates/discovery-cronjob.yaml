@@ -1,0 +1,71 @@
+{{- if .Values.discovery.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "gatus.fullname" . }}-auto-discovery
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "gatus.labels" . | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  schedule: {{ .Values.discovery.schedule | quote }}
+  concurrencyPolicy: {{ .Values.discovery.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.discovery.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.discovery.failedJobsHistoryLimit }}
+  {{- if .Values.discovery.suspend }}
+  suspend: true
+  {{- end }}
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: {{ .Values.discovery.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            {{- include "gatus.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: discovery
+          {{- with .Values.discovery.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        spec:
+          serviceAccountName: {{ include "gatus.discoveryServiceAccountName" . }}
+          restartPolicy: {{ .Values.discovery.restartPolicy }}
+          {{- with .Values.discovery.podSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: discovery-job
+              image: "{{ .Values.discovery.image.repository }}:{{ .Values.discovery.image.tag }}"
+              imagePullPolicy: {{ .Values.discovery.image.pullPolicy }}
+              command:
+                - /bin/bash
+                - /scripts/discover.sh
+              {{- with .Values.discovery.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              {{- with .Values.discovery.containerSecurityContext }}
+              securityContext:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              volumeMounts:
+                - name: script-volume
+                  mountPath: /scripts
+          volumes:
+            - name: script-volume
+              configMap:
+                name: {{ include "gatus.fullname" . }}-discovery-script
+                defaultMode: 0755
+          {{- with .Values.discovery.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.discovery.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
