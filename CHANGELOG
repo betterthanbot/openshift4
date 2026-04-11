@@ -9,8 +9,9 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Released]
 ## [0.3.0] - 2026-04-10
 ### Added
-- Added Gatus Status Page
-
+- Added Gatus for monitoring HTTP/HTTPS endpoints
+- Added Gatus Helm chart to bases
+- Added Gatus configmap template to generate monitors based on container readiness probes
 
 ## [0.2.3] - 2026-03-06
 ### Changed
