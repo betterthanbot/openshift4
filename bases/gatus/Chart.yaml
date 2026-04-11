@@ -1,0 +1,21 @@
+apiVersion: v2
+name: gatus
+description: |
+  A Helm chart for Gatus – the automated developer-oriented status page.
+  Deploys Gatus with a fully configurable set of HTTP/HTTPS endpoint monitors,
+  persistent SQLite storage, a ClusterIP Service, and an OpenShift Route.
+type: application
+version: 1.0.0
+appVersion: "latest"
+keywords:
+  - gatus
+  - status
+  - monitoring
+  - health
+  - openshift
+home: https://github.com/TwiN/gatus
+sources:
+  - https://github.com/TwiN/gatus
+maintainers:
+  - name: platform-team
+    email: platform@example.com
