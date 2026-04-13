@@ -124,47 +124,6 @@ data:
     ')
     [ -n "$SKIPPED_ROUTES" ] && echo "$SKIPPED_ROUTES" >> $INVALID_LOG
     echo "[Routes] Added: $ROUTES_ADDED"
-    echo ""
-    echo "[Probes] Scraping deployment readinessProbes..."
-    DEPLOY_JSON=$(oc get deployment --all-namespaces -o json)
-
-    # IMPORTANT: Only include numeric ports.
-    # Named ports (e.g. "healthcheck", "liveness-port", "http") cannot be used
-    # in a URL and cause Gatus to panic on startup. These are filtered here and
-    # also caught again in the pre-patch validation below.
-    PROBES_BLOCK=$(echo "$DEPLOY_JSON" | jq -r '
-      .items[] |
-      .metadata.namespace as $ns |
-      .metadata.name as $app |
-      .spec.template.spec.containers[]? |
-      select(.readinessProbe.httpGet != null) |
-      select((.readinessProbe.httpGet.port | tostring) | test("^[0-9]+$")) |
-      .readinessProbe.httpGet as $probe |
-      (if $probe.scheme then ($probe.scheme | ascii_downcase) else "http" end) as $scheme |
-      ($probe.path | if (. == null or . == "") then "/" elif startswith("/") then . else "/"+. end) as $path |
-      "      - name: \"\($app) (\(.name) Probe)\"\n" +
-      "        group: \"\($ns)\"\n" +
-      "        url: \"\($scheme)://\($app).\($ns).svc.cluster.local:\($probe.port)\($path)\"\n" +
-      "        interval: 1m\n" +
-      "        conditions:\n" +
-      "          - \"[STATUS] >= 200\"\n" +
-      "          - \"[STATUS] <= 499\"\n" +
-      ""
-    ')
-    echo "$PROBES_BLOCK" >> $CONFIG_FILE
-    PROBES_ADDED=$(echo "$PROBES_BLOCK" | grep -c "^      - name:" || true)
-
-    SKIPPED_PROBES=$(echo "$DEPLOY_JSON" | jq -r '
-      .items[] |
-      .metadata.namespace as $ns |
-      .metadata.name as $app |
-      .spec.template.spec.containers[]? |
-      select(.readinessProbe.httpGet != null) |
-      select((.readinessProbe.httpGet.port | tostring) | test("^[0-9]+$") | not) |
-      "  SKIP (named port \"\(.readinessProbe.httpGet.port)\"): \($ns)/\($app)/\(.name)"
-    ')
-    [ -n "$SKIPPED_PROBES" ] && echo "$SKIPPED_PROBES" >> $INVALID_LOG
-    echo "[Probes] Added: $PROBES_ADDED"
 
     # Skipped summary
     SKIPPED=$(wc -l < $INVALID_LOG | tr -d ' ')

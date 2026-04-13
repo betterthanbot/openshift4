@@ -233,7 +233,7 @@ discovery:
 
   # What to scrape
   scrapeRoutes: true        # Discover all OpenShift Routes cluster-wide
-  scrapeDeployments: true   # Discover readinessProbe httpGet paths from Deployments/DCs
+  scrapeDeployments: false   # Discover readinessProbe httpGet paths from Deployments/DCs
 
   # Namespaces to skip when scraping (regex-matched, passed to grep -Ev)
   excludeNamespaces: []
