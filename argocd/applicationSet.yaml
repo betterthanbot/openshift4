@@ -30,6 +30,14 @@ spec:
         server: "{{destServer}}"
         namespace: "{{destNamespace}}"
 
+      ignoreDifferences:
+        - group: ""
+          kind: ConfigMap
+          name: gatus-config
+          namespace: gatus
+          jsonPointers:
+            - /data
+
       syncPolicy:
         automated:
           prune: true
