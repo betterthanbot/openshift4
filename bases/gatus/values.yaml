@@ -224,6 +224,9 @@ gatus:
 discovery:
   enabled: true   # Set to true to activate the auto-discovery CronJob
 
+  # Skip x509 TLS verification for all discovered endpoints
+  insecureSkipTLSVerify: true
+
   # Cron schedule — default is every hour on the hour.
   # Examples:
   #   "*/15 * * * *"  – every 15 minutes

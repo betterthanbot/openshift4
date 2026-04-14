@@ -63,6 +63,8 @@ data:
       "        group: \"\(.metadata.namespace)\"\n" +
       "        url: \"\(if .spec.tls != null then "https" else "http" end)://\(.spec.host)\(if .spec.path != null and .spec.path != "" then .spec.path else "" end)\"\n" +
       "        interval: {{ .Values.gatus.endpointDefaults.interval }}\n" +
+      "        client:\n" +
+      "          insecure: {{ .Values.discovery.insecureSkipTLSVerify }}\n" +
       "        conditions:\n" +
       {{- range .Values.gatus.endpointDefaults.conditions }}
       "          - \"{{ . }}\"\n" +

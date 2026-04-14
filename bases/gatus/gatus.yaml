@@ -110,6 +110,8 @@ data:
       "        group: \"\(.metadata.namespace)\"\n" +
       "        url: \"\(if .spec.tls != null then "https" else "http" end)://\(.spec.host)\(if .spec.path != null and .spec.path != "" then .spec.path else "" end)\"\n" +
       "        interval: 1m\n" +
+      "        client:\n" +
+      "          insecure: true\n" +
       "        conditions:\n" +
       "          - \"[STATUS] >= 200\"\n" +
       "          - \"[STATUS] <= 499\"\n" +
