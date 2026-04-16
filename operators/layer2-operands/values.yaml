@@ -1,0 +1,305 @@
+# ==============================================================================
+# layer2-operands values
+#
+# IMPORTANT — cluster-specific values to update before deploying:
+#   - certManager.clusterIssuer.acme.*          (email, AWS keys, hosted zone)
+#   - certManager.certificates.*.dnsNames       (your cluster domain)
+#   - certManager.certificates.*.commonName     (your cluster domain)
+#   - rhacs.securedCluster.clusterName          (logical name for this cluster)
+#   - gitops.appProjects                        (adjust source repos as needed)
+#
+# SENSITIVE values (never commit to git):
+#   - certManager.clusterIssuer.acme.route53.accessKeyID
+#   Pass at deploy time:  --set certManager.clusterIssuer.acme.route53.accessKeyID=AKIAXXXXXXXX
+#   Or use a Helm secrets plugin / external-secrets / SealedSecrets.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# cert-manager
+# ------------------------------------------------------------------------------
+# certManager:
+#   enabled: true
+
+#   clusterIssuer:
+#     enabled: true
+#     name: letsencrypt-production-ec2
+#     acme:
+#       # CHANGE ME: notification email for Let's Encrypt
+#       email: "platform-admins@example.com"
+#       server: https://acme-v02.api.letsencrypt.org/directory
+#       privateKeySecretRef: cluster-issuer-acme-production
+#       route53:
+#         # SENSITIVE — override via --set or a secrets manager, never commit
+#         accessKeyID: ""
+#         # CHANGE ME: your Route 53 hosted zone ID
+#         hostedZoneID: ""
+#         # CHANGE ME: AWS region where the zone lives
+#         region: "us-east-1"
+#         secretAccessKeySecretRef:
+#           key: aws_secret_access_key
+#           name: cert-manager-aws-creds
+#         # CHANGE ME: DNS zones for ACME DNS-01 challenges
+#         dnsZones:
+#           - "api.cluster.example.com"
+#           - "apps.cluster.example.com"
+
+#   certificates:
+#     enabled: true
+#     items:
+#       - name: cert-manager-api-cert
+#         namespace: openshift-config
+#         # CHANGE ME
+#         commonName: "api.cluster.example.com"
+#         dnsNames:
+#           - "api.cluster.example.com"
+#         duration: 2160h
+#         renewBefore: 360h
+#         secretName: cert-manager-api-cert
+#         issuerRef:
+#           group: cert-manager.io
+#           kind: ClusterIssuer
+#           name: letsencrypt-production-ec2
+#         usages:
+#           - server auth
+#           - client auth
+
+#       - name: cert-manager-ingress-cert
+#         namespace: openshift-ingress
+#         # CHANGE ME
+#         commonName: "apps.cluster.example.com"
+#         dnsNames:
+#           - "apps.cluster.example.com"
+#           - "*.apps.cluster.example.com"
+#         duration: 2160h
+#         renewBefore: 360h
+#         secretName: cert-manager-ingress-cert
+#         issuerRef:
+#           group: cert-manager.io
+#           kind: ClusterIssuer
+#           name: letsencrypt-production-ec2
+#         usages:
+#           - server auth
+#           - client auth
+
+# ------------------------------------------------------------------------------
+# Red Hat Advanced Cluster Security (RHACS)
+# ------------------------------------------------------------------------------
+rhacs:
+  enabled: true
+
+  central:
+    enabled: true
+    name: stackrox-central-services
+    namespace: stackrox
+    spec:
+      central:
+        exposure:
+          route:
+            enabled: true
+
+  securedCluster:
+    enabled: true
+    name: stackrox-secured-cluster-services
+    namespace: stackrox
+    # CHANGE ME: logical name for this cluster shown in RHACS console
+    clusterName: "my-cluster"
+
+# ------------------------------------------------------------------------------
+# OpenShift GitOps / ArgoCD
+# The GitOps operator auto-creates the openshift-gitops ArgoCD instance.
+# The CR below customises it with resource tuning, RBAC, and exclusions.
+# ------------------------------------------------------------------------------
+# gitops:
+#   enabled: true
+
+#   argocd:
+#     enabled: true
+#     name: openshift-gitops
+#     namespace: openshift-gitops
+#     spec:
+#       applicationSet:
+#         resources:
+#           limits:
+#             cpu: "2"
+#             memory: 1Gi
+#           requests:
+#             cpu: 250m
+#             memory: 512Mi
+#         webhookServer:
+#           ingress:
+#             enabled: false
+#           route:
+#             enabled: false
+#       controller:
+#         processors: {}
+#         resources:
+#           limits:
+#             cpu: "2"
+#             memory: 2Gi
+#           requests:
+#             cpu: 250m
+#             memory: 1Gi
+#         sharding: {}
+#       grafana:
+#         enabled: false
+#         ingress:
+#           enabled: false
+#         route:
+#           enabled: false
+#       ha:
+#         enabled: false
+#       imageUpdater:
+#         enabled: false
+#       monitoring:
+#         enabled: false
+#       networkPolicy:
+#         enabled: true
+#       notifications:
+#         enabled: false
+#       prometheus:
+#         enabled: false
+#         ingress:
+#           enabled: false
+#         route:
+#           enabled: false
+#       rbac:
+#         defaultPolicy: ""
+#         policy: |
+#           g, system:cluster-admins, role:admin
+#           g, cluster-admins, role:admin
+#         scopes: "[groups]"
+#       redis:
+#         resources:
+#           limits:
+#             cpu: 500m
+#             memory: 256Mi
+#           requests:
+#             cpu: 250m
+#             memory: 128Mi
+#       repo:
+#         resources:
+#           limits:
+#             cpu: "1"
+#             memory: 1Gi
+#           requests:
+#             cpu: 250m
+#             memory: 256Mi
+#       server:
+#         autoscale:
+#           enabled: false
+#         grpc:
+#           ingress:
+#             enabled: false
+#         ingress:
+#           enabled: false
+#         resources:
+#           limits:
+#             cpu: 500m
+#             memory: 256Mi
+#           requests:
+#             cpu: 125m
+#             memory: 128Mi
+#         route:
+#           enabled: true
+#         service:
+#           type: ""
+#       sso:
+#         dex:
+#           openShiftOAuth: true
+#           resources:
+#             limits:
+#               cpu: 500m
+#               memory: 256Mi
+#             requests:
+#               cpu: 250m
+#               memory: 128Mi
+#         provider: dex
+#       tls:
+#         ca: {}
+
+#   appProjects:
+#     enabled: true
+#     items:
+#       - name: default
+#         namespace: openshift-gitops
+#         spec:
+#           clusterResourceWhitelist:
+#             - group: "*"
+#               kind: "*"
+#           destinations:
+#             - namespace: "*"
+#               server: "*"
+#           sourceRepos:
+#             - "*"
+
+#       - name: openshift4-community
+#         namespace: openshift-gitops
+#         description: "Open community GitOps project for shared OpenShift enablement assets"
+#         spec:
+#           clusterResourceWhitelist:
+#             - group: "*"
+#               kind: "*"
+#           namespaceResourceWhitelist:
+#             - group: "*"
+#               kind: "*"
+#           destinations:
+#             - namespace: "*"
+#               server: https://kubernetes.default.svc
+#           # CHANGE ME: point to your fork / mirror
+#           sourceRepos:
+#             - "https://github.com/betterthanbot/openshift4.git"
+
+# ------------------------------------------------------------------------------
+# Cluster Logging / LokiStack
+# ------------------------------------------------------------------------------
+logging:
+  enabled: true
+
+  clusterLogForwarder:
+    enabled: true
+    name: instance
+    namespace: openshift-logging
+    serviceAccountName: logging-collector
+    lokiStackName: logging-loki
+    lokiStackNamespace: openshift-logging
+
+# ------------------------------------------------------------------------------
+# Compliance Operator — ScanSettings and ScanSettingBindings
+# The "default" and "default-auto-apply" ScanSettings are built-in to the
+# operator; only the custom ones are managed here.
+# ------------------------------------------------------------------------------
+compliance:
+  enabled: true
+
+  scanSettings:
+    - name: cis-1.7-full
+      namespace: openshift-compliance
+      maxRetryOnTimeout: 2
+      schedule: "0 0 1 * *"
+      timeout: 15m0s
+      suspend: false
+      strictNodeScan: false
+      showNotApplicable: false
+      roles:
+        - master
+        - worker
+      scanTolerations:
+        - operator: Exists
+      rawResultStorage:
+        enabled: true
+        pvAccessModes:
+          - ReadWriteOnce
+        rotation: 3
+        size: 1Gi
+
+  scanSettingBindings:
+    - name: cis-1.7-full
+      namespace: openshift-compliance
+      settingsRef: cis-1.7-full
+      profiles:
+        - apiGroup: compliance.openshift.io/v1alpha1
+          kind: Profile
+          name: ocp4-cis-1-7
+        - apiGroup: compliance.openshift.io/v1alpha1
+          kind: Profile
+          name: ocp4-cis-node-1-7

@@ -1,0 +1,34 @@
+{{- if and .Values.certManager.enabled .Values.certManager.clusterIssuer.enabled }}
+{{- $ci := .Values.certManager.clusterIssuer }}
+---
+# ClusterIssuer — uses ACME DNS-01 via Route 53
+# Prerequisite: secret "{{ $ci.acme.route53.secretAccessKeySecretRef.name }}" must exist
+# in the cert-manager namespace with key "{{ $ci.acme.route53.secretAccessKeySecretRef.key }}"
+# containing the AWS secret access key.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ $ci.name }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  acme:
+    email: {{ $ci.acme.email | quote }}
+    server: {{ $ci.acme.server | quote }}
+    privateKeySecretRef:
+      name: {{ $ci.acme.privateKeySecretRef }}
+    solvers:
+      - dns01:
+          route53:
+            accessKeyID: {{ $ci.acme.route53.accessKeyID | quote }}
+            hostedZoneID: {{ $ci.acme.route53.hostedZoneID | quote }}
+            region: {{ $ci.acme.route53.region | quote }}
+            secretAccessKeySecretRef:
+              key: {{ $ci.acme.route53.secretAccessKeySecretRef.key }}
+              name: {{ $ci.acme.route53.secretAccessKeySecretRef.name }}
+        selector:
+          dnsZones:
+            {{- range $ci.acme.route53.dnsZones }}
+            - {{ . | quote }}
+            {{- end }}
+{{- end }}

@@ -7,6 +7,21 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [1.0.0] - 2026-04-17
+### Added
+- Added `operators/layer1-install` Helm chart — installs all OLM Namespaces, OperatorGroups, and Subscriptions (14 operators)
+- Added `operators/layer2-operands` Helm chart — installs operator CRs (cert-manager ClusterIssuer/Certificates; RHACS Central/SecuredCluster; ArgoCD instance; ClusterLogForwarder; Compliance ScanSettings/Bindings)
+- Added `argocd/appset-operators.yaml` — operators ApplicationSet with sync-wave ordering (layer1=wave 1, layer2=wave 2)
+- Added `argocd/appset-workloads.yaml` — replaces monolithic applicationSet.yaml; Git directory generator gives each workload its own ArgoCD Application
+### Changed
+- Split `overlay/my-sno-cluster/kustomization.yaml` into per-component subdirs (`grafana/`, `gatus/`, `kyverno/`) so each appears as a separate Application in the ArgoCD UI
+- Updated `bootstrap/bootstrap.yaml` — branch `feature/status` → `main`; added finalizer and syncPolicy
+- Updated `argocd/appProject.yaml` — added orphanedResources warning
+### Removed
+- `argocd/applicationSet.yaml` — replaced by appset-workloads.yaml + appset-operators.yaml
+- `argocd/application.yaml` — superseded by ApplicationSets
+- `overlay/my-sno-cluster/kustomization.yaml` — split into per-component subdirs
+
 ## [0.3.1] - 2026-04-12
 ### Changed
 - Updated makefile 

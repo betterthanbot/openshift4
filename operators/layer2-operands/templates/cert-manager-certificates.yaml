@@ -1,0 +1,30 @@
+{{- if and .Values.certManager.enabled .Values.certManager.certificates.enabled }}
+{{- range .Values.certManager.certificates.items }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .name }}
+  namespace: {{ .namespace }}
+  labels:
+    {{- include "layer2-operands.labels" $ | nindent 4 }}
+spec:
+  commonName: {{ .commonName | quote }}
+  dnsNames:
+    {{- range .dnsNames }}
+    - {{ . | quote }}
+    {{- end }}
+  duration: {{ .duration }}
+  renewBefore: {{ .renewBefore }}
+  isCA: false
+  issuerRef:
+    group: {{ .issuerRef.group }}
+    kind: {{ .issuerRef.kind }}
+    name: {{ .issuerRef.name }}
+  secretName: {{ .secretName }}
+  usages:
+    {{- range .usages }}
+    - {{ . | quote }}
+    {{- end }}
+{{- end }}
+{{- end }}

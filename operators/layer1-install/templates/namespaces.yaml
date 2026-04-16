@@ -1,0 +1,21 @@
+{{- /*
+  Create a Namespace for each operator whose namespace.create == true.
+  Namespaces in openshift-operators (already built-in to OCP) are skipped.
+*/ -}}
+{{- range $opKey, $op := .Values.operators }}
+{{- if and $op.enabled $op.namespace.create }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $op.namespace.name }}
+  labels:
+    {{- range $k, $v := $op.namespace.labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+    {{- include "layer1-install.labels" $ | nindent 4 }}
+  annotations:
+    meta.helm.sh/release-name: {{ $.Release.Name }}
+    meta.helm.sh/release-namespace: {{ $.Release.Namespace }}
+{{- end }}
+{{- end }}

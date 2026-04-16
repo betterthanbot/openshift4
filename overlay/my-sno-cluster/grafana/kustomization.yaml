@@ -1,0 +1,9 @@
+---
+# Grafana Dashboards overlay for my-sno-cluster
+# Deploys all GrafanaDashboard CRs from the base into openshift-operators namespace.
+# The Grafana operator (from layer1-install) must be running before ArgoCD syncs this.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../bases/grafana/

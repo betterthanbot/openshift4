@@ -1,0 +1,120 @@
+# ==============================================================================
+# ApplicationSet: openshift4-operators
+#
+# Manages the two-layer OLM operator installation as separate ArgoCD Applications:
+#
+#   operators-layer1  (sync-wave 1) — Namespaces, OperatorGroups, Subscriptions
+#   operators-layer2  (sync-wave 2) — Operands / Custom Resources
+#
+# Sync-wave ordering ensures layer1 (operators) reaches healthy state before
+# layer2 (operands) attempts to create CRs that depend on the operator CRDs.
+#
+# NOTE: The cert-manager AWS credentials secret must exist in the cert-manager
+# namespace BEFORE layer2 syncs. Create it out-of-band:
+#   oc create secret generic cert-manager-aws-creds \
+#     --namespace cert-manager \
+#     --from-literal=aws_secret_access_key="$AWS_SECRET_KEY"
+# ==============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: openshift4-operators
+  namespace: openshift-gitops
+spec:
+  # Prevent the ApplicationSet controller from deleting Applications if the
+  # generator entry is accidentally removed — operators need manual cleanup.
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+
+  generators:
+    - list:
+        elements:
+          # ------------------------------------------------------------------
+          # Layer 1: Namespaces + OperatorGroups + Subscriptions
+          # ------------------------------------------------------------------
+          - name: operators-layer1
+            path: operators/layer1-install
+            wave: "1"
+            destNamespace: openshift-operators-helm
+
+          # ------------------------------------------------------------------
+          # Layer 2: Operands (CRs)
+          # ------------------------------------------------------------------
+          - name: operators-layer2
+            path: operators/layer2-operands
+            wave: "2"
+            destNamespace: openshift-operators-helm
+
+  template:
+    metadata:
+      name: "{{name}}"
+      namespace: openshift-gitops
+      annotations:
+        # Sync-wave controls ordering within the bootstrap parent app sync
+        argocd.argoproj.io/sync-wave: "{{wave}}"
+    spec:
+      project: openshift4-community
+
+      source:
+        repoURL: https://github.com/betterthanbot/openshift4.git
+        targetRevision: main
+        path: "{{path}}"
+        helm:
+          valueFiles:
+            - values.yaml
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{destNamespace}}"
+
+      syncPolicy:
+        automated:
+          prune: false       # never auto-delete operator namespaces or CRDs
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true          # required for large ArgoCD / operator CRs
+          - RespectIgnoreDifferences=true
+          - ApplyOutOfSyncOnly=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 30s
+            factor: 2
+            maxDuration: 5m
+
+      # Ignore fields that operators / OCP manage themselves after creation
+      ignoreDifferences:
+        # OLM updates status and adds annotations after subscription creation
+        - group: operators.coreos.com
+          kind: Subscription
+          jsonPointers:
+            - /status
+        - group: operators.coreos.com
+          kind: OperatorGroup
+          jsonPointers:
+            - /metadata/annotations/olm.providedAPIs
+        # ArgoCD CR is owned by the GitOps operator — ownerRef changes are expected
+        - group: argoproj.io
+          kind: ArgoCD
+          jsonPointers:
+            - /status
+            - /metadata/ownerReferences
+        # RHACS operator manages status after Central creation
+        - group: platform.stackrox.io
+          kind: Central
+          jsonPointers:
+            - /status
+        - group: platform.stackrox.io
+          kind: SecuredCluster
+          jsonPointers:
+            - /status
+        # cert-manager updates issuer status after ACME challenge
+        - group: cert-manager.io
+          kind: ClusterIssuer
+          jsonPointers:
+            - /status
+        - group: cert-manager.io
+          kind: Certificate
+          jsonPointers:
+            - /status

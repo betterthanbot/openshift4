@@ -1,0 +1,29 @@
+{{- if and .Values.gitops.enabled .Values.gitops.appProjects.enabled }}
+{{- range .Values.gitops.appProjects.items }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ .name }}
+  namespace: {{ .namespace }}
+  labels:
+    {{- include "layer2-operands.labels" $ | nindent 4 }}
+  {{- if .description }}
+  annotations:
+    description: {{ .description | quote }}
+  {{- end }}
+spec:
+  {{- if .spec.clusterResourceWhitelist }}
+  clusterResourceWhitelist:
+    {{- toYaml .spec.clusterResourceWhitelist | nindent 4 }}
+  {{- end }}
+  {{- if .spec.namespaceResourceWhitelist }}
+  namespaceResourceWhitelist:
+    {{- toYaml .spec.namespaceResourceWhitelist | nindent 4 }}
+  {{- end }}
+  destinations:
+    {{- toYaml .spec.destinations | nindent 4 }}
+  sourceRepos:
+    {{- toYaml .spec.sourceRepos | nindent 4 }}
+{{- end }}
+{{- end }}

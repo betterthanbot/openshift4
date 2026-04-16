@@ -1,0 +1,28 @@
+{{- if .Values.compliance.enabled }}
+{{- range .Values.compliance.scanSettings }}
+---
+apiVersion: compliance.openshift.io/v1alpha1
+kind: ScanSetting
+metadata:
+  name: {{ .name }}
+  namespace: {{ .namespace }}
+  labels:
+    {{- include "layer2-operands.labels" $ | nindent 4 }}
+maxRetryOnTimeout: {{ .maxRetryOnTimeout }}
+rawResultStorage:
+  enabled: {{ .rawResultStorage.enabled }}
+  pvAccessModes:
+    {{- toYaml .rawResultStorage.pvAccessModes | nindent 4 }}
+  rotation: {{ .rawResultStorage.rotation }}
+  size: {{ .rawResultStorage.size | quote }}
+roles:
+  {{- toYaml .roles | nindent 2 }}
+scanTolerations:
+  {{- toYaml .scanTolerations | nindent 2 }}
+schedule: {{ .schedule | quote }}
+showNotApplicable: {{ .showNotApplicable }}
+strictNodeScan: {{ .strictNodeScan }}
+suspend: {{ .suspend }}
+timeout: {{ .timeout | quote }}
+{{- end }}
+{{- end }}

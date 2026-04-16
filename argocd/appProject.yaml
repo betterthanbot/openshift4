@@ -7,16 +7,22 @@ spec:
   description: "Open community GitOps project for shared OpenShift enablement assets"
 
   sourceRepos:
+    # Main cluster configuration repo
     - https://github.com/betterthanbot/openshift4.git
 
   destinations:
     - server: https://kubernetes.default.svc
       namespace: "*"
 
-  # Allow cluster-scoped + namespaced resources (tune down later if you want)
+  # Allow cluster-scoped + namespaced resources.
+  # Tighten these per-namespace once the cluster is stable.
   clusterResourceWhitelist:
     - group: "*"
       kind: "*"
   namespaceResourceWhitelist:
     - group: "*"
       kind: "*"
+
+  # Prevent accidental deletion of the project while Applications exist
+  orphanedResources:
+    warn: true

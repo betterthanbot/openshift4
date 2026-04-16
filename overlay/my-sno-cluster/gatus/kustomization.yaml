@@ -1,0 +1,7 @@
+---
+# Gatus (uptime monitoring) overlay for my-sno-cluster
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../bases/gatus/

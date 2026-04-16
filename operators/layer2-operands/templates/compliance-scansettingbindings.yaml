@@ -1,0 +1,18 @@
+{{- if .Values.compliance.enabled }}
+{{- range .Values.compliance.scanSettingBindings }}
+---
+apiVersion: compliance.openshift.io/v1alpha1
+kind: ScanSettingBinding
+metadata:
+  name: {{ .name }}
+  namespace: {{ .namespace }}
+  labels:
+    {{- include "layer2-operands.labels" $ | nindent 4 }}
+profiles:
+  {{- toYaml .profiles | nindent 2 }}
+settingsRef:
+  apiGroup: compliance.openshift.io/v1alpha1
+  kind: ScanSetting
+  name: {{ .settingsRef }}
+{{- end }}
+{{- end }}

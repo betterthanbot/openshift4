@@ -1,0 +1,16 @@
+---
+# Kyverno policy engine overlay for my-sno-cluster
+# Uncomment to enable. Ensure the kyverno namespace patch (psm.yaml) is applied.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../bases/kyverno/
+
+# Apply the OpenShift cluster-monitoring label to the kyverno namespace
+patches:
+  - path: ./psm.yaml
+    target:
+      version: v1
+      kind: Namespace
+      name: kyverno
