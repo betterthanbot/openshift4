@@ -25,7 +25,7 @@ operators:
   # cert-manager (Red Hat)
   # ----------------------------------------------------------------------------
   certManager:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: cert-manager-operator
@@ -141,7 +141,7 @@ operators:
   # OpenShift GitOps (Red Hat)
   # ----------------------------------------------------------------------------
   gitopsOperator:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: openshift-gitops-operator
