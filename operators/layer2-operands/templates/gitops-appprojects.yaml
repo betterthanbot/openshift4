@@ -1,4 +1,4 @@
-{{- if and (dig "gitops" "enabled" false .Values) (dig "gitops" "appProjects" "enabled" false .Values) }}
+{{- if and .Values.gitops .Values.gitops.enabled .Values.gitops.appProjects .Values.gitops.appProjects.enabled }}
 {{- range .Values.gitops.appProjects.items }}
 ---
 apiVersion: argoproj.io/v1alpha1

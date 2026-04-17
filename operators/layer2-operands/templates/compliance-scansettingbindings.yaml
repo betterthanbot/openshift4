@@ -1,4 +1,4 @@
-{{- if dig "compliance" "enabled" false .Values }}
+{{- if and .Values.compliance .Values.compliance.enabled }}
 {{- range .Values.compliance.scanSettingBindings }}
 ---
 apiVersion: compliance.openshift.io/v1alpha1
