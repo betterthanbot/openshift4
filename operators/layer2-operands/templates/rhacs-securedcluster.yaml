@@ -1,4 +1,4 @@
-{{- if and .Values.rhacs.enabled .Values.rhacs.securedCluster.enabled }}
+{{- if and (dig "rhacs" "enabled" false .Values) (dig "rhacs" "securedCluster" "enabled" false .Values) }}
 {{- $sc := .Values.rhacs.securedCluster }}
 ---
 # RHACS SecuredCluster — registers this cluster's Sensor/Collector with Central.

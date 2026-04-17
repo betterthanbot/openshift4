@@ -1,4 +1,4 @@
-{{- if and .Values.rhacs.enabled .Values.rhacs.central.enabled }}
+{{- if and (dig "rhacs" "enabled" false .Values) (dig "rhacs" "central" "enabled" false .Values) }}
 {{- $c := .Values.rhacs.central }}
 ---
 # RHACS Central — the main RHACS console and API server.

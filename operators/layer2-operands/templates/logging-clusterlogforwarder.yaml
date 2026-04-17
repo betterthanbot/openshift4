@@ -1,4 +1,4 @@
-{{- if and .Values.logging.enabled .Values.logging.clusterLogForwarder.enabled }}
+{{- if and (dig "logging" "enabled" false .Values) (dig "logging" "clusterLogForwarder" "enabled" false .Values) }}
 {{- $clf := .Values.logging.clusterLogForwarder }}
 ---
 # ClusterLogForwarder — forwards application and infrastructure logs to LokiStack.

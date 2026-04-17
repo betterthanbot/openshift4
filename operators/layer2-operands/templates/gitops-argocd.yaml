@@ -1,4 +1,4 @@
-{{- if and .Values.gitops.enabled .Values.gitops.argocd.enabled }}
+{{- if and (dig "gitops" "enabled" false .Values) (dig "gitops" "argocd" "enabled" false .Values) }}
 {{- $a := .Values.gitops.argocd }}
 ---
 # ArgoCD instance managed by the OpenShift GitOps operator.

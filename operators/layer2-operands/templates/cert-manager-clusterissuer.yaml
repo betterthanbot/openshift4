@@ -1,4 +1,4 @@
-{{- if and .Values.certManager.enabled .Values.certManager.clusterIssuer.enabled }}
+{{- if and (dig "certManager" "enabled" false .Values) (dig "certManager" "clusterIssuer" "enabled" false .Values) }}
 {{- $ci := .Values.certManager.clusterIssuer }}
 ---
 # ClusterIssuer — uses ACME DNS-01 via Route 53

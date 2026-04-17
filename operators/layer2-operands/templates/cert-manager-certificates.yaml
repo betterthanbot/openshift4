@@ -1,4 +1,4 @@
-{{- if and .Values.certManager.enabled .Values.certManager.certificates.enabled }}
+{{- if and (dig "certManager" "enabled" false .Values) (dig "certManager" "certificates" "enabled" false .Values) }}
 {{- range .Values.certManager.certificates.items }}
 ---
 apiVersion: cert-manager.io/v1
