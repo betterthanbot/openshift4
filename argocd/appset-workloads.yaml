@@ -45,11 +45,12 @@ spec:
 
   template:
     metadata:
-      # Name is the directory name, e.g. "grafana", "gatus", "kyverno"
       name: "{{ .path.basename }}"
       namespace: openshift-gitops
       annotations:
         argocd.argoproj.io/sync-wave: "3"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
     spec:
       project: openshift4-community
 

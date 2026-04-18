@@ -13,7 +13,7 @@ kind: Application
 metadata:
   name: bootstrap
   namespace: openshift-gitops
-  # Prevent accidental deletion cascading to all managed apps
+  # Cascade-delete all managed resources when this app is deleted
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
