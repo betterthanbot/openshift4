@@ -279,7 +279,7 @@ grafana:
   instance:
     enabled: true
     name: grafana-a
-    namespace: openshift-operators
+    namespace: grafana
     dashboardLabel: grafana-a
     spec:
       config:
@@ -305,7 +305,7 @@ grafana:
   serviceAccount:
     enabled: true
     name: grafana-sa
-    namespace: openshift-operators
+    namespace: grafana
     authSecretName: grafana-thanos-auth
     tokenBuilderSA: grafana-token-builder-sa
     # Audience required by the Thanos kube-rbac-proxy (--auth-token-audiences flag).
@@ -319,7 +319,7 @@ grafana:
   datasource:
     enabled: true
     name: thanos-prometheus
-    namespace: openshift-operators
+    namespace: grafana
     instanceLabel: grafana-a
     datasourceName: Prometheus
     # Internal Thanos service — works on every OpenShift cluster without changes
