@@ -4,8 +4,6 @@
 # IMPORTANT — cluster-specific values to update before deploying:
 #   - rhacs.securedCluster.clusterName          (logical name for this cluster)
 #   - gitops.appProjects                        (adjust source repos as needed)
-#   - lokiStack.spec.storage.secret.name        (S3 credentials secret)
-#   - lokiStack.spec.storageClassName           (your cluster storage class)
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -333,16 +331,19 @@ lokiStack:
   name: logging-loki
   namespace: openshift-logging
   spec:
-    size: 1x.extra-small
+    managementState: Managed
+    limits:
+      global:
+        retention:
+          days: 14
+    size: 1x.pico # Supported size options for production instances of Loki are 1x.extra-small, 1x.small, or 1x.medium. Additionally, 1x.pico is available for testing and development purposes only.
     storage:
       schemas:
-        - effectiveDate: "2024-01-01"
+        - effectiveDate: "2026-04-19"
           version: v13
       secret:
-        # CHANGE ME: create a secret with S3 credentials before enabling
         name: logging-loki-s3
         type: s3
-    # CHANGE ME: set to your cluster's storage class (e.g. gp3-csi, thin-csi)
     storageClassName: gp3-csi
     tenants:
       mode: openshift-logging

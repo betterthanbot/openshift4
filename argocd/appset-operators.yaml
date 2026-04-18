@@ -103,3 +103,11 @@ spec:
           kind: SecuredCluster
           jsonPointers:
             - /status
+        # LokiStack S3 secret — placeholder is committed; real values are set manually.
+        # Ignore data so ArgoCD never overwrites credentials after they are entered.
+        - group: ""
+          kind: Secret
+          name: logging-loki-s3
+          namespace: openshift-logging
+          jsonPointers:
+            - /data
