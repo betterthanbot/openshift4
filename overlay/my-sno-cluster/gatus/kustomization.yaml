@@ -5,3 +5,4 @@ kind: Kustomization
 
 resources:
   - ../../../bases/gatus/
+  - namespace.yaml
