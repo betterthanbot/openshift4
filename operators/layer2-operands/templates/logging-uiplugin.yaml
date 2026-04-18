@@ -1,0 +1,18 @@
+{{- if and .Values.logging .Values.logging.enabled .Values.logging.uiPlugin .Values.logging.uiPlugin.enabled }}
+{{- $ui := .Values.logging.uiPlugin }}
+---
+# UIPlugin — enables the Logs tab under Observe > Logs in the OpenShift console.
+# Managed by the Cluster Observability Operator (must be installed via layer1).
+apiVersion: observability.openshift.io/v1alpha1
+kind: UIPlugin
+metadata:
+  name: logging
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  type: Logging
+  logging:
+    lokiStack:
+      name: {{ $ui.lokiStackName }}
+      namespace: {{ $ui.lokiStackNamespace }}
+{{- end }}

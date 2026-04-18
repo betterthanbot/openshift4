@@ -188,6 +188,11 @@ logging:
     lokiStackName: logging-loki
     lokiStackNamespace: openshift-logging
 
+  uiPlugin:
+    enabled: true
+    lokiStackName: logging-loki
+    lokiStackNamespace: openshift-logging
+
 # ------------------------------------------------------------------------------
 # Compliance Operator — ScanSettings and ScanSettingBindings
 # The "default" and "default-auto-apply" ScanSettings are built-in to the

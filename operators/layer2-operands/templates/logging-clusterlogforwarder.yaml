@@ -28,10 +28,11 @@ spec:
           configMapName: openshift-service-ca.crt
           key: service-ca.crt
   pipelines:
-    - name: infra-app-logs
+    - name: all-logs
       inputRefs:
         - application
         - infrastructure
+        - audit
       outputRefs:
         - lokistack-out
   serviceAccount:
