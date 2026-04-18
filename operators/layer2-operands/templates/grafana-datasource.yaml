@@ -1,12 +1,9 @@
 {{- if and .Values.grafana .Values.grafana.enabled .Values.grafana.datasource .Values.grafana.datasource.enabled }}
 {{- $d := .Values.grafana.datasource }}
 ---
-# GrafanaDatasource — wires the Grafana instance to the in-cluster Thanos querier.
-# The internal URL (thanos-querier.openshift-monitoring.svc) is identical on every
-# OpenShift cluster, so no cluster-specific changes are needed here.
-#
-# Auth: the `token` key from the SA token secret is injected by the Grafana
-# operator into the ${token} placeholder in httpHeaderValue1 at reconcile time.
+# Wave 2: runs after the sync-hook Job (wave 1) has written the auth Secret.
+# targetPath replaces the full field value — the derived Secret already contains
+# the complete "Bearer <token>" string so no prefix handling is needed here.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDatasource
 metadata:
@@ -14,6 +11,8 @@ metadata:
   namespace: {{ $d.namespace }}
   labels:
     {{- include "layer2-operands.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   instanceSelector:
     matchLabels:
@@ -29,10 +28,11 @@ spec:
       tlsSkipVerify: true
       httpHeaderName1: "Authorization"
     secureJsonData:
-      httpHeaderValue1: "Bearer ${token}"
+      httpHeaderValue1: ""
   valuesFrom:
-    - valueFrom:
+    - targetPath: "secureJsonData.httpHeaderValue1"
+      valueFrom:
         secretKeyRef:
-          name: {{ $d.tokenSecretName }}
-          key: token
+          name: {{ $d.authSecretName }}
+          key: bearer-token
 {{- end }}

@@ -307,6 +307,10 @@ grafana:
     name: grafana-sa
     namespace: openshift-operators
     tokenSecretName: grafana-sa-token
+    authSecretName: grafana-thanos-auth
+    tokenBuilderSA: grafana-token-builder-sa
+    # Built-in OpenShift CLI image — available on every cluster without registry auth
+    tokenBuilderImage: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
 
   datasource:
     enabled: true
@@ -316,7 +320,7 @@ grafana:
     datasourceName: Prometheus
     # Internal Thanos service — works on every OpenShift cluster without changes
     url: https://thanos-querier.openshift-monitoring.svc:9091
-    tokenSecretName: grafana-sa-token
+    authSecretName: grafana-thanos-auth
 
 # ------------------------------------------------------------------------------
 # Loki Operator — LokiStack instance
