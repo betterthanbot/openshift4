@@ -29,7 +29,7 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/betterthanbot/openshift4.git
-        revision: main
+        revision: feature/reorg
         directories:
           # Each subdirectory here becomes one ArgoCD Application.
           # Add new workloads by creating overlay/my-sno-cluster/<name>/kustomization.yaml

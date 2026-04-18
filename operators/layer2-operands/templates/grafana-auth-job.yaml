@@ -39,7 +39,6 @@ spec:
               set -e
               TOKEN=$(oc create token {{ $sa.name }} \
                 -n {{ $sa.namespace }} \
-                --audience {{ $sa.thanosAudience }} \
                 --duration {{ $sa.tokenDuration }})
 
               oc create secret generic {{ $sa.authSecretName }} \

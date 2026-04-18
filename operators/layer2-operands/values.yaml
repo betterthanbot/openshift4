@@ -308,9 +308,6 @@ grafana:
     namespace: grafana
     authSecretName: grafana-thanos-auth
     tokenBuilderSA: grafana-token-builder-sa
-    # Audience required by the Thanos kube-rbac-proxy (--auth-token-audiences flag).
-    # Tokens without this audience are rejected with 401.
-    thanosAudience: thanos-querier
     # Token lifetime. Job re-runs on every ArgoCD sync so keep this >= your sync interval.
     tokenDuration: 4380h
     # Built-in OpenShift CLI image — available on every cluster without registry auth
