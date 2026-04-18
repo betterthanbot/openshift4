@@ -1,0 +1,85 @@
+# ==============================================================================
+# ApplicationSet: openshift4-workloads
+#
+# Uses ArgoCD's Git directory generator to automatically discover every
+# subdirectory under overlay/my-sno-cluster/ and create a separate ArgoCD
+# Application for each one.
+#
+# This replaces the old single "my-sno-cluster" Application that lumped
+# everything together. Now each component (grafana, gatus, kyverno, …)
+# appears as its own Application in the ArgoCD UI.
+#
+# Adding a new workload:
+#   1. Create  overlay/my-sno-cluster/<name>/kustomization.yaml
+#   2. Push to main — ArgoCD auto-discovers and creates the Application.
+#      No changes to this file required.
+#
+# Sync-wave 3 ensures workloads deploy after operators (waves 1 & 2).
+# ==============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: openshift4-workloads
+  namespace: openshift-gitops
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+
+  generators:
+    - git:
+        repoURL: https://github.com/betterthanbot/openshift4.git
+        revision: feature/reorg
+        directories:
+          # Each subdirectory here becomes one ArgoCD Application.
+          # Add new workloads by creating overlay/my-sno-cluster/<name>/kustomization.yaml
+          - path: overlay/my-sno-cluster/*
+            # Exclude the shared patches directory — it's not a standalone app
+            exclude: false
+        # Exclude helper directories that aren't self-contained apps
+        # (uncomment and add names if you add non-app directories)
+        # template:
+        #   metadata:
+        #     annotations:
+        #       exclude: "true"
+
+  template:
+    metadata:
+      name: "{{ .path.basename }}"
+      namespace: openshift-gitops
+      annotations:
+        argocd.argoproj.io/sync-wave: "3"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: openshift4-community
+
+      source:
+        repoURL: https://github.com/betterthanbot/openshift4.git
+        targetRevision: feature/reorg
+        path: "{{ .path.path }}"
+        # ArgoCD auto-detects kustomize (kustomization.yaml present)
+        # or Helm (Chart.yaml present) — no explicit config needed
+
+      destination:
+        server: https://kubernetes.default.svc
+        # Individual kustomization.yaml files set their own namespace via
+        # the 'namespace:' field; this is a fallback default.
+        namespace: default
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ApplyOutOfSyncOnly=true
+
+      ignoreDifferences:
+        # Gatus config is generated at runtime by the discovery CronJob
+        - group: ""
+          kind: ConfigMap
+          name: gatus-config
+          namespace: gatus
+          jsonPointers:
+            - /data

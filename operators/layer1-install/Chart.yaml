@@ -1,0 +1,15 @@
+apiVersion: v2
+name: layer1-install
+description: >
+  OpenShift Operator installation layer — creates Namespaces, OperatorGroups,
+  and Subscriptions for all cluster operators. Deploy this chart BEFORE
+  layer2-operands.
+type: application
+version: 1.0.0
+appVersion: "4.20"
+keywords:
+  - openshift
+  - operators
+  - olm
+maintainers:
+  - name: platform-team

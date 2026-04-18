@@ -1,0 +1,502 @@
+# ==============================================================================
+# layer2-operands values
+#
+# IMPORTANT — cluster-specific values to update before deploying:
+#   - rhacs.securedCluster.clusterName          (logical name for this cluster)
+#   - gitops.appProjects                        (adjust source repos as needed)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Red Hat Advanced Cluster Security (RHACS)
+# ------------------------------------------------------------------------------
+rhacs:
+  enabled: true
+
+  central:
+    enabled: true
+    name: stackrox-central-services
+    namespace: stackrox
+    spec:
+      central:
+        exposure:
+          route:
+            enabled: true
+
+  securedCluster:
+    enabled: true
+    name: stackrox-secured-cluster-services
+    namespace: stackrox
+    # CHANGE ME: logical name for this cluster shown in RHACS console
+    clusterName: "my-cluster"
+
+# ------------------------------------------------------------------------------
+# OpenShift GitOps / ArgoCD
+# The GitOps operator auto-creates the openshift-gitops ArgoCD instance.
+# The CR below customises it with resource tuning, RBAC, and exclusions.
+# ------------------------------------------------------------------------------
+gitops:
+  enabled: false
+
+  argocd:
+    enabled: true
+    name: openshift-gitops
+    namespace: openshift-gitops
+    spec:
+      applicationSet:
+        resources:
+          limits:
+            cpu: "2"
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 512Mi
+        webhookServer:
+          ingress:
+            enabled: false
+          route:
+            enabled: false
+      controller:
+        processors: {}
+        resources:
+          limits:
+            cpu: "2"
+            memory: 2Gi
+          requests:
+            cpu: 250m
+            memory: 1Gi
+        sharding: {}
+      grafana:
+        enabled: false
+        ingress:
+          enabled: false
+        route:
+          enabled: false
+      ha:
+        enabled: false
+      imageUpdater:
+        enabled: false
+      monitoring:
+        enabled: false
+      networkPolicy:
+        enabled: true
+      notifications:
+        enabled: false
+      prometheus:
+        enabled: false
+        ingress:
+          enabled: false
+        route:
+          enabled: false
+      rbac:
+        defaultPolicy: ""
+        policy: |
+          g, system:cluster-admins, role:admin
+          g, cluster-admins, role:admin
+        scopes: "[groups]"
+      redis:
+        resources:
+          limits:
+            cpu: 500m
+            memory: 256Mi
+          requests:
+            cpu: 250m
+            memory: 128Mi
+      repo:
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+      server:
+        autoscale:
+          enabled: false
+        grpc:
+          ingress:
+            enabled: false
+        ingress:
+          enabled: false
+        resources:
+          limits:
+            cpu: 500m
+            memory: 256Mi
+          requests:
+            cpu: 125m
+            memory: 128Mi
+        route:
+          enabled: true
+        service:
+          type: ""
+      sso:
+        dex:
+          openShiftOAuth: true
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 250m
+              memory: 128Mi
+        provider: dex
+      tls:
+        ca: {}
+
+  appProjects:
+    enabled: true
+    items:
+      - name: default
+        namespace: openshift-gitops
+        spec:
+          clusterResourceWhitelist:
+            - group: "*"
+              kind: "*"
+          destinations:
+            - namespace: "*"
+              server: "*"
+          sourceRepos:
+            - "*"
+
+      - name: openshift4-community
+        namespace: openshift-gitops
+        description: "Open community GitOps project for shared OpenShift enablement assets"
+        spec:
+          clusterResourceWhitelist:
+            - group: "*"
+              kind: "*"
+          namespaceResourceWhitelist:
+            - group: "*"
+              kind: "*"
+          destinations:
+            - namespace: "*"
+              server: https://kubernetes.default.svc
+          # CHANGE ME: point to your fork / mirror
+          sourceRepos:
+            - "https://github.com/betterthanbot/openshift4.git"
+
+# ------------------------------------------------------------------------------
+# Cluster Logging / LokiStack
+# ------------------------------------------------------------------------------
+logging:
+  enabled: true
+
+  clusterLogForwarder:
+    enabled: true
+    name: instance
+    namespace: openshift-logging
+    serviceAccountName: logging-collector
+    lokiStackName: logging-loki
+    lokiStackNamespace: openshift-logging
+
+  uiPlugin:
+    enabled: true
+    lokiStackName: logging-loki
+    lokiStackNamespace: openshift-logging
+
+# ------------------------------------------------------------------------------
+# Compliance Operator — ScanSettings and ScanSettingBindings
+# The "default" and "default-auto-apply" ScanSettings are built-in to the
+# operator; only the custom ones are managed here.
+# ------------------------------------------------------------------------------
+compliance:
+  enabled: true
+
+  scanSettings:
+    - name: cis-1.7-full
+      namespace: openshift-compliance
+      maxRetryOnTimeout: 2
+      schedule: "0 0 1 * *"
+      timeout: 15m0s
+      suspend: false
+      strictNodeScan: false
+      showNotApplicable: false
+      roles:
+        - master
+        - worker
+      scanTolerations:
+        - operator: Exists
+      rawResultStorage:
+        enabled: true
+        pvAccessModes:
+          - ReadWriteOnce
+        rotation: 3
+        size: 1Gi
+
+    - name: ownself-monitor-ownself
+      namespace: openshift-compliance
+      maxRetryOnTimeout: 2
+      schedule: "0 0 1 * *"
+      timeout: 15m0s
+      suspend: false
+      strictNodeScan: false
+      showNotApplicable: false
+      roles:
+        - master
+        - worker
+      scanTolerations:
+        - operator: Exists
+      rawResultStorage:
+        enabled: true
+        pvAccessModes:
+          - ReadWriteOnce
+        rotation: 3
+        size: 1Gi
+
+  scanSettingBindings:
+    - name: cis-1.7-full
+      namespace: openshift-compliance
+      settingsRef: cis-1.7-full
+      profiles:
+        - apiGroup: compliance.openshift.io/v1alpha1
+          kind: Profile
+          name: ocp4-cis-1-7
+        - apiGroup: compliance.openshift.io/v1alpha1
+          kind: Profile
+          name: ocp4-cis-node-1-7
+
+    - name: ownself-monitor-ownself
+      namespace: openshift-compliance
+      settingsRef: ownself-monitor-ownself
+      profiles:
+        - apiGroup: compliance.openshift.io/v1alpha1
+          kind: Profile
+          name: ocp4-stig
+        - apiGroup: compliance.openshift.io/v1alpha1
+          kind: Profile
+          name: ocp4-stig-node
+        - apiGroup: compliance.openshift.io/v1alpha1
+          kind: Profile
+          name: ocp4-stig-node-v2r2
+        - apiGroup: compliance.openshift.io/v1alpha1
+          kind: Profile
+          name: ocp4-stig-node-v2r3
+
+# ------------------------------------------------------------------------------
+# Community Grafana Operator — Grafana instance
+# The `dashboardLabel` must match the instanceSelector used in GrafanaDashboard
+# and GrafanaDatasource CRs (bases/grafana uses "grafana-a").
+# ------------------------------------------------------------------------------
+grafana:
+  enabled: true
+
+  instance:
+    enabled: true
+    name: grafana-a
+    namespace: grafana
+    dashboardLabel: grafana-a
+    spec:
+      config:
+        log:
+          mode: console
+        security:
+          admin_user: root
+          admin_password: secret
+      persistentVolumeClaim:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+      route:
+        spec:
+          port:
+            targetPort: grafana
+          tls:
+            termination: edge
+
+  serviceAccount:
+    enabled: true
+    name: grafana-sa
+    namespace: grafana
+    authSecretName: grafana-thanos-auth
+    tokenBuilderSA: grafana-token-builder-sa
+    # Built-in OpenShift CLI image — available on every cluster without registry auth
+    tokenBuilderImage: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+
+  datasource:
+    enabled: true
+    name: thanos-prometheus
+    namespace: grafana
+    instanceLabel: grafana-a
+    datasourceName: Prometheus
+    # Internal Thanos service — works on every OpenShift cluster without changes
+    url: https://thanos-querier.openshift-monitoring.svc:9091
+    authSecretName: grafana-thanos-auth
+
+  lokiDatasources:
+    enabled: true
+    namespace: grafana
+    instanceLabel: grafana-a
+    # Reuses the same grafana-sa token written by the grafana-auth-job (wave 1).
+    authSecretName: grafana-thanos-auth
+    # Internal LokiStack gateway — <lokistack-name>-gateway-http.<namespace>.svc
+    lokiGatewayURL: https://logging-loki-gateway-http.openshift-logging.svc:8080
+    tenants:
+      application:
+        enabled: true
+        name: loki-application
+        datasourceName: "Loki - Application"
+      infrastructure:
+        enabled: true
+        name: loki-infrastructure
+        datasourceName: "Loki - Infrastructure"
+      audit:
+        enabled: true
+        name: loki-audit
+        datasourceName: "Loki - Audit"
+
+# ------------------------------------------------------------------------------
+# Loki Operator — LokiStack instance
+# Required by ClusterLogForwarder. Object storage secret must exist first.
+# CHANGE ME: storage.secret.name, storageClassName, and schemas.effectiveDate.
+# ------------------------------------------------------------------------------
+lokiStack:
+  enabled: true
+  name: logging-loki
+  namespace: openshift-logging
+  spec:
+    managementState: Managed
+    limits:
+      global:
+        retention:
+          days: 14
+    size: 1x.pico # Supported size options for production instances of Loki are 1x.extra-small, 1x.small, or 1x.medium. Additionally, 1x.pico is available for testing and development purposes only.
+    storage:
+      schemas:
+        - effectiveDate: "2024-01-01"
+          version: v13
+      secret:
+        name: logging-loki-s3
+        type: s3
+    storageClassName: gp3-csi
+    tenants:
+      mode: openshift-logging
+
+# ------------------------------------------------------------------------------
+# Node Feature Discovery — NodeFeatureDiscovery instance
+# Detects hardware features (GPU, CPU flags, PCI devices) and labels nodes.
+# ------------------------------------------------------------------------------
+nfd:
+  enabled: true
+
+  instance:
+    enabled: true
+    name: nfd-instance
+    namespace: openshift-nfd
+    spec:
+      operand:
+        image: "quay.io/openshift/origin-node-feature-discovery"
+        imagePullPolicy: Always
+      workerConfig:
+        configData: |
+          core:
+            sleepInterval: 60s
+          sources:
+            pci:
+              deviceClassWhitelist:
+                - "02"
+                - "03"
+                - "12"
+              deviceLabelFields:
+                - vendor
+            usb:
+              deviceClassWhitelist:
+                - "ef"
+              deviceLabelFields:
+                - class
+                - vendor
+                - device
+            custom: []
+
+# ------------------------------------------------------------------------------
+# Red Hat OpenShift AI (RHODS) — DSCInitialization + DataScienceCluster
+# DSCInitialization must reconcile before DataScienceCluster is applied.
+# Toggle individual components via managementState: Managed | Removed.
+# ------------------------------------------------------------------------------
+rhods:
+  enabled: true
+
+  dscInitialization:
+    enabled: true
+    name: default-dsci
+    spec:
+      applicationsNamespace: redhat-ods-applications
+      monitoring:
+        managementState: Managed
+        namespace: redhat-ods-monitoring
+      serviceMesh:
+        managementState: Removed
+      trustedCABundle:
+        managementState: Managed
+
+  dataScientCluster:
+    enabled: true
+    name: default-dsc
+    spec:
+      components:
+        codeflare:
+          managementState: Removed
+        dashboard:
+          managementState: Managed
+        datasciencepipelines:
+          managementState: Managed
+        kserve:
+          managementState: Removed
+        kueue:
+          managementState: Removed
+        modelmeshserving:
+          managementState: Managed
+        ray:
+          managementState: Removed
+        trainingoperator:
+          managementState: Removed
+        trustyai:
+          managementState: Removed
+        workbenches:
+          managementState: Managed
+
+# ------------------------------------------------------------------------------
+# NVIDIA GPU Operator — ClusterPolicy
+# Manages driver, toolkit, device-plugin, DCGM, GFD daemonsets on GPU nodes.
+# ------------------------------------------------------------------------------
+gpuOperator:
+  enabled: true
+
+  clusterPolicy:
+    enabled: true
+    name: gpu-cluster-policy
+    spec:
+      operator:
+        defaultRuntime: crio
+      sandboxWorkloads:
+        defaultWorkload: container
+      migManager:
+        enabled: true
+      nodeStatusExporter:
+        enabled: true
+      daemonsets:
+        rollingUpdate:
+          maxUnavailable: "1"
+      driver:
+        enabled: true
+        useNvidiaDriverCRD: true
+      dcgm:
+        enabled: true
+      dcgmExporter:
+        enabled: true
+      devicePlugin:
+        enabled: true
+      gfd:
+        enabled: true
+      toolkit:
+        enabled: true
+      validator:
+        plugin:
+          env:
+            - name: WITH_WORKLOAD
+              value: "true"
+      vgpuDeviceManager:
+        enabled: false
+      vgpuManager:
+        enabled: false

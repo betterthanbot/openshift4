@@ -1,0 +1,26 @@
+{{- /*
+  Create an OLM Subscription for each enabled operator.
+  startingCSV is optional — omit it to always track the latest in the channel.
+  For Manual installPlanApproval, set startingCSV to pin the desired version.
+*/ -}}
+{{- range $opKey, $op := .Values.operators }}
+{{- if $op.enabled }}
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: {{ $op.subscription.name }}
+  namespace: {{ $op.subscription.namespace }}
+  labels:
+    {{- include "layer1-install.labels" $ | nindent 4 }}
+spec:
+  channel: {{ $op.subscription.channel | quote }}
+  name: {{ $op.subscription.name | quote }}
+  source: {{ $op.subscription.source | quote }}
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: {{ $op.subscription.installPlanApproval }}
+  {{- if $op.subscription.startingCSV }}
+  startingCSV: {{ $op.subscription.startingCSV | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

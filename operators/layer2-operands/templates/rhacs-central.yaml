@@ -1,0 +1,16 @@
+{{- if and .Values.rhacs .Values.rhacs.enabled .Values.rhacs.central .Values.rhacs.central.enabled }}
+{{- $c := .Values.rhacs.central }}
+---
+# RHACS Central — the main RHACS console and API server.
+# After first deploy the operator will generate an admin password in a secret
+# named "central-htpasswd" in the {{ $c.namespace }} namespace.
+apiVersion: platform.stackrox.io/v1alpha1
+kind: Central
+metadata:
+  name: {{ $c.name }}
+  namespace: {{ $c.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  {{- toYaml $c.spec | nindent 2 }}
+{{- end }}

@@ -1,0 +1,41 @@
+{{- if and .Values.grafana .Values.grafana.enabled .Values.grafana.lokiDatasources .Values.grafana.lokiDatasources.enabled }}
+{{- $loki := .Values.grafana.lokiDatasources }}
+{{- $tenants := dict "application" $loki.tenants.application "infrastructure" $loki.tenants.infrastructure "audit" $loki.tenants.audit }}
+{{- range $tenant, $cfg := $tenants }}
+{{- if $cfg.enabled }}
+---
+# Wave 2: depends on the auth Secret written by the grafana-auth-job (wave 1).
+# URL format: <gateway>/api/logs/v1/<tenant> — Grafana Loki datasource appends
+# /loki/api/v1/... automatically, producing the correct LokiStack gateway path.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: {{ $cfg.name }}
+  namespace: {{ $loki.namespace }}
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: {{ $loki.instanceLabel }}
+  datasource:
+    name: {{ $cfg.datasourceName }}
+    type: loki
+    access: proxy
+    url: {{ $loki.lokiGatewayURL }}/api/logs/v1/{{ $tenant }}
+    jsonData:
+      tlsSkipVerify: true
+      httpHeaderName1: "Authorization"
+    secureJsonData:
+      httpHeaderValue1: ""
+  valuesFrom:
+    - targetPath: "secureJsonData.httpHeaderValue1"
+      valueFrom:
+        secretKeyRef:
+          name: {{ $loki.authSecretName }}
+          key: bearer-token
+{{- end }}
+{{- end }}
+{{- end }}

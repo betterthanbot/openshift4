@@ -1,0 +1,132 @@
+{{- if and .Values.gitops .Values.gitops.enabled .Values.gitops.argocd .Values.gitops.argocd.enabled }}
+{{- $a := .Values.gitops.argocd }}
+---
+# ArgoCD instance managed by the OpenShift GitOps operator.
+# The GitOps operator creates this automatically; this CR customises it.
+# Note: ownerReferences are intentionally omitted — the operator will
+# re-establish ownership after applying this resource.
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: {{ $a.name }}
+  namespace: {{ $a.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  applicationSet:
+    resources:
+      {{- toYaml $a.spec.applicationSet.resources | nindent 6 }}
+    webhookServer:
+      ingress:
+        enabled: {{ $a.spec.applicationSet.webhookServer.ingress.enabled }}
+      route:
+        enabled: {{ $a.spec.applicationSet.webhookServer.route.enabled }}
+  controller:
+    processors: {}
+    resources:
+      {{- toYaml $a.spec.controller.resources | nindent 6 }}
+    sharding: {}
+  grafana:
+    enabled: {{ $a.spec.grafana.enabled }}
+    ingress:
+      enabled: {{ $a.spec.grafana.ingress.enabled }}
+    route:
+      enabled: {{ $a.spec.grafana.route.enabled }}
+  ha:
+    enabled: {{ $a.spec.ha.enabled }}
+  imageUpdater:
+    enabled: {{ $a.spec.imageUpdater.enabled }}
+  monitoring:
+    enabled: {{ $a.spec.monitoring.enabled }}
+  networkPolicy:
+    enabled: {{ $a.spec.networkPolicy.enabled }}
+  notifications:
+    enabled: {{ $a.spec.notifications.enabled }}
+  prometheus:
+    enabled: {{ $a.spec.prometheus.enabled }}
+    ingress:
+      enabled: {{ $a.spec.prometheus.ingress.enabled }}
+    route:
+      enabled: {{ $a.spec.prometheus.route.enabled }}
+  rbac:
+    defaultPolicy: {{ $a.spec.rbac.defaultPolicy | quote }}
+    policy: |
+      {{- $a.spec.rbac.policy | nindent 6 }}
+    scopes: {{ $a.spec.rbac.scopes | quote }}
+  redis:
+    resources:
+      {{- toYaml $a.spec.redis.resources | nindent 6 }}
+  repo:
+    resources:
+      {{- toYaml $a.spec.repo.resources | nindent 6 }}
+  # resourceExclusions prevents ArgoCD from tracking high-churn objects
+  # that would cause constant reconciliation loops.
+  resourceExclusions: |
+    - apiGroups:
+      - ""
+      - discovery.k8s.io
+      clusters:
+      - '*'
+      kinds:
+      - Endpoints
+      - EndpointSlice
+    - apiGroups:
+      - apiregistration.k8s.io
+      clusters:
+      - '*'
+      kinds:
+      - APIService
+    - apiGroups:
+      - coordination.k8s.io
+      clusters:
+      - '*'
+      kinds:
+      - Lease
+    - apiGroups:
+      - authentication.k8s.io
+      - authorization.k8s.io
+      clusters:
+      - '*'
+      kinds:
+      - SelfSubjectReview
+      - TokenReview
+      - LocalSubjectAccessReview
+      - SelfSubjectAccessReview
+      - SelfSubjectRulesReview
+      - SubjectAccessReview
+    - apiGroups:
+      - certificates.k8s.io
+      clusters:
+      - '*'
+      kinds:
+      - CertificateSigningRequest
+    - apiGroups:
+      - tekton.dev
+      clusters:
+      - '*'
+      kinds:
+      - TaskRun
+      - PipelineRun
+  server:
+    autoscale:
+      enabled: {{ $a.spec.server.autoscale.enabled }}
+    grpc:
+      ingress:
+        enabled: {{ $a.spec.server.grpc.ingress.enabled }}
+    ingress:
+      enabled: {{ $a.spec.server.ingress.enabled }}
+    resources:
+      {{- toYaml $a.spec.server.resources | nindent 6 }}
+    route:
+      enabled: {{ $a.spec.server.route.enabled }}
+    service:
+      type: {{ $a.spec.server.service.type | quote }}
+  sso:
+    dex:
+      openShiftOAuth: {{ $a.spec.sso.dex.openShiftOAuth }}
+      resources:
+        {{- toYaml $a.spec.sso.dex.resources | nindent 8 }}
+    provider: {{ $a.spec.sso.provider }}
+  tls:
+    ca: {}
+{{- end }}

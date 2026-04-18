@@ -1,13 +1,34 @@
+# ==============================================================================
+# Bootstrap Application — "App of Apps"
+#
+# Apply this ONCE manually to seed ArgoCD. It points at argocd/ in this repo
+# and picks up: AppProjects, ApplicationSets (operators + workloads), and RBAC.
+# ArgoCD then manages all downstream Applications automatically.
+#
+# Apply:
+#   oc apply -f bootstrap/bootstrap.yaml -n openshift-gitops
+# ==============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: bootstrap
   namespace: openshift-gitops
+  # Cascade-delete all managed resources when this app is deleted
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   destination:
-    server: 'https://kubernetes.default.svc'
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
   project: default
   source:
-    repoURL: 'https://github.com/betterthanbot/openshift4.git'
+    repoURL: https://github.com/betterthanbot/openshift4.git
     path: argocd/
-    targetRevision: feature/status
+    targetRevision: feature/reorg
+  syncPolicy:
+    automated:
+      prune: false      # never auto-delete argocd/ resources
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true

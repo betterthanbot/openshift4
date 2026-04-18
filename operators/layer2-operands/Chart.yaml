@@ -1,0 +1,19 @@
+apiVersion: v2
+name: layer2-operands
+description: >
+  OpenShift Operator operand layer — deploys the Custom Resources (CRs) that
+  configure each operator once it is running. Deploy this chart AFTER
+  layer1-install operators are fully reconciled.
+type: application
+version: 1.0.0
+appVersion: "4.20"
+keywords:
+  - openshift
+  - operators
+  - operands
+  - rhacs
+  - gitops
+  - logging
+  - compliance
+maintainers:
+  - name: platform-team

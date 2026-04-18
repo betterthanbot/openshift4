@@ -1,3 +1,8 @@
+---
+title: Home
+nav_order: 1
+---
+
 # OCP (Community Repo)
 
 Welcome! 👋
@@ -19,6 +24,24 @@ The goal: **make it easy for engineers and the open-source community to learn, r
 * Open-source practitioners who want to share knowledge and improvements
 * Platform, DevOps, SRE, and infrastructure teams collaborating on reusable patterns
 * Community members who want a central place to exchange operational and technical practices
+
+---
+
+## Platform Docs
+
+| Document | Description |
+|---|---|
+| [Architecture](architecture.md) | How the platform is structured — app-of-apps, sync waves, namespace layout, RBAC model |
+| [Getting Started](getting-started.md) | Prerequisites, bootstrap steps, and post-install verification |
+
+## Tutorials
+
+| Tutorial | Description |
+|---|---|
+| [Operator Management](tutorials/operator-management.md) | Enable, disable, add, and configure operators via GitOps |
+| [Adding a Workload](tutorials/adding-a-workload.md) | Add a new application using the base + overlay pattern |
+| [Grafana + Thanos Datasource](tutorials/grafana-thanos-datasource.md) | Wire community Grafana to OpenShift's built-in Thanos querier with GitOps-managed auth |
+| [LokiStack S3 Setup](tutorials/lokistack-s3-setup.md) | Enter S3 credentials for LokiStack log storage via Web Console or CLI |
 
 ---
 

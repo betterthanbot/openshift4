@@ -1,0 +1,16 @@
+{{- if and .Values.grafana .Values.grafana.enabled .Values.grafana.instance .Values.grafana.instance.enabled }}
+{{- $g := .Values.grafana.instance }}
+---
+# Grafana instance — must exist before GrafanaDashboard/GrafanaDatasource resources
+# are picked up. The `dashboards` label must match the instanceSelector in those CRs.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: Grafana
+metadata:
+  name: {{ $g.name }}
+  namespace: {{ $g.namespace }}
+  labels:
+    dashboards: {{ $g.dashboardLabel }}
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  {{- toYaml $g.spec | nindent 2 }}
+{{- end }}

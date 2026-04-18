@@ -1,0 +1,303 @@
+# ==============================================================================
+# layer1-install values
+# Each operator entry drives Namespace + OperatorGroup + Subscription creation.
+#
+# Fields:
+#   enabled                    - toggle the entire operator on/off
+#   namespace.create           - false if the namespace already exists in OCP
+#   namespace.name             - namespace to install the operator into
+#   namespace.labels           - extra labels to apply to the namespace
+#   operatorGroup.create       - false if a global OG already covers this NS
+#   operatorGroup.name         - OperatorGroup resource name
+#   operatorGroup.targetNamespaces - [] means watch all namespaces (OwnNamespace
+#                                   = list the namespace; AllNamespaces = [])
+#   subscription.name          - OLM package name (also the Subscription name)
+#   subscription.namespace     - must match namespace.name
+#   subscription.channel       - operator channel to track
+#   subscription.source        - CatalogSource name
+#   subscription.installPlanApproval - Automatic | Manual
+#   subscription.startingCSV   - pin to a specific CSV version; "" = latest
+# ==============================================================================
+
+operators:
+
+  # ----------------------------------------------------------------------------
+  # Grafana (Community)
+  # ----------------------------------------------------------------------------
+  grafana:
+    enabled: true
+    namespace:
+      create: true
+      name: grafana
+      labels:
+        kubernetes.io/metadata.name: grafana
+    operatorGroup:
+      create: true
+      name: grafana
+      targetNamespaces: []   # AllNamespaces
+    subscription:
+      name: grafana-operator
+      namespace: grafana
+      channel: v5
+      source: community-operators
+      installPlanApproval: Automatic
+      startingCSV: "grafana-operator.v5.22.2"
+
+  # ----------------------------------------------------------------------------
+  # NVIDIA GPU Operator (Certified)
+  # ----------------------------------------------------------------------------
+  gpuOperator:
+    enabled: true
+    namespace:
+      create: true
+      name: nvidia-gpu-operator
+      labels:
+        kubernetes.io/metadata.name: nvidia-gpu-operator
+        openshift.io/cluster-monitoring: "true"
+    operatorGroup:
+      create: true
+      name: nvidia-gpu-operator
+      targetNamespaces:
+        - nvidia-gpu-operator
+    subscription:
+      name: gpu-operator-certified
+      namespace: nvidia-gpu-operator
+      channel: v26.3
+      source: certified-operators
+      installPlanApproval: Automatic
+      startingCSV: "gpu-operator-certified.v26.3.0"
+
+  # ----------------------------------------------------------------------------
+  # Cluster Observability Operator (Red Hat)
+  # ----------------------------------------------------------------------------
+  clusterObservability:
+    enabled: true
+    namespace:
+      create: true
+      name: openshift-cluster-observability-operator
+      labels:
+        kubernetes.io/metadata.name: openshift-cluster-observability-operator
+        openshift.io/cluster-monitoring: "true"
+        security.openshift.io/scc.podSecurityLabelSync: "true"
+    operatorGroup:
+      create: true
+      name: openshift-cluster-observability-operator
+      targetNamespaces: []   # AllNamespaces
+    subscription:
+      name: cluster-observability-operator
+      namespace: openshift-cluster-observability-operator
+      channel: stable
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "cluster-observability-operator.v1.4.0"
+
+  # ----------------------------------------------------------------------------
+  # Compliance Operator (Red Hat)
+  # ----------------------------------------------------------------------------
+  complianceOperator:
+    enabled: true
+    namespace:
+      create: true
+      name: openshift-compliance
+      labels:
+        kubernetes.io/metadata.name: openshift-compliance
+        security.openshift.io/scc.podSecurityLabelSync: "true"
+    operatorGroup:
+      create: true
+      name: openshift-compliance
+      targetNamespaces: []   # AllNamespaces
+    subscription:
+      name: compliance-operator
+      namespace: openshift-compliance
+      channel: stable
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "compliance-operator.v1.8.2"
+
+  # ----------------------------------------------------------------------------
+  # OpenShift GitOps (Red Hat)
+  # ----------------------------------------------------------------------------
+  gitopsOperator:
+    enabled: false
+    namespace:
+      create: true
+      name: openshift-gitops-operator
+      labels:
+        kubernetes.io/metadata.name: openshift-gitops-operator
+        openshift.io/cluster-monitoring: "true"
+        security.openshift.io/scc.podSecurityLabelSync: "true"
+    operatorGroup:
+      create: true
+      name: openshift-gitops-operator
+      targetNamespaces: []   # AllNamespaces
+    subscription:
+      name: openshift-gitops-operator
+      namespace: openshift-gitops-operator
+      channel: latest
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "openshift-gitops-operator.v1.20.1"
+
+  # ----------------------------------------------------------------------------
+  # Kernel Module Management Hub (Red Hat)
+  # ----------------------------------------------------------------------------
+  kmmHub:
+    enabled: true
+    namespace:
+      create: true
+      name: openshift-kmm-hub
+      labels:
+        kubernetes.io/metadata.name: openshift-kmm-hub
+        security.openshift.io/scc.podSecurityLabelSync: "true"
+    operatorGroup:
+      create: true
+      name: openshift-kmm-hub
+      targetNamespaces:
+        - openshift-kmm-hub
+    subscription:
+      name: kernel-module-management-hub
+      namespace: openshift-kmm-hub
+      channel: stable
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "kernel-module-management-hub.v2.6.0"
+
+  # ----------------------------------------------------------------------------
+  # Cluster Logging (Red Hat)
+  # ----------------------------------------------------------------------------
+  clusterLogging:
+    enabled: true
+    namespace:
+      create: true
+      name: openshift-logging
+      labels:
+        kubernetes.io/metadata.name: openshift-logging
+        openshift.io/cluster-monitoring: "true"
+        security.openshift.io/scc.podSecurityLabelSync: "true"
+    operatorGroup:
+      create: true
+      name: openshift-logging
+      targetNamespaces: []   # AllNamespaces
+    subscription:
+      name: cluster-logging
+      namespace: openshift-logging
+      channel: stable-6.3
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "cluster-logging.v6.3.4"
+
+  # ----------------------------------------------------------------------------
+  # Node Feature Discovery (Red Hat)
+  # ----------------------------------------------------------------------------
+  nfd:
+    enabled: true
+    namespace:
+      create: true
+      name: openshift-nfd
+      labels:
+        kubernetes.io/metadata.name: openshift-nfd
+        openshift.io/cluster-monitoring: "true"
+        security.openshift.io/scc.podSecurityLabelSync: "true"
+    operatorGroup:
+      create: true
+      name: openshift-nfd
+      targetNamespaces:
+        - openshift-nfd
+    subscription:
+      name: nfd
+      namespace: openshift-nfd
+      channel: stable
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "nfd.4.20.0-202603051149"
+
+  # ----------------------------------------------------------------------------
+  # Loki Operator (Red Hat)
+  # openshift-operators-redhat is a standard OCP namespace for RH operators
+  # that require their own OperatorGroup (not the global one).
+  # ----------------------------------------------------------------------------
+  lokiOperator:
+    enabled: true
+    namespace:
+      create: true
+      name: openshift-operators-redhat
+      labels:
+        kubernetes.io/metadata.name: openshift-operators-redhat
+        openshift.io/cluster-monitoring: "true"
+        security.openshift.io/MinimallySufficientPodSecurityStandard: restricted
+        security.openshift.io/scc.podSecurityLabelSync: "true"
+    operatorGroup:
+      create: true
+      name: openshift-operators-redhat
+      targetNamespaces: []   # AllNamespaces
+    subscription:
+      name: loki-operator
+      namespace: openshift-operators-redhat
+      channel: stable-6.3
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "loki-operator.v6.3.4"
+
+  # ----------------------------------------------------------------------------
+  # DevWorkspace Operator (Red Hat)
+  # Installs into openshift-operators which already exists in OCP and already
+  # has the "global-operators" OperatorGroup — no Namespace/OG creation needed.
+  # ----------------------------------------------------------------------------
+  devWorkspace:
+    enabled: true
+    namespace:
+      create: false   # openshift-operators is a built-in OCP namespace
+      name: openshift-operators
+    operatorGroup:
+      create: false   # global-operators OG already exists
+    subscription:
+      name: devworkspace-operator
+      namespace: openshift-operators
+      channel: fast
+      source: redhat-operators
+      installPlanApproval: Manual
+      startingCSV: "devworkspace-operator.v0.40.0"
+
+  # ----------------------------------------------------------------------------
+  # Red Hat OpenShift AI / RHODS (Red Hat)
+  # ----------------------------------------------------------------------------
+  rhodsOperator:
+    enabled: true
+    namespace:
+      create: true
+      name: redhat-ods-operator
+      labels:
+        kubernetes.io/metadata.name: redhat-ods-operator
+    operatorGroup:
+      create: true
+      name: redhat-ods-operator
+      targetNamespaces: []   # AllNamespaces
+    subscription:
+      name: rhods-operator
+      namespace: redhat-ods-operator
+      channel: stable-3.3
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "rhods-operator.3.3.0"
+
+  # ----------------------------------------------------------------------------
+  # Red Hat Advanced Cluster Security (RHACS) (Red Hat)
+  # ----------------------------------------------------------------------------
+  rhacsOperator:
+    enabled: true
+    namespace:
+      create: true
+      name: stackrox
+      labels:
+        kubernetes.io/metadata.name: stackrox
+    operatorGroup:
+      create: true
+      name: stackrox
+      targetNamespaces: []   # AllNamespaces
+    subscription:
+      name: rhacs-operator
+      namespace: stackrox
+      channel: stable
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "rhacs-operator.v4.10.0"

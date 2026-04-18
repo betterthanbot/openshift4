@@ -1,0 +1,29 @@
+{{- /*
+  Create an OperatorGroup for each operator whose operatorGroup.create == true.
+  Operators targeting openshift-operators (which already has global-operators)
+  have operatorGroup.create = false and are skipped.
+
+  targetNamespaces behavior:
+    - non-empty list  → OwnNamespace or MultiNamespace mode (watches listed NSes)
+    - empty list []   → AllNamespaces mode (watches entire cluster)
+*/ -}}
+{{- range $opKey, $op := .Values.operators }}
+{{- if and $op.enabled $op.operatorGroup.create }}
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: {{ $op.operatorGroup.name }}
+  namespace: {{ $op.namespace.name }}
+  labels:
+    {{- include "layer1-install.labels" $ | nindent 4 }}
+spec:
+  {{- if $op.operatorGroup.targetNamespaces }}
+  targetNamespaces:
+    {{- range $op.operatorGroup.targetNamespaces }}
+    - {{ . | quote }}
+    {{- end }}
+  {{- end }}
+  {{- /* empty targetNamespaces omitted → AllNamespaces mode */ -}}
+{{- end }}
+{{- end }}

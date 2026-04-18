@@ -1,0 +1,13 @@
+{{- if and .Values.nfd .Values.nfd.enabled .Values.nfd.instance .Values.nfd.instance.enabled }}
+{{- $n := .Values.nfd.instance }}
+---
+apiVersion: nfd.openshift.io/v1
+kind: NodeFeatureDiscovery
+metadata:
+  name: {{ $n.name }}
+  namespace: {{ $n.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  {{- toYaml $n.spec | nindent 2 }}
+{{- end }}

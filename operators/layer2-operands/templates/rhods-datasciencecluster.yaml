@@ -1,0 +1,26 @@
+{{- if and .Values.rhods .Values.rhods.enabled }}
+{{- $r := .Values.rhods }}
+{{- if and $r.dscInitialization $r.dscInitialization.enabled }}
+---
+# DSCInitialization must be created before DataScienceCluster.
+apiVersion: dscinitialization.opendatahub.io/v1
+kind: DSCInitialization
+metadata:
+  name: {{ $r.dscInitialization.name }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  {{- toYaml $r.dscInitialization.spec | nindent 2 }}
+{{- end }}
+{{- if and $r.dataScientCluster $r.dataScientCluster.enabled }}
+---
+apiVersion: datasciencecluster.opendatahub.io/v1
+kind: DataScienceCluster
+metadata:
+  name: {{ $r.dataScientCluster.name }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  {{- toYaml $r.dataScientCluster.spec | nindent 2 }}
+{{- end }}
+{{- end }}

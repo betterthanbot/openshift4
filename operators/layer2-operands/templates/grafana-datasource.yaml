@@ -1,0 +1,38 @@
+{{- if and .Values.grafana .Values.grafana.enabled .Values.grafana.datasource .Values.grafana.datasource.enabled }}
+{{- $d := .Values.grafana.datasource }}
+---
+# Wave 2: runs after the sync-hook Job (wave 1) has written the auth Secret.
+# targetPath replaces the full field value — the derived Secret already contains
+# the complete "Bearer <token>" string so no prefix handling is needed here.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: {{ $d.name }}
+  namespace: {{ $d.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: {{ $d.instanceLabel }}
+  datasource:
+    name: {{ $d.datasourceName }}
+    type: prometheus
+    access: proxy
+    url: {{ $d.url }}
+    isDefault: true
+    jsonData:
+      timeInterval: 5s
+      tlsSkipVerify: true
+      httpHeaderName1: "Authorization"
+    secureJsonData:
+      httpHeaderValue1: ""
+  valuesFrom:
+    - targetPath: "secureJsonData.httpHeaderValue1"
+      valueFrom:
+        secretKeyRef:
+          name: {{ $d.authSecretName }}
+          key: bearer-token
+{{- end }}

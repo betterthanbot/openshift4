@@ -1,0 +1,40 @@
+{{- if and .Values.logging .Values.logging.enabled .Values.logging.clusterLogForwarder .Values.logging.clusterLogForwarder.enabled }}
+{{- $clf := .Values.logging.clusterLogForwarder }}
+---
+# ClusterLogForwarder — forwards application and infrastructure logs to LokiStack.
+# Prerequisite: LokiStack instance named "{{ $clf.lokiStackName }}" must exist
+# in namespace "{{ $clf.lokiStackNamespace }}" before this is applied.
+apiVersion: observability.openshift.io/v1
+kind: ClusterLogForwarder
+metadata:
+  name: {{ $clf.name }}
+  namespace: {{ $clf.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  managementState: Managed
+  outputs:
+    - name: lokistack-out
+      type: lokiStack
+      lokiStack:
+        authentication:
+          token:
+            from: serviceAccount
+        target:
+          name: {{ $clf.lokiStackName }}
+          namespace: {{ $clf.lokiStackNamespace }}
+      tls:
+        ca:
+          configMapName: openshift-service-ca.crt
+          key: service-ca.crt
+  pipelines:
+    - name: all-logs
+      inputRefs:
+        - application
+        - infrastructure
+        - audit
+      outputRefs:
+        - lokistack-out
+  serviceAccount:
+    name: {{ $clf.serviceAccountName }}
+{{- end }}
