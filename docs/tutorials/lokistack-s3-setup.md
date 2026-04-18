@@ -1,3 +1,9 @@
+---
+title: LokiStack S3 Setup
+parent: Tutorials
+nav_order: 4
+---
+
 # LokiStack S3 Storage Setup
 
 LokiStack requires an S3-compatible object storage bucket to store logs. A placeholder Secret is committed to this repo — you must fill in your real credentials before LokiStack will start.

@@ -1,3 +1,9 @@
+---
+title: Grafana + Thanos Datasource
+parent: Tutorials
+nav_order: 3
+---
+
 # Grafana + Thanos Datasource on OpenShift
 
 **Audience:** Platform / SRE engineers setting up community Grafana on OpenShift
@@ -52,10 +58,10 @@ The bearer token comes from a Kubernetes ServiceAccount that has been granted th
 
 | Resource | Kind | Namespace | Purpose |
 |---|---|---|---|
-| `grafana-sa` | ServiceAccount | `openshift-operators` | Identity for querying Thanos |
-| `grafana-sa-token` | Secret (`kubernetes.io/service-account-token`) | `openshift-operators` | Long-lived bearer token for the SA |
+| `grafana-sa` | ServiceAccount | `grafana` | Identity for querying Thanos |
+| `grafana-sa-token` | Secret (`kubernetes.io/service-account-token`) | `grafana` | Long-lived bearer token for the SA |
 | `grafana-cluster-monitoring-view` | ClusterRoleBinding | cluster-scoped | Grants `grafana-sa` → `cluster-monitoring-view` |
-| `thanos-prometheus` | GrafanaDatasource | `openshift-operators` | Wires Grafana to Thanos with the token |
+| `thanos-prometheus` | GrafanaDatasource | `grafana` | Wires Grafana to Thanos with the token |
 
 ---
 
@@ -94,7 +100,7 @@ If the GrafanaDatasource reconciles before the token is ready, the Grafana Opera
 ### 1. Check the token Secret is populated
 
 ```bash
-oc get secret grafana-sa-token -n openshift-operators -o jsonpath='{.data.token}' | base64 -d | head -c 20
+oc get secret grafana-sa-token -n grafana -o jsonpath='{.data.token}' | base64 -d | head -c 20
 ```
 
 You should see the beginning of a JWT string (`eyJ...`).
@@ -102,7 +108,7 @@ You should see the beginning of a JWT string (`eyJ...`).
 ### 2. Test the token against Thanos directly
 
 ```bash
-TOKEN=$(oc get secret grafana-sa-token -n openshift-operators -o jsonpath='{.data.token}' | base64 -d)
+TOKEN=$(oc get secret grafana-sa-token -n grafana -o jsonpath='{.data.token}' | base64 -d)
 
 curl -k -H "Authorization: Bearer $TOKEN" \
   https://thanos-querier.openshift-monitoring.svc:9091/api/v1/query?query=up
@@ -112,7 +118,7 @@ A `200 OK` with Prometheus JSON confirms auth is working.
 
 ### 3. Check the datasource in Grafana
 
-1. Open the Grafana route: `oc get route -n openshift-operators`
+1. Open the Grafana route: `oc get route -n grafana`
 2. Log in with the credentials configured in your `Grafana` CR
 3. Navigate to **Connections → Data sources → Prometheus**
 4. Click **Save & test** — you should see `Data source is working`

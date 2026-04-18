@@ -7,20 +7,92 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
-## [1.0.0] - 2026-04-17
+## [1.0.0] - 2026-04-19
+
 ### Added
-- Added `operators/layer1-install` Helm chart — installs all OLM Namespaces, OperatorGroups, and Subscriptions (14 operators)
-- Added `operators/layer2-operands` Helm chart — installs operator CRs (cert-manager ClusterIssuer/Certificates; RHACS Central/SecuredCluster; ArgoCD instance; ClusterLogForwarder; Compliance ScanSettings/Bindings)
-- Added `argocd/appset-operators.yaml` — operators ApplicationSet with sync-wave ordering (layer1=wave 1, layer2=wave 2)
-- Added `argocd/appset-workloads.yaml` — replaces monolithic applicationSet.yaml; Git directory generator gives each workload its own ArgoCD Application
+
+#### GitOps Foundation
+- `bootstrap/bootstrap.yaml` — single ArgoCD Application bootstrapping the App-of-Apps pattern; applied once manually to seed the platform
+- `argocd/appProject.yaml` — AppProject `openshift4-community` with cluster-wide source/destination access and orphaned resource warnings
+- `argocd/appset-operators.yaml` — ApplicationSet (list generator) deploying `operators-layer1` (sync wave 1) and `operators-layer2` (sync wave 2) with `ignoreDifferences` on the LokiStack S3 Secret to prevent credential drift
+- `argocd/appset-workloads.yaml` — ApplicationSet (git directory generator) auto-discovering all workloads under `overlay/my-sno-cluster/`; each subdirectory becomes its own ArgoCD Application
+- `argocd/rbac-operands.yaml` — ClusterRole + ClusterRoleBinding granting the ArgoCD application controller SA `cluster-admin`; required for managing cluster-scoped resources across all namespaces
+
+#### Operator Layer 1 — `operators/layer1-install/`
+Helm chart installing 11 operators via OLM. Each operator entry creates a dedicated Namespace, OperatorGroup, and Subscription. An `enabled:` flag per operator allows zero-downtime enable/disable without touching ArgoCD:
+- Grafana Community Operator v5 (`grafana` namespace)
+- NVIDIA GPU Operator (`nvidia-gpu-operator` namespace)
+- Cluster Observability Operator (`openshift-operators` namespace)
+- Compliance Operator (`openshift-compliance` namespace)
+- Kernel Module Management (KMM) Hub (`openshift-kmm-hub` namespace)
+- Cluster Logging Operator v6 (`openshift-logging` namespace)
+- Node Feature Discovery (NFD) (`openshift-nfd` namespace)
+- Loki Operator (`openshift-operators-redhat` namespace)
+- DevWorkspace Operator (`openshift-operators` namespace)
+- RHODS / OpenShift AI (`redhat-ods-operator` namespace)
+- RHACS (`stackrox` namespace)
+
+#### Operator Layer 2 — `operators/layer2-operands/`
+Helm chart creating operator Custom Resources (operands) once operators are running:
+- `grafana-instance.yaml` — `Grafana` CR deploying a community Grafana instance in the dedicated `grafana` namespace
+- `grafana-serviceaccount.yaml` — `grafana-sa` ServiceAccount + `grafana-cluster-monitoring-view` ClusterRoleBinding granting read access to OpenShift monitoring metrics
+- `grafana-auth-job.yaml` — Sync hook Job (wave 1) that mints a `grafana-sa` bearer token via `oc create token` and writes it to a Secret for use by the datasource
+- `grafana-datasource.yaml` — `GrafanaDatasource` CR (wave 2) pointing to `https://thanos-querier.openshift-monitoring.svc:9091` with `valuesFrom` token injection from the Job-written Secret
+- `lokistack.yaml` — `LokiStack` CR configured for AWS S3 (`gp3-csi` storage, `1x.pico` size, 14-day log retention)
+- `lokistack-s3-secret.yaml` — Placeholder `logging-loki-s3` Secret with `argocd.argoproj.io/sync-options: Prune=false`; ArgoCD creates it on first sync but never deletes or overwrites it after credentials are entered
+- `logging-collector-sa.yaml` — `logging-collector` ServiceAccount, `logging-collector-token` Secret (type `kubernetes.io/service-account-token`) providing a long-lived bearer token for the vector log collector, and four ClusterRoleBindings: `collect-application-logs`, `collect-infrastructure-logs`, `collect-audit-logs`, `logging-collector-logs-writer`
+- `logging-clusterlogforwarder.yaml` — `ClusterLogForwarder` routing application, infrastructure, and audit logs to LokiStack via the `logging-collector` SA
+- `logging-uiplugin.yaml` — `UIPlugin` CR enabling the **Observe → Logs** tab in the OpenShift Web Console (powered by LokiStack)
+- `nfd-instance.yaml` — `NodeFeatureDiscovery` CR
+- `rhacs-central.yaml` — RHACS `Central` CR
+- `rhacs-securedcluster.yaml` — RHACS `SecuredCluster` CR
+- `compliance-scansettings.yaml` — two `ScanSetting` CRs (default + scheduled daily)
+- `compliance-scansettingbindings.yaml` — two `ScanSettingBinding` CRs (ocp4-cis-1-7 + rhcos4-cis-1-7 profiles)
+- `gpu-clusterpolicy.yaml` — NVIDIA GPU `ClusterPolicy` CR enabling GPU feature discovery and device plugin
+- `rhods-datasciencecluster.yaml` — `DSCInitialization` + `DataScienceCluster` CRs for OpenShift AI / RHODS
+- `gitops-argocd.yaml` — `ArgoCD` CR (disabled by default; managed for completeness)
+- `gitops-appprojects.yaml` — additional `AppProject` CRs
+
+#### Workloads
+- `overlay/my-sno-cluster/gatus/` — Kustomize overlay for Gatus uptime monitoring with auto-created `gatus` namespace
+- `overlay/my-sno-cluster/grafana/` — Kustomize overlay deploying `GrafanaDashboard` CRs to the `grafana` namespace (custom dashboards: cluster health, GPU utilization, vLLM performance, API network analysis, VPA, RHOAI inference)
+- `overlay/my-sno-cluster/kyverno/` — Kustomize overlay for Kyverno policy engine with auto-created `kyverno` namespace
+
+#### Documentation — GitHub Pages (`docs/`)
+- `docs/_config.yml` — Just the Docs Jekyll theme with hierarchical sidebar navigation and dark color scheme
+- `docs/index.md` — Platform home page with navigation to all docs and tutorials
+- `docs/platform-docs.md` — Platform Docs parent navigation page
+- `docs/architecture.md` — App-of-apps design diagram, sync wave ordering table, two-layer operator model, workload overlay pattern, namespace layout, RBAC model, key design decisions
+- `docs/getting-started.md` — Prerequisites (cluster + tooling), step-by-step bootstrap procedure, LokiStack S3 secret setup, verification commands, access URLs, uninstall procedure
+- `docs/tutorials/index.md` — Tutorials parent navigation page
+- `docs/tutorials/operator-management.md` — Full operator table with enable/disable flags, step-by-step enable/disable/add workflows, version pinning, channel changes, Compliance profile management
+- `docs/tutorials/adding-a-workload.md` — Kustomize overlay pattern (Option A) and Helm chart base (Option B), cluster-specific patches, `ignoreDifferences` for runtime-generated fields, verification commands, removal procedure
+- `docs/tutorials/grafana-thanos-datasource.md` — Grafana SA token injection mechanism, Thanos datasource GitOps setup, verify and troubleshoot guide
+- `docs/tutorials/lokistack-s3-setup.md` — Web Console and CLI methods for entering S3 credentials, LokiStack readiness verification, troubleshooting table
+
 ### Changed
-- Split `overlay/my-sno-cluster/kustomization.yaml` into per-component subdirs (`grafana/`, `gatus/`, `kyverno/`) so each appears as a separate Application in the ArgoCD UI
-- Updated `bootstrap/bootstrap.yaml` — branch `feature/status` → `main`; added finalizer and syncPolicy
-- Updated `argocd/appProject.yaml` — added orphanedResources warning
+- `bootstrap/bootstrap.yaml` — branch updated from `feature/status` → `main`; added cascade deletion finalizer and auto-sync policy
+- `argocd/appProject.yaml` — added `orphanedResources` warning configuration
+- `argocd/appset-workloads.yaml` — generator `revision` aligned with source `targetRevision` (`feature/reorg`) to correctly discover workload overlay directories on the active branch
+- `operators/layer2-operands/values.yaml` — Grafana resources moved from `openshift-operators` to dedicated `grafana` namespace; LokiStack configured for AWS (`gp3-csi`, `1x.pico`, 14-day retention); `uiPlugin` section added for console Logs tab
+- `operators/layer2-operands/templates/grafana-auth-job.yaml` — removed `--audience` flag from `oc create token`; confirmed unnecessary on this cluster
+- `overlay/my-sno-cluster/gatus/kustomization.yaml` — added `namespace.yaml` resource for auto namespace creation
+- `docs/tutorials/grafana-thanos-datasource.md` — updated all namespace references from `openshift-operators` → `grafana` to reflect current deployment
+
+### Fixed
+- **Grafana datasource 401** — Grafana `GrafanaDatasource` `valuesFrom` secret reference failed silently when the secret was in a different namespace (`openshift-operators`) than the Grafana instance (`grafana`). Fixed by consolidating all Grafana resources into the `grafana` namespace.
+- **ArgoCD workload discovery** — generator `revision: main` caused ArgoCD to discover stale directories (`patches`, `policies`, `vpa`) from the main branch instead of the active `feature/reorg` directories (`gatus`, `grafana`, `kyverno`). Fixed by aligning generator revision with source revision.
+- **Vector log collector 403 from LokiStack gateway** — vector reads its bearer token from a directory-mounted Secret (`logging-collector-token`) rather than the pod's projected SA token. Without a `kubernetes.io/service-account-token` type Secret of that name, vector sent no token → 403 Forbidden. Fixed by adding the Secret to `logging-collector-sa.yaml`.
+- **ArgoCD forbidden on standard K8s resources** — ArgoCD SA lacked permissions to create Services, Deployments, Routes, and CronJobs for workload apps. Fixed by adding a `cluster-admin` ClusterRoleBinding in `rbac-operands.yaml`.
+- **Gatus missing namespace** — Gatus overlay had no namespace; pods could not be scheduled. Fixed by adding `namespace.yaml` to the gatus overlay.
+- **LokiStack schema effectiveDate** — admission webhook rejected a future-dated `effectiveDate`; reverted to `"2024-01-01"`.
+
 ### Removed
-- `argocd/applicationSet.yaml` — replaced by appset-workloads.yaml + appset-operators.yaml
+- `argocd/applicationSet.yaml` — replaced by `appset-workloads.yaml` + `appset-operators.yaml`
 - `argocd/application.yaml` — superseded by ApplicationSets
-- `overlay/my-sno-cluster/kustomization.yaml` — split into per-component subdirs
+- `overlay/my-sno-cluster/kustomization.yaml` — split into per-component subdirectories (`gatus/`, `grafana/`, `kyverno/`)
+- cert-manager operator — OpenShift provides equivalent certificate management by default
+- Service Mesh operator — OpenShift provides equivalent by default
 
 ## [0.3.1] - 2026-04-12
 ### Changed

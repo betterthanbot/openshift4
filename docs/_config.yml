@@ -1,0 +1,31 @@
+title: OpenShift4 GitOps Platform
+description: >-
+  Community-driven GitOps platform for Single-Node OpenShift — operators,
+  observability, and workloads managed entirely via ArgoCD.
+
+remote_theme: just-the-docs/just-the-docs@v0.10.0
+
+url: https://betterthanbot.github.io
+baseurl: /openshift4
+
+aux_links:
+  "GitHub":
+    - "https://github.com/betterthanbot/openshift4"
+aux_links_new_tab: true
+
+search_enabled: true
+search:
+  heading_level: 3
+  previews: 3
+
+nav_sort: case_insensitive
+
+color_scheme: dark
+
+footer_content: >-
+  Community platform docs ·
+  <a href="https://github.com/betterthanbot/openshift4">betterthanbot/openshift4</a>
+
+plugins:
+  - jekyll-seo-tag
+  - jekyll-remote-theme

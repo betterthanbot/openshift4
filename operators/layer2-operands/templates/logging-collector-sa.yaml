@@ -11,6 +11,20 @@ metadata:
   labels:
     {{- include "layer2-operands.labels" . | nindent 4 }}
 ---
+# Long-lived SA token secret required by vector's directory secret provider.
+# Vector reads the bearer token from /var/run/ocp-collector/secrets/logging-collector-token/token.
+# Without this secret, vector sends no token and LokiStack returns 403.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $clf.serviceAccountName }}-token
+  namespace: {{ $clf.namespace }}
+  annotations:
+    kubernetes.io/service-account.name: {{ $clf.serviceAccountName }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+type: kubernetes.io/service-account-token
+---
 # Grants the collector SA permission to collect application logs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -58,4 +72,22 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: collect-audit-logs
+---
+# Grants the collector SA permission to WRITE logs into LokiStack tenants.
+# This ClusterRole is created by the Loki Operator when tenants.mode: openshift-logging.
+# Without this binding the vector collector gets 403 Forbidden from the LokiStack gateway.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: logging-collector-logs-writer
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $clf.serviceAccountName }}
+    namespace: {{ $clf.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: logging-collector-logs-writer
 {{- end }}
