@@ -8,9 +8,7 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 
 ## [Released]
 ## [1.0.0] - 2026-04-19
-
 ### Added
-
 #### GitOps Foundation
 - `bootstrap/bootstrap.yaml` — single ArgoCD Application bootstrapping the App-of-Apps pattern; applied once manually to seed the platform
 - `argocd/appProject.yaml` — AppProject `openshift4-community` with cluster-wide source/destination access and orphaned resource warnings

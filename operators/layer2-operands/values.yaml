@@ -326,6 +326,28 @@ grafana:
     url: https://thanos-querier.openshift-monitoring.svc:9091
     authSecretName: grafana-thanos-auth
 
+  lokiDatasources:
+    enabled: true
+    namespace: grafana
+    instanceLabel: grafana-a
+    # Reuses the same grafana-sa token written by the grafana-auth-job (wave 1).
+    authSecretName: grafana-thanos-auth
+    # Internal LokiStack gateway — <lokistack-name>-gateway-http.<namespace>.svc
+    lokiGatewayURL: https://logging-loki-gateway-http.openshift-logging.svc:8080
+    tenants:
+      application:
+        enabled: true
+        name: loki-application
+        datasourceName: "Loki - Application"
+      infrastructure:
+        enabled: true
+        name: loki-infrastructure
+        datasourceName: "Loki - Infrastructure"
+      audit:
+        enabled: true
+        name: loki-audit
+        datasourceName: "Loki - Audit"
+
 # ------------------------------------------------------------------------------
 # Loki Operator — LokiStack instance
 # Required by ClusterLogForwarder. Object storage secret must exist first.
