@@ -1,0 +1,16 @@
+{{- if and .Values.lokiStack .Values.lokiStack.enabled }}
+{{- $l := .Values.lokiStack }}
+---
+# LokiStack — required by ClusterLogForwarder to store logs.
+# Prerequisite: an S3-compatible secret named {{ $l.spec.storage.secret.name }}
+# must exist in namespace {{ $l.namespace }} before this is applied.
+apiVersion: loki.grafana.com/v1
+kind: LokiStack
+metadata:
+  name: {{ $l.name }}
+  namespace: {{ $l.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  {{- toYaml $l.spec | nindent 2 }}
+{{- end }}

@@ -22,29 +22,6 @@
 operators:
 
   # ----------------------------------------------------------------------------
-  # cert-manager (Red Hat)
-  # ----------------------------------------------------------------------------
-  certManager:
-    enabled: false
-    namespace:
-      create: true
-      name: cert-manager-operator
-      labels:
-        kubernetes.io/metadata.name: cert-manager-operator
-    operatorGroup:
-      create: true
-      name: cert-manager-operator-og
-      targetNamespaces:
-        - cert-manager-operator
-    subscription:
-      name: openshift-cert-manager-operator
-      namespace: cert-manager-operator
-      channel: stable-v1
-      source: redhat-operators
-      installPlanApproval: Automatic
-      startingCSV: ""   # leave empty to track latest; pin: e.g. openshift-cert-manager-operator.v1.x.y
-
-  # ----------------------------------------------------------------------------
   # Grafana (Community)
   # ----------------------------------------------------------------------------
   grafana:
@@ -280,25 +257,6 @@ operators:
       source: redhat-operators
       installPlanApproval: Manual
       startingCSV: "devworkspace-operator.v0.40.0"
-
-  # ----------------------------------------------------------------------------
-  # Service Mesh v3 (Red Hat)
-  # Same openshift-operators namespace — no Namespace/OG creation needed.
-  # ----------------------------------------------------------------------------
-  serviceMesh:
-    enabled: true
-    namespace:
-      create: false
-      name: openshift-operators
-    operatorGroup:
-      create: false
-    subscription:
-      name: servicemeshoperator3
-      namespace: openshift-operators
-      channel: stable
-      source: redhat-operators
-      installPlanApproval: Manual
-      startingCSV: "servicemeshoperator3.v3.1.0"
 
   # ----------------------------------------------------------------------------
   # Red Hat OpenShift AI / RHODS (Red Hat)

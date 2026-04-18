@@ -2,84 +2,11 @@
 # layer2-operands values
 #
 # IMPORTANT — cluster-specific values to update before deploying:
-#   - certManager.clusterIssuer.acme.*          (email, AWS keys, hosted zone)
-#   - certManager.certificates.*.dnsNames       (your cluster domain)
-#   - certManager.certificates.*.commonName     (your cluster domain)
 #   - rhacs.securedCluster.clusterName          (logical name for this cluster)
 #   - gitops.appProjects                        (adjust source repos as needed)
-#
-# SENSITIVE values (never commit to git):
-#   - certManager.clusterIssuer.acme.route53.accessKeyID
-#   Pass at deploy time:  --set certManager.clusterIssuer.acme.route53.accessKeyID=AKIAXXXXXXXX
-#   Or use a Helm secrets plugin / external-secrets / SealedSecrets.
+#   - lokiStack.spec.storage.secret.name        (S3 credentials secret)
+#   - lokiStack.spec.storageClassName           (your cluster storage class)
 # ==============================================================================
-
-# ------------------------------------------------------------------------------
-# cert-manager
-# ------------------------------------------------------------------------------
-certManager:
-  enabled: false
-
-  clusterIssuer:
-    enabled: true
-    name: letsencrypt-production-ec2
-    acme:
-      # CHANGE ME: notification email for Let's Encrypt
-      email: "platform-admins@example.com"
-      server: https://acme-v02.api.letsencrypt.org/directory
-      privateKeySecretRef: cluster-issuer-acme-production
-      route53:
-        # SENSITIVE — override via --set or a secrets manager, never commit
-        accessKeyID: ""
-        # CHANGE ME: your Route 53 hosted zone ID
-        hostedZoneID: ""
-        # CHANGE ME: AWS region where the zone lives
-        region: "us-east-1"
-        secretAccessKeySecretRef:
-          key: aws_secret_access_key
-          name: cert-manager-aws-creds
-        # CHANGE ME: DNS zones for ACME DNS-01 challenges
-        dnsZones:
-          - "api.cluster.example.com"
-          - "apps.cluster.example.com"
-
-  certificates:
-    enabled: true
-    items:
-      - name: cert-manager-api-cert
-        namespace: openshift-config
-        # CHANGE ME
-        commonName: "api.cluster.example.com"
-        dnsNames:
-          - "api.cluster.example.com"
-        duration: 2160h
-        renewBefore: 360h
-        secretName: cert-manager-api-cert
-        issuerRef:
-          group: cert-manager.io
-          kind: ClusterIssuer
-          name: letsencrypt-production-ec2
-        usages:
-          - server auth
-          - client auth
-
-      - name: cert-manager-ingress-cert
-        namespace: openshift-ingress
-        # CHANGE ME
-        commonName: "apps.cluster.example.com"
-        dnsNames:
-          - "apps.cluster.example.com"
-          - "*.apps.cluster.example.com"
-        duration: 2160h
-        renewBefore: 360h
-        secretName: cert-manager-ingress-cert
-        issuerRef:
-          group: cert-manager.io
-          kind: ClusterIssuer
-          name: letsencrypt-production-ec2
-        usages:
-          - server auth
-          - client auth
 
 # ------------------------------------------------------------------------------
 # Red Hat Advanced Cluster Security (RHACS)
@@ -340,3 +267,190 @@ compliance:
         - apiGroup: compliance.openshift.io/v1alpha1
           kind: Profile
           name: ocp4-stig-node-v2r3
+
+# ------------------------------------------------------------------------------
+# Community Grafana Operator — Grafana instance
+# The `dashboardLabel` must match the instanceSelector used in GrafanaDashboard
+# and GrafanaDatasource CRs (bases/grafana uses "grafana-a").
+# ------------------------------------------------------------------------------
+grafana:
+  enabled: true
+
+  instance:
+    enabled: true
+    name: grafana-a
+    namespace: openshift-operators
+    dashboardLabel: grafana-a
+    spec:
+      config:
+        log:
+          mode: console
+        security:
+          admin_user: root
+          admin_password: secret
+      persistentVolumeClaim:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+      route:
+        spec:
+          port:
+            targetPort: grafana
+          tls:
+            termination: edge
+
+# ------------------------------------------------------------------------------
+# Loki Operator — LokiStack instance
+# Required by ClusterLogForwarder. Object storage secret must exist first.
+# CHANGE ME: storage.secret.name, storageClassName, and schemas.effectiveDate.
+# ------------------------------------------------------------------------------
+lokiStack:
+  enabled: true
+  name: logging-loki
+  namespace: openshift-logging
+  spec:
+    size: 1x.extra-small
+    storage:
+      schemas:
+        - effectiveDate: "2024-01-01"
+          version: v13
+      secret:
+        # CHANGE ME: create a secret with S3 credentials before enabling
+        name: logging-loki-s3
+        type: s3
+    # CHANGE ME: set to your cluster's storage class (e.g. gp3-csi, thin-csi)
+    storageClassName: gp3-csi
+    tenants:
+      mode: openshift-logging
+
+# ------------------------------------------------------------------------------
+# Node Feature Discovery — NodeFeatureDiscovery instance
+# Detects hardware features (GPU, CPU flags, PCI devices) and labels nodes.
+# ------------------------------------------------------------------------------
+nfd:
+  enabled: true
+
+  instance:
+    enabled: true
+    name: nfd-instance
+    namespace: openshift-nfd
+    spec:
+      operand:
+        image: "quay.io/openshift/origin-node-feature-discovery"
+        imagePullPolicy: Always
+      workerConfig:
+        configData: |
+          core:
+            sleepInterval: 60s
+          sources:
+            pci:
+              deviceClassWhitelist:
+                - "02"
+                - "03"
+                - "12"
+              deviceLabelFields:
+                - vendor
+            usb:
+              deviceClassWhitelist:
+                - "ef"
+              deviceLabelFields:
+                - class
+                - vendor
+                - device
+            custom: []
+
+# ------------------------------------------------------------------------------
+# Red Hat OpenShift AI (RHODS) — DSCInitialization + DataScienceCluster
+# DSCInitialization must reconcile before DataScienceCluster is applied.
+# Toggle individual components via managementState: Managed | Removed.
+# ------------------------------------------------------------------------------
+rhods:
+  enabled: true
+
+  dscInitialization:
+    enabled: true
+    name: default-dsci
+    spec:
+      applicationsNamespace: redhat-ods-applications
+      monitoring:
+        managementState: Managed
+        namespace: redhat-ods-monitoring
+      serviceMesh:
+        managementState: Removed
+      trustedCABundle:
+        managementState: Managed
+
+  dataScientCluster:
+    enabled: true
+    name: default-dsc
+    spec:
+      components:
+        codeflare:
+          managementState: Removed
+        dashboard:
+          managementState: Managed
+        datasciencepipelines:
+          managementState: Managed
+        kserve:
+          managementState: Removed
+        kueue:
+          managementState: Removed
+        modelmeshserving:
+          managementState: Managed
+        ray:
+          managementState: Removed
+        trainingoperator:
+          managementState: Removed
+        trustyai:
+          managementState: Removed
+        workbenches:
+          managementState: Managed
+
+# ------------------------------------------------------------------------------
+# NVIDIA GPU Operator — ClusterPolicy
+# Manages driver, toolkit, device-plugin, DCGM, GFD daemonsets on GPU nodes.
+# ------------------------------------------------------------------------------
+gpuOperator:
+  enabled: true
+
+  clusterPolicy:
+    enabled: true
+    name: gpu-cluster-policy
+    spec:
+      operator:
+        defaultRuntime: crio
+      sandboxWorkloads:
+        defaultWorkload: container
+      migManager:
+        enabled: true
+      nodeStatusExporter:
+        enabled: true
+      daemonsets:
+        rollingUpdate:
+          maxUnavailable: "1"
+      driver:
+        enabled: true
+        useNvidiaDriverCRD: true
+      dcgm:
+        enabled: true
+      dcgmExporter:
+        enabled: true
+      devicePlugin:
+        enabled: true
+      gfd:
+        enabled: true
+      initContainer: {}
+      toolkit:
+        enabled: true
+      validator:
+        plugin:
+          env:
+            - name: WITH_WORKLOAD
+              value: "true"
+      vgpuDeviceManager:
+        enabled: false
+      vgpuManager:
+        enabled: false

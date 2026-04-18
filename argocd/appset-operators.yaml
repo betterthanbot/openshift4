@@ -9,11 +9,6 @@
 # Sync-wave ordering ensures layer1 (operators) reaches healthy state before
 # layer2 (operands) attempts to create CRs that depend on the operator CRDs.
 #
-# NOTE: The cert-manager AWS credentials secret must exist in the cert-manager
-# namespace BEFORE layer2 syncs. Create it out-of-band:
-#   oc create secret generic cert-manager-aws-creds \
-#     --namespace cert-manager \
-#     --from-literal=aws_secret_access_key="$AWS_SECRET_KEY"
 # ==============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -107,14 +102,5 @@ spec:
             - /status
         - group: platform.stackrox.io
           kind: SecuredCluster
-          jsonPointers:
-            - /status
-        # cert-manager updates issuer status after ACME challenge
-        - group: cert-manager.io
-          kind: ClusterIssuer
-          jsonPointers:
-            - /status
-        - group: cert-manager.io
-          kind: Certificate
           jsonPointers:
             - /status

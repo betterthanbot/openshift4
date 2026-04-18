@@ -101,12 +101,6 @@ spec:
       kinds:
       - CertificateSigningRequest
     - apiGroups:
-      - cert-manager.io
-      clusters:
-      - '*'
-      kinds:
-      - CertificateRequest
-    - apiGroups:
       - tekton.dev
       clusters:
       - '*'

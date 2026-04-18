@@ -1,0 +1,12 @@
+{{- if and .Values.gpuOperator .Values.gpuOperator.enabled .Values.gpuOperator.clusterPolicy .Values.gpuOperator.clusterPolicy.enabled }}
+{{- $g := .Values.gpuOperator.clusterPolicy }}
+---
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: {{ $g.name }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  {{- toYaml $g.spec | nindent 2 }}
+{{- end }}
