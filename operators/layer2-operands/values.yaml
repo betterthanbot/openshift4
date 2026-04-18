@@ -311,8 +311,6 @@ grafana:
     namespace: grafana
     authSecretName: grafana-thanos-auth
     tokenBuilderSA: grafana-token-builder-sa
-    # Token lifetime. Job re-runs on every ArgoCD sync so keep this >= your sync interval.
-    tokenDuration: 4380h
     # Built-in OpenShift CLI image — available on every cluster without registry auth
     tokenBuilderImage: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
 
