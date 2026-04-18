@@ -339,7 +339,7 @@ lokiStack:
     size: 1x.pico # Supported size options for production instances of Loki are 1x.extra-small, 1x.small, or 1x.medium. Additionally, 1x.pico is available for testing and development purposes only.
     storage:
       schemas:
-        - effectiveDate: "2026-04-19"
+        - effectiveDate: "2024-01-01"
           version: v13
       secret:
         name: logging-loki-s3
