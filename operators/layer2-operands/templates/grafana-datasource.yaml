@@ -1,0 +1,38 @@
+{{- if and .Values.grafana .Values.grafana.enabled .Values.grafana.datasource .Values.grafana.datasource.enabled }}
+{{- $d := .Values.grafana.datasource }}
+---
+# GrafanaDatasource — wires the Grafana instance to the in-cluster Thanos querier.
+# The internal URL (thanos-querier.openshift-monitoring.svc) is identical on every
+# OpenShift cluster, so no cluster-specific changes are needed here.
+#
+# Auth: the `token` key from the SA token secret is injected by the Grafana
+# operator into the ${token} placeholder in httpHeaderValue1 at reconcile time.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: {{ $d.name }}
+  namespace: {{ $d.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: {{ $d.instanceLabel }}
+  datasource:
+    name: {{ $d.datasourceName }}
+    type: prometheus
+    access: proxy
+    url: {{ $d.url }}
+    isDefault: true
+    jsonData:
+      timeInterval: 5s
+      tlsSkipVerify: true
+      httpHeaderName1: "Authorization"
+    secureJsonData:
+      httpHeaderValue1: "Bearer ${token}"
+  valuesFrom:
+    - valueFrom:
+        secretKeyRef:
+          name: {{ $d.tokenSecretName }}
+          key: token
+{{- end }}

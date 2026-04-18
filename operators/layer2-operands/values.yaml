@@ -302,6 +302,22 @@ grafana:
           tls:
             termination: edge
 
+  serviceAccount:
+    enabled: true
+    name: grafana-sa
+    namespace: openshift-operators
+    tokenSecretName: grafana-sa-token
+
+  datasource:
+    enabled: true
+    name: thanos-prometheus
+    namespace: openshift-operators
+    instanceLabel: grafana-a
+    datasourceName: Prometheus
+    # Internal Thanos service — works on every OpenShift cluster without changes
+    url: https://thanos-querier.openshift-monitoring.svc:9091
+    tokenSecretName: grafana-sa-token
+
 # ------------------------------------------------------------------------------
 # Loki Operator — LokiStack instance
 # Required by ClusterLogForwarder. Object storage secret must exist first.

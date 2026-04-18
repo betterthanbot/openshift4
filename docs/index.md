@@ -22,6 +22,14 @@ The goal: **make it easy for engineers and the open-source community to learn, r
 
 ---
 
+## Tutorials
+
+| Tutorial | Description |
+|---|---|
+| [Grafana + Thanos Datasource](tutorials/grafana-thanos-datasource.md) | Wire community Grafana to OpenShift's built-in Thanos querier with GitOps-managed auth |
+
+---
+
 ## Repository Structure (Suggested)
 
 > Adjust these folders to match your setup.
