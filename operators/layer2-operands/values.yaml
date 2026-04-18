@@ -442,7 +442,6 @@ gpuOperator:
         enabled: true
       gfd:
         enabled: true
-      initContainer: {}
       toolkit:
         enabled: true
       validator:
