@@ -1,10 +1,16 @@
 {{- if and .Values.grafana .Values.grafana.enabled .Values.grafana.serviceAccount .Values.grafana.serviceAccount.enabled }}
 {{- $sa := .Values.grafana.serviceAccount }}
 ---
-# Sync-hook Job (wave 1): reads the SA token, prepends "Bearer ", writes it to a
-# derived Secret so GrafanaDatasource can use targetPath without losing the prefix.
-# Runs on every ArgoCD sync (BeforeHookCreation deletes the previous Job first),
-# which also refreshes the token in case it was rotated.
+# Sync-hook Job (wave 1): mints a TokenRequest token for grafana-sa with
+# audience=thanos-querier so the Thanos kube-rbac-proxy accepts it.
+#
+# Why not use a kubernetes.io/service-account-token Secret?
+# The Thanos kube-rbac-proxy validates tokens with --auth-token-audiences=thanos-querier.
+# Legacy SA token Secrets carry a generic audience and fail that check (401).
+# oc create token issues via the TokenRequest API with the exact audience required.
+#
+# BeforeHookCreation re-runs this on every ArgoCD sync, keeping the token fresh
+# within its --duration window.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -31,27 +37,15 @@ spec:
             - -c
             - |
               set -e
-              # Wait for the token key to be populated by the API server
-              for i in $(seq 1 30); do
-                TOKEN=$(cat /var/run/secrets/grafana-sa-token/token 2>/dev/null || true)
-                [ -n "$TOKEN" ] && break
-                echo "Waiting for token... ($i/30)"
-                sleep 3
-              done
-              [ -z "$TOKEN" ] && echo "ERROR: token not populated after 90s" && exit 1
+              TOKEN=$(oc create token {{ $sa.name }} \
+                -n {{ $sa.namespace }} \
+                --audience {{ $sa.thanosAudience }} \
+                --duration {{ $sa.tokenDuration }})
 
               oc create secret generic {{ $sa.authSecretName }} \
                 --from-literal=bearer-token="Bearer ${TOKEN}" \
                 -n {{ $sa.namespace }} \
                 --dry-run=client -o yaml | oc apply -f -
 
-              echo "Done: {{ $sa.authSecretName }} is up to date"
-          volumeMounts:
-            - name: grafana-sa-token
-              mountPath: /var/run/secrets/grafana-sa-token
-              readOnly: true
-      volumes:
-        - name: grafana-sa-token
-          secret:
-            secretName: {{ $sa.tokenSecretName }}
+              echo "Done: {{ $sa.authSecretName }} refreshed"
 {{- end }}
