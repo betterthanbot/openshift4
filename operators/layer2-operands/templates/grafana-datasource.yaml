@@ -1,9 +1,10 @@
 {{- if and .Values.grafana .Values.grafana.enabled .Values.grafana.datasource .Values.grafana.datasource.enabled }}
 {{- $d := .Values.grafana.datasource }}
 ---
-# Wave 2: runs after the sync-hook Job (wave 1) has written the auth Secret.
-# targetPath replaces the full field value — the derived Secret already contains
-# the complete "Bearer <token>" string so no prefix handling is needed here.
+# Wave 2: GrafanaDatasource CR. secureJsonData is intentionally omitted here —
+# the grafana-auth-job (wave 1) patches it directly after creating the token.
+# ArgoCD ignoreDifferences on /spec/datasource/secureJsonData prevents syncs
+# from clearing the patched value.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDatasource
 metadata:
@@ -27,12 +28,4 @@ spec:
       timeInterval: 5s
       tlsSkipVerify: true
       httpHeaderName1: "Authorization"
-    secureJsonData:
-      httpHeaderValue1: ""
-  valuesFrom:
-    - targetPath: "secureJsonData.httpHeaderValue1"
-      valueFrom:
-        secretKeyRef:
-          name: {{ $d.authSecretName }}
-          key: bearer-token
 {{- end }}

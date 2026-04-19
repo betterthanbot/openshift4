@@ -386,28 +386,23 @@ nfd:
     namespace: openshift-nfd
     spec:
       operand:
-        image: "quay.io/openshift/origin-node-feature-discovery"
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
+        servicePort: 12000
       workerConfig:
         configData: |
           core:
+          #  labelWhiteList:
+          #  noPublish: false
             sleepInterval: 60s
+          #  sources: [all]
           sources:
             pci:
               deviceClassWhitelist:
-                - "02"
+                - "0200"
                 - "03"
                 - "12"
               deviceLabelFields:
-                - vendor
-            usb:
-              deviceClassWhitelist:
-                - "ef"
-              deviceLabelFields:
-                - class
-                - vendor
-                - device
-            custom: []
+                - "vendor"
 
 # ------------------------------------------------------------------------------
 # Red Hat OpenShift AI (RHODS) — DSCInitialization + DataScienceCluster
@@ -425,8 +420,6 @@ rhods:
       monitoring:
         managementState: Managed
         namespace: redhat-ods-monitoring
-      serviceMesh:
-        managementState: Removed
       trustedCABundle:
         managementState: Managed
 
@@ -435,26 +428,42 @@ rhods:
     name: default-dsc
     spec:
       components:
-        codeflare:
-          managementState: Removed
+        aipipelines:
+          managementState: Managed
         dashboard:
           managementState: Managed
-        datasciencepipelines:
-          managementState: Managed
+        feastoperator: {}
         kserve:
           managementState: Removed
+          modelsAsService:
+            managementState: Removed
+          nim:
+            managementState: Managed
+          rawDeploymentServiceConfig: Headless
         kueue:
+          defaultClusterQueueName: default
+          defaultLocalQueueName: default
           managementState: Removed
-        modelmeshserving:
-          managementState: Managed
+        llamastackoperator: {}
+        mlflowoperator:
+          managementState: Removed
+        modelregistry:
+          registriesNamespace: rhoai-model-registries
         ray:
+          managementState: Removed
+        trainer:
           managementState: Removed
         trainingoperator:
           managementState: Removed
         trustyai:
           managementState: Removed
+          eval:
+            lmeval:
+              permitCodeExecution: deny
+              permitOnline: deny
         workbenches:
           managementState: Managed
+          workbenchNamespace: rhods-notebooks
 
 # ------------------------------------------------------------------------------
 # NVIDIA GPU Operator — ClusterPolicy
@@ -472,7 +481,7 @@ gpuOperator:
       sandboxWorkloads:
         defaultWorkload: container
       migManager:
-        enabled: true
+        enabled: false
       nodeStatusExporter:
         enabled: true
       daemonsets:

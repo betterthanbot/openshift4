@@ -51,7 +51,7 @@ spec:
 
       source:
         repoURL: https://github.com/betterthanbot/openshift4.git
-        targetRevision: feature/reorg
+        targetRevision: main
         path: "{{path}}"
         helm:
           valueFiles:
@@ -111,3 +111,9 @@ spec:
           namespace: openshift-logging
           jsonPointers:
             - /data
+        # Grafana datasource bearer token is injected by the grafana-auth-job sync hook.
+        # Ignore secureJsonData so ArgoCD does not reset it to empty on each sync.
+        - group: grafana.integreatly.org
+          kind: GrafanaDatasource
+          jsonPointers:
+            - /spec/datasource/secureJsonData

@@ -1,17 +1,11 @@
 {{- if and .Values.grafana .Values.grafana.enabled .Values.grafana.serviceAccount .Values.grafana.serviceAccount.enabled }}
 {{- $sa := .Values.grafana.serviceAccount }}
 ---
-# Sync-hook Job (wave 1): reads the non-expiring grafana-sa-token Secret (populated by the
-# Kubernetes token controller) and writes it with a "Bearer " prefix into grafana-thanos-auth.
-#
-# Why not use `oc create token`?
-# TokenRequest tokens are capped by kube-apiserver --service-account-max-token-expiration.
-# If ArgoCD does not sync (no drift detected), the Job never re-runs, and a short-lived
-# token expires causing 401. The kubernetes.io/service-account-token type Secret has no
-# expiry and is kept valid by Kubernetes automatically.
-#
-# After updating the Secret, the Job annotates all GrafanaDatasource CRs so the Grafana
-# Operator reconciles them immediately and picks up the new token value.
+# Sync-hook Job (wave 1): creates a 7440h (310-day) TokenRequest token for grafana-sa,
+# writes it to grafana-thanos-auth Secret, then patches all GrafanaDatasource CRs with
+# the token directly in spec.datasource.secureJsonData. The patch triggers Grafana Operator
+# reconciliation, which pushes the token to Grafana. ArgoCD ignoreDifferences on
+# /spec/datasource/secureJsonData prevents subsequent syncs from clearing it.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -22,7 +16,7 @@ metadata:
   annotations:
     argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   backoffLimit: 5
   ttlSecondsAfterFinished: 300
@@ -39,26 +33,31 @@ spec:
             - |
               set -e
 
-              # Read the non-expiring SA token Secret (Kubernetes keeps this populated)
-              TOKEN=$(oc get secret {{ $sa.name }}-token \
+              TOKEN=$(oc create token {{ $sa.name }} \
                 -n {{ $sa.namespace }} \
-                -o jsonpath='{.data.token}' | base64 -d)
+                --duration=7440h)
 
               if [ -z "$TOKEN" ]; then
-                echo "ERROR: {{ $sa.name }}-token secret is empty — token controller may not have populated it yet"
+                echo "ERROR: oc create token returned empty token"
                 exit 1
               fi
 
+              # Write to Secret for reference / debugging
               oc create secret generic {{ $sa.authSecretName }} \
                 --from-literal=bearer-token="Bearer ${TOKEN}" \
                 -n {{ $sa.namespace }} \
                 --dry-run=client -o yaml | oc apply -f -
 
-              # Annotate GrafanaDatasource CRs so the Grafana Operator reconciles and
-              # picks up the new token from grafana-thanos-auth immediately.
-              oc annotate grafanadatasource -n {{ $sa.namespace }} --all \
-                grafana-operator/last-auth-refresh="$(date -u +%s)" \
-                --overwrite
+              # Patch secureJsonData directly into each GrafanaDatasource CR.
+              # This triggers the Grafana Operator to reconcile and push the token
+              # to Grafana via its API. ArgoCD ignoreDifferences prevents syncs
+              # from resetting this field back to empty.
+              for CR in $(oc get grafanadatasource -n {{ $sa.namespace }} -o name); do
+                oc patch "${CR}" -n {{ $sa.namespace }} \
+                  --type merge \
+                  -p "{\"spec\":{\"datasource\":{\"secureJsonData\":{\"httpHeaderValue1\":\"Bearer ${TOKEN}\"}}}}"
+                echo "Patched: ${CR}"
+              done
 
-              echo "Done: {{ $sa.authSecretName }} refreshed, datasources triggered"
+              echo "Done: all GrafanaDatasource CRs patched with fresh bearer token"
 {{- end }}

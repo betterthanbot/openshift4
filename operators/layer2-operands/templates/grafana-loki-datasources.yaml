@@ -4,7 +4,8 @@
 {{- range $tenant, $cfg := $tenants }}
 {{- if $cfg.enabled }}
 ---
-# Wave 2: depends on the auth Secret written by the grafana-auth-job (wave 1).
+# Wave 2: GrafanaDatasource CR. secureJsonData is intentionally omitted here —
+# the grafana-auth-job (wave 1) patches it directly after creating the token.
 # URL format: <gateway>/api/logs/v1/<tenant> — Grafana Loki datasource appends
 # /loki/api/v1/... automatically, producing the correct LokiStack gateway path.
 apiVersion: grafana.integreatly.org/v1beta1
@@ -28,14 +29,6 @@ spec:
     jsonData:
       tlsSkipVerify: true
       httpHeaderName1: "Authorization"
-    secureJsonData:
-      httpHeaderValue1: ""
-  valuesFrom:
-    - targetPath: "secureJsonData.httpHeaderValue1"
-      valueFrom:
-        secretKeyRef:
-          name: {{ $loki.authSecretName }}
-          key: bearer-token
 {{- end }}
 {{- end }}
 {{- end }}
