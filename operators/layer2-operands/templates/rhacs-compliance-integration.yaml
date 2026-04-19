@@ -1,0 +1,15 @@
+{{- if and .Values.rhacs .Values.rhacs.enabled .Values.rhacs.complianceIntegration .Values.rhacs.complianceIntegration.enabled }}
+{{- $c := .Values.rhacs.complianceIntegration }}
+---
+apiVersion: platform.stackrox.io/v1alpha1
+kind: ComplianceIntegration
+metadata:
+  name: {{ $c.name }}
+  namespace: {{ $c.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  namespace: {{ $c.complianceNamespace }}
+  statusUI:
+    enabled: true
+{{- end }}
