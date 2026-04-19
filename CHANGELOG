@@ -7,9 +7,28 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
-## [1.0.1] - 2026-04-19
+## [1.1.0] - 2026-04-19
+### Added
+- `README.md` — new repo root README covering prerequisites, bootstrap quick start, LokiStack S3 credential setup, RHACS init bundle steps, operator versions table, post-install verification commands, repo structure overview, and links to all docs
+- `VERSIONS.md` — operator version reference listing all 11 operators with pinned CSV, channel, source, namespace, and approval mode; includes operand versions and upgrade instructions
+- `docs/tutorials/adding-gpu-nodes.md` — new tutorial covering GPU MachineSet provisioning on AWS: cluster value lookup commands, sanitised MachineSet template, GPU instance type reference table, GPU Operator verification steps, and troubleshooting table
+- `argocd/appset-operators.yaml` — added `ignoreDifferences` entry for `GrafanaDatasource /spec/datasource/secureJsonData` so ArgoCD does not reset the bearer token injected by the sync-hook Job on each sync
+
 ### Changed
-- Fixed Grafana Datasource
+- `operators/layer2-operands/templates/grafana-auth-job.yaml` — replaced `valuesFrom` / `kubernetes.io/service-account-token` Secret approach with `oc create token grafana-sa --duration=7440h`; Job now patches `secureJsonData.httpHeaderValue1` directly into every `GrafanaDatasource` CR via `oc patch --type merge`; sync-wave moved from `"1"` to `"3"` so the patch runs after datasource CRs are applied at wave 2
+- `operators/layer2-operands/templates/grafana-datasource.yaml` — removed `secureJsonData` and `valuesFrom` from spec; field is intentionally absent from git and injected at runtime by the auth Job
+- `operators/layer2-operands/templates/grafana-loki-datasources.yaml` — same removal of `secureJsonData` and `valuesFrom` across all three Loki tenant datasource specs
+- `operators/layer2-operands/templates/grafana-serviceaccount.yaml` — updated `grafana-token-builder` Role: added `serviceaccounts/token` create verb; updated secrets verbs to `get`, `create`, `patch`; added `grafanadatasources` get/list/patch; removed the `grafana-sa-token` (`kubernetes.io/service-account-token`) Secret block
+- `operators/layer2-operands/templates/rhods-datasciencecluster.yaml` — updated both API versions: `dscinitialization.opendatahub.io/v1` → `v2` and `datasciencecluster.opendatahub.io/v1` → `v2`
+- `operators/layer2-operands/values.yaml` (DSCI) — removed `serviceMesh.managementState` field (not present in DSCInitialization v2 schema)
+- `operators/layer2-operands/values.yaml` (DSC) — replaced v1 component list with v2 schema: renamed `datasciencepipelines` → `aipipelines`; removed `codeflare` and `modelmeshserving`; added `feastoperator`, `llamastackoperator`, `mlflowoperator`, `modelregistry`, `trainer`; updated `kserve` with `modelsAsService`, `nim`, `rawDeploymentServiceConfig` sub-fields; updated `kueue` with `defaultClusterQueueName`/`defaultLocalQueueName`; updated `workbenches` with `workbenchNamespace`; updated `trustyai` with `eval.lmeval` sub-fields
+- `operators/layer2-operands/values.yaml` (NFD) — removed hardcoded `image` field; changed `imagePullPolicy: Always` → `IfNotPresent`; added `servicePort: 12000`; corrected PCI device class from `"02"` → `"0200"`; removed `usb` and `custom` source sections; removed `customConfig` block (field not declared in NFD CRD schema on this cluster)
+- `docs/tutorials/grafana-thanos-datasource.md` — fully rewritten to document the CR-patch token injection approach, wave 3 ordering rationale, `ignoreDifferences` explanation, updated architecture diagram, correct resource table, verification steps, and updated troubleshooting table
+
+### Fixed
+- **Grafana datasource 401 (Prometheus + Loki)** — root cause: Grafana Operator v5 `valuesFrom` does not reliably inject `secureJsonData`; the operator sends the empty spec value to the Grafana API, clearing any previously stored token. Compounded by wave ordering: the wave-1 Job patch was overwritten when ArgoCD applied datasource CRs at wave 2. Fix: Job moved to wave 3; uses `oc create token grafana-sa --duration=7440h`; patches `secureJsonData.httpHeaderValue1` directly into each `GrafanaDatasource` CR; `ignoreDifferences` on `/spec/datasource/secureJsonData` prevents ArgoCD from resetting it on subsequent syncs
+- **NFD pods failing** — `NodeFeatureDiscovery` CR spec contained fields not present in the cluster's NFD CRD schema (`customConfig`) and an incorrect PCI device class whitelist entry (`"02"` should be `"0200"`). Fixed by aligning spec with the default OpenShift NFD operator template
+- **OpenShift AI DSC/DSCI sync errors** — templates were using API version `v1` while the installed operator serves `v2`; component names in the DSC spec were v1 names no longer recognised by the v2 CRD. Fixed by updating API versions and component list to match the installed RHOAI 3.3.2 schema
 
 ## [1.0.0] - 2026-04-19
 ### Added

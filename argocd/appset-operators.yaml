@@ -51,7 +51,7 @@ spec:
 
       source:
         repoURL: https://github.com/betterthanbot/openshift4.git
-        targetRevision: feature/reorg
+        targetRevision: main
         path: "{{path}}"
         helm:
           valueFiles:
