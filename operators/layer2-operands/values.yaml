@@ -29,12 +29,6 @@ rhacs:
     # CHANGE ME: logical name for this cluster shown in RHACS console
     clusterName: "my-cluster"
 
-  complianceIntegration:
-    enabled: true
-    name: compliance-integration
-    namespace: stackrox
-    complianceNamespace: openshift-compliance
-
 # ------------------------------------------------------------------------------
 # OpenShift GitOps / ArgoCD
 # The GitOps operator auto-creates the openshift-gitops ArgoCD instance.
