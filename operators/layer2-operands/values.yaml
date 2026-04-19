@@ -385,29 +385,33 @@ nfd:
     name: nfd-instance
     namespace: openshift-nfd
     spec:
+      customConfig:
+        configData: |
+          #    - name: "more.kernel.features"
+          #      matchOn:
+          #      - loadedKMod: ["example_kmod3"]
+          #    - name: "more.features.by.nodename"
+          #      value: customValue
+          #      matchOn:
+          #      - nodename: ["special-.*-node-.*"]
       operand:
-        image: "quay.io/openshift/origin-node-feature-discovery"
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
+        servicePort: 12000
       workerConfig:
         configData: |
           core:
+          #  labelWhiteList:
+          #  noPublish: false
             sleepInterval: 60s
+          #  sources: [all]
           sources:
             pci:
               deviceClassWhitelist:
-                - "02"
+                - "0200"
                 - "03"
                 - "12"
               deviceLabelFields:
-                - vendor
-            usb:
-              deviceClassWhitelist:
-                - "ef"
-              deviceLabelFields:
-                - class
-                - vendor
-                - device
-            custom: []
+                - "vendor"
 
 # ------------------------------------------------------------------------------
 # Red Hat OpenShift AI (RHODS) — DSCInitialization + DataScienceCluster

@@ -7,6 +7,10 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [1.0.1] - 2026-04-19
+### Changed
+- Fixed Grafana Datasource
+
 ## [1.0.0] - 2026-04-19
 ### Added
 #### GitOps Foundation
