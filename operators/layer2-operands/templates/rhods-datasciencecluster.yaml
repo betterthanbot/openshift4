@@ -3,7 +3,7 @@
 {{- if and $r.dscInitialization $r.dscInitialization.enabled }}
 ---
 # DSCInitialization must be created before DataScienceCluster.
-apiVersion: dscinitialization.opendatahub.io/v1
+apiVersion: dscinitialization.opendatahub.io/v2
 kind: DSCInitialization
 metadata:
   name: {{ $r.dscInitialization.name }}
@@ -14,7 +14,7 @@ spec:
 {{- end }}
 {{- if and $r.dataScientCluster $r.dataScientCluster.enabled }}
 ---
-apiVersion: datasciencecluster.opendatahub.io/v1
+apiVersion: datasciencecluster.opendatahub.io/v2
 kind: DataScienceCluster
 metadata:
   name: {{ $r.dataScientCluster.name }}
