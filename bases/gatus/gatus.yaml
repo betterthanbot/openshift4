@@ -443,7 +443,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: discovery-job
-              image: "quay.io/rhn-support-gong/gatus-discovery:1.0.0"
+              image: "quay.io/rhn-support-gong/gatus-discovery:1.0.2"
               imagePullPolicy: IfNotPresent
               command:
                 - /bin/bash

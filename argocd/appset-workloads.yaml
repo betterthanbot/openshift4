@@ -56,7 +56,7 @@ spec:
 
       source:
         repoURL: https://github.com/betterthanbot/openshift4.git
-        targetRevision: main
+        targetRevision: feature/reduceCVE
         path: "{{ .path.path }}"
         # ArgoCD auto-detects kustomize (kustomization.yaml present)
         # or Helm (Chart.yaml present) — no explicit config needed

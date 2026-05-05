@@ -6,10 +6,10 @@
 # ==============================================================================
 
 # ── Stage 1: builder ──────────────────────────────────────────────────────────
-FROM registry.redhat.io/ubi9/ubi-minimal:9.7-1776315208 AS builder
+FROM registry.redhat.io/ubi9/ubi-minimal@sha256:8d0a8fb39ec907e8ca62cdd24b62a63ca49a30fe465798a360741fde58437a23 AS builder
 
-ARG OC_VERSION=4.20.18
-ARG JQ_VERSION=1.7.1
+ARG OC_VERSION=4.20.20
+ARG JQ_VERSION=1.8.1
 
 # Install tools needed for downloading/extracting on the builder
 RUN microdnf install -y --nodocs tar gzip
@@ -48,7 +48,7 @@ RUN curl -fsSL \
 
 # ── Stage 2: lean runtime image ──────────────────────────────────────────────
 # ubi-micro has absolutely no package manager or related overhead
-FROM registry.redhat.io/ubi9/ubi-micro:9.7-1773894938
+FROM registry.redhat.io/ubi9/ubi-micro:latest
 
 # Copy the pre-assembled filesystem from the builder
 COPY --from=builder /mnt/rootfs /

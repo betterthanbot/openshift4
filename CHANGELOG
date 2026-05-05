@@ -7,6 +7,10 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [1.1.1] - 2026-05-05
+### Changed
+- Updated Gatus images
+
 ## [1.1.0] - 2026-04-19
 ### Added
 - `README.md` — new repo root README covering prerequisites, bootstrap quick start, LokiStack S3 credential setup, RHACS init bundle steps, operator versions table, post-install verification commands, repo structure overview, and links to all docs

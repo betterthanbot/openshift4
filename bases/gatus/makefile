@@ -1,6 +1,6 @@
 .PHONY: gatus
 GATUS_VERSION := 5.35.0
-GATUS_DISCOVERY_VERSION := 1.0.0
+GATUS_DISCOVERY_VERSION := 1.0.2
 
 gatus:
 	helm template \

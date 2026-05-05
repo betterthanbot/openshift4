@@ -259,7 +259,7 @@ discovery:
   # Container image — needs 'oc' and 'jq' (Red Hat origin-cli ships both)
   image:
     repository: quay.io/rhn-support-gong/gatus-discovery
-    tag: 1.0.0
+    tag: 1.0.2
     pullPolicy: IfNotPresent
 
   # Resource limits for the discovery job pod
