@@ -19,7 +19,7 @@ commonAnnotations: {}
 # ------------------------------------------------------------------------------
 image:
   repository: quay.io/rhn-support-gong/gatus
-  tag: v5.35.1-rc1
+  tag: 5.35.1-rc1
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
