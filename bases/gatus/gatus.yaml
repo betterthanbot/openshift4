@@ -371,7 +371,7 @@ spec:
     spec:
       containers:
         - name: gatus
-          image: "quay.io/rhn-support-gong/gatus:v5.35.0"
+          image: "quay.io/rhn-support-gong/gatus:v5.35.1-rc1"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
