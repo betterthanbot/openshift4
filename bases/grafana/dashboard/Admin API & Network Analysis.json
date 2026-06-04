@@ -34,7 +34,7 @@
       "type": "row"
     },
     {
-      "datasource": "prometheus",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "description": "Total rate of requests grouped by HTTP Status Code. Decimals hidden.",
       "fieldConfig": {
         "defaults": {
@@ -153,7 +153,7 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "editorMode": "builder",
           "expr": "sum by (code) (rate(http_requests_total[1m])) or sum by (status) (rate(nginx_ingress_controller_requests[1m]))",
           "legendFormat": "HTTP {{code}}{{status}}",
@@ -165,7 +165,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": "prometheus",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -217,7 +217,7 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "sum(increase(http_requests_total{code=~\"5..\"}[1h]))",
           "legendFormat": "5xx Errors",
           "refId": "A"
@@ -227,7 +227,7 @@
       "type": "stat"
     },
     {
-      "datasource": "prometheus",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -283,7 +283,7 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "editorMode": "code",
           "expr": "sum(rate(http_requests_total{code!~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
           "legendFormat": "Success Rate",
@@ -295,7 +295,7 @@
       "type": "gauge"
     },
     {
-      "datasource": "prometheus",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -347,7 +347,7 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "sum(increase(http_requests_total{code=~\"4..\"}[1h]))",
           "legendFormat": "4xx Errors",
           "refId": "A"
@@ -370,7 +370,7 @@
       "type": "row"
     },
     {
-      "datasource": "prometheus",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -448,7 +448,7 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "editorMode": "code",
           "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "P99 Latency",
@@ -456,7 +456,7 @@
           "refId": "A"
         },
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "P95 Latency",
@@ -468,7 +468,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": "prometheus",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -548,7 +548,7 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "editorMode": "code",
           "expr": "topk(5, sum by (pod) (rate(http_requests_total[5m])))",
           "legendFormat": "{{pod}}",
@@ -573,7 +573,7 @@
       "type": "row"
     },
     {
-      "datasource": "prometheus",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -654,7 +654,7 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "editorMode": "code",
           "expr": "sum(rate(container_network_receive_bytes_total{namespace=~\"vllm.*|.*llm.*\"}[1m]))",
           "legendFormat": "Inbound Traffic (RX)",
@@ -662,7 +662,7 @@
           "refId": "A"
         },
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "editorMode": "code",
           "expr": "sum(rate(container_network_transmit_bytes_total{namespace=~\"vllm.*|.*llm.*\"}[1m]))",
           "legendFormat": "Outbound Traffic (TX)",
@@ -674,7 +674,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": "prometheus",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -752,13 +752,13 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "sum(rate(container_network_receive_packets_dropped_total{namespace=~\"vllm.*|.*llm.*\"}[1m]))",
           "legendFormat": "RX Dropped Packets",
           "refId": "A"
         },
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "sum(rate(container_network_transmit_packets_dropped_total{namespace=~\"vllm.*|.*llm.*\"}[1m]))",
           "legendFormat": "TX Dropped Packets",
           "refId": "B"
@@ -778,7 +778,20 @@
     "detailed"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "DS_PROMETHEUS",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "type": "datasource"
+      }
+    ]
   },
   "time": {
     "from": "now-1h",

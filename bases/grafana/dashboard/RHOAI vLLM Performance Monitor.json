@@ -116,13 +116,13 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "sum(rate(haproxy_backend_sessions_total{namespace=~\"$ingress_ns\"}[$interval]))",
           "legendFormat": "HAProxy Ingress (NS: $ingress_ns)",
           "refId": "A"
         },
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "sum(rate(vllm:request_success_total{namespace=~\"$vllm_ns\", pod=~\"$vllm_pod\"}[$interval]))",
           "legendFormat": "vLLM Success (NS: $vllm_ns)",
           "refId": "B"
@@ -213,7 +213,7 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "editorMode": "code",
           "expr": "sum(rate(haproxy_backend_response_errors_total{namespace=~\"openshift-ingress\"}[$interval]))",
           "legendFormat": "HAProxy 5xx Errors",
@@ -221,7 +221,7 @@
           "refId": "A"
         },
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "sum(rate(haproxy_backend_connection_errors_total{namespace=~\"$ingress_ns\"}[$interval]))",
           "legendFormat": "HAProxy Connection Timeouts",
           "refId": "B"
@@ -325,7 +325,7 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "editorMode": "code",
           "expr": "avg(haproxy_backend_http_average_response_latency_milliseconds{namespace=~\"openshift-ingress\"})",
           "legendFormat": "HAProxy Avg Response",
@@ -418,13 +418,13 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "histogram_quantile(0.95, sum(rate(vllm:time_to_first_token_seconds_bucket{namespace=~\"$vllm_ns\", pod=~\"$vllm_pod\"}[$interval])) by (le))",
           "legendFormat": "Time to First Token (P95)",
           "refId": "A"
         },
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "histogram_quantile(0.95, sum(rate(vllm:time_per_output_token_seconds_bucket{namespace=~\"$vllm_ns\", pod=~\"$vllm_pod\"}[$interval])) by (le))",
           "legendFormat": "Inter-Token Latency (P95)",
           "refId": "B"
@@ -528,13 +528,13 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "sum(rate(container_network_receive_bytes_total{namespace=\"$vllm_ns\"}[$interval]))",
           "legendFormat": "Inbound (RX) - $vllm_ns",
           "refId": "A"
         },
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "sum(rate(container_network_transmit_bytes_total{namespace=\"$vllm_ns\"}[$interval]))",
           "legendFormat": "Outbound (TX) - $vllm_ns",
           "refId": "B"
@@ -625,13 +625,13 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "sum(rate(container_network_receive_packets_dropped_total{namespace=\"$vllm_ns\"}[$interval]))",
           "legendFormat": "RX Drops (Inbound)",
           "refId": "A"
         },
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "sum(rate(container_network_transmit_packets_dropped_total{namespace=\"$vllm_ns\"}[$interval]))",
           "legendFormat": "TX Drops (Outbound)",
           "refId": "B"
@@ -737,7 +737,7 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "avg by (pod) (DCGM_FI_DEV_GPU_UTIL{namespace=~\"$gpu_ns\", pod=~\"$gpu_pod\"})",
           "legendFormat": "GPU Util - {{pod}}",
           "refId": "A"
@@ -828,7 +828,7 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "max by (pod) (DCGM_FI_DEV_FB_USED{namespace=~\"$gpu_ns\", pod=~\"$gpu_pod\"}) * 1024 * 1024",
           "legendFormat": "VRAM Used - {{pod}}",
           "refId": "A"
@@ -932,7 +932,7 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$vllm_ns\", pod=~\"$vllm_pod\", container!=\"POD\"}[$interval])) by (pod)",
           "legendFormat": "{{pod}}",
           "refId": "A"
@@ -1023,7 +1023,7 @@
       "pluginVersion": "12.3.0",
       "targets": [
         {
-          "datasource": "prometheus",
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
           "expr": "sum(container_memory_working_set_bytes{namespace=~\"$vllm_ns\", pod=~\"$vllm_pod\", container!=\"POD\"}) by (pod)",
           "legendFormat": "{{pod}}",
           "refId": "A"
@@ -1044,11 +1044,23 @@
   "templating": {
     "list": [
       {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "DS_PROMETHEUS",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "type": "datasource"
+      },
+      {
         "current": {
           "text": "llm-project",
           "value": "llm-project"
         },
-        "datasource": "prometheus",
+        "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
         "definition": "label_values(vllm:request_success_total, namespace)",
         "includeAll": false,
         "label": "vLLM Namespace",
@@ -1067,7 +1079,7 @@
             "$__all"
           ]
         },
-        "datasource": "prometheus",
+        "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
         "definition": "label_values(vllm:request_success_total{namespace=\"$vllm_ns\"}, pod)",
         "includeAll": true,
         "label": "vLLM Pod",
@@ -1085,7 +1097,7 @@
           "text": "nvidia-gpu-operator",
           "value": "nvidia-gpu-operator"
         },
-        "datasource": "prometheus",
+        "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
         "definition": "label_values(DCGM_FI_DEV_GPU_UTIL, namespace)",
         "includeAll": false,
         "label": "GPU Namespace",
@@ -1104,7 +1116,7 @@
             "$__all"
           ]
         },
-        "datasource": "prometheus",
+        "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
         "definition": "label_values(DCGM_FI_DEV_GPU_UTIL{namespace=\"$gpu_ns\"}, pod)",
         "includeAll": true,
         "label": "GPU Pod",
@@ -1142,7 +1154,7 @@
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
