@@ -1,0 +1,11 @@
+apiVersion: vendir.k14s.io/v1alpha1
+directories:
+- contents:
+  - git:
+      commitTitle: Change to use Gatus 1.0.2
+      sha: e7544d6f2e4ef7c6bf6521fde2eb9392b2ba04fe
+      tags:
+      - 1.0.2
+    path: .
+  path: vendor/gatus-helmchart
+kind: LockConfig

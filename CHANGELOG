@@ -7,6 +7,22 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [1.1.1] - 2026-06-04
+### Changed
+- Changed Gatus repo pull skeleton
+- `bases/gatus/Dockerfile` — switched builder stage from `ubi9/ubi-minimal` to `ubi9/ubi` (full UBI) to gain access to `dnf`; replaced `microdnf --installroot` with `dnf --installroot --setopt=tsflags=noscripts` to skip RPM post-install scriptlets that fail under Rosetta 2 when building `--platform linux/amd64` on Apple Silicon; added manual copy of `tls-ca-bundle.pem` into the rootfs since `update-ca-trust` no longer runs as a scriptlet; bumped `OC_VERSION` default to `4.20.23` and `JQ_VERSION` to `1.8.1`
+- `bases/gatus/makefile` — added `vendor` target running `vendir sync`; updated `gatus` helm template target to reference `./vendor/gatus-helmchart` instead of `./`; bumped `GATUS_DISCOVERY_VERSION` to `1.0.0-rc2`
+- `bases/gatus/vendir.yml` — added vendir config to sync `https://github.com/betterthanbot/gatus-helmchart.git` at ref `1.0.2` into `vendor/gatus-helmchart/`
+- `bases/grafana/dashboard/Admin API & Network Analysis.json` — added `DS_PROMETHEUS` datasource template variable (previously missing entirely); replaced all hardcoded `"datasource": "prometheus"` string literals with proper `{"type": "prometheus", "uid": "${DS_PROMETHEUS}"}` objects so the dashboard resolves correctly under the Grafana Operator where datasource UIDs are dynamic
+- `bases/grafana/dashboard/RHOAI vLLM Performance Monitor.json` — same datasource fix as above (all panel and variable datasources were hardcoded strings); added `DS_PROMETHEUS` template variable; extended default time range from `now-5m` to `now-1h`
+- `bases/grafana/dashboard/vLLM Advanced Performance Dashboard.json` — added `DS_PROMETHEUS` template variable; replaced hardcoded `"uid": "prometheus"` datasource references with `"uid": "${DS_PROMETHEUS}"`; upgraded `schemaVersion` from `36` to `42`
+- `bases/grafana/dashboard/README.md` — full rewrite: corrected dashboard count (9, not 10), added quick-reference table with UIDs/refresh/time range, added prerequisites matrix by dashboard, documented `DS_PROMETHEUS` variable behaviour and ACM Right-Sizing exception, expanded per-dashboard panel breakdowns
+
+### Fixed
+- `bases/grafana/dashboard/ACM Right-Sizing Namespace.json` — hardcoded `"id": 29` changed to `0`; a non-zero dashboard ID causes import conflicts when provisioning via the Grafana Operator (existing dashboards with the same ID get overwritten)
+- `bases/grafana/dashboard/RHOAI GPU Utilization & Consumption.json` — hardcoded `"id": 18` changed to `0`
+- `bases/grafana/dashboard/RHOAI Inference Endpoint Monitoring.json` — hardcoded `"id": 16` changed to `0`
+
 ## [1.1.0] - 2026-04-19
 ### Added
 - `README.md` — new repo root README covering prerequisites, bootstrap quick start, LokiStack S3 credential setup, RHACS init bundle steps, operator versions table, post-install verification commands, repo structure overview, and links to all docs

@@ -101,7 +101,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "histogram_quantile(0.50, rate(vllm:time_to_first_token_seconds_bucket[5m]))",
                 "interval": "",
@@ -111,7 +111,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "histogram_quantile(0.95, rate(vllm:time_to_first_token_seconds_bucket[5m]))",
                 "interval": "",
@@ -121,7 +121,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "histogram_quantile(0.99, rate(vllm:time_to_first_token_seconds_bucket[5m]))",
                 "interval": "",
@@ -201,7 +201,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "histogram_quantile(0.50, rate(vllm:time_per_output_token_seconds_bucket[5m]))",
                 "interval": "",
@@ -211,7 +211,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "histogram_quantile(0.95, rate(vllm:time_per_output_token_seconds_bucket[5m]))",
                 "interval": "",
@@ -278,7 +278,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "65592",
                 "interval": "",
@@ -345,7 +345,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "sum(vllm:gpu_prefix_cache_hits_total) / sum(vllm:gpu_prefix_cache_queries_total)",
                 "interval": "",
@@ -412,7 +412,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "vllm:gpu_prefix_cache_hits_total / vllm:gpu_prefix_cache_queries_total",
                 "interval": "",
@@ -504,7 +504,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "vllm:num_requests_running",
                 "interval": "",
@@ -514,7 +514,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "vllm:num_requests_waiting",
                 "interval": "",
@@ -586,7 +586,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "rate(vllm:request_success_total[5m])",
                 "interval": "",
@@ -596,7 +596,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "rate(vllm:e2e_request_latency_seconds_count[5m])",
                 "interval": "",
@@ -668,7 +668,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "rate(vllm:prompt_tokens_total[5m])",
                 "interval": "",
@@ -678,7 +678,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "rate(vllm:generation_tokens_total[5m])",
                 "interval": "",
@@ -758,7 +758,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "histogram_quantile(0.50, rate(vllm:e2e_request_latency_seconds_bucket[5m]))",
                 "interval": "",
@@ -768,7 +768,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "histogram_quantile(0.95, rate(vllm:e2e_request_latency_seconds_bucket[5m]))",
                 "interval": "",
@@ -778,7 +778,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "histogram_quantile(0.99, rate(vllm:e2e_request_latency_seconds_bucket[5m]))",
                 "interval": "",
@@ -788,7 +788,7 @@ spec:
               {
                 "datasource": {
                   "type": "prometheus",
-                  "uid": "prometheus"
+                  "uid": "${DS_PROMETHEUS}"
                 },
                 "expr": "vllm:e2e_request_latency_seconds_sum / vllm:e2e_request_latency_seconds_count",
                 "interval": "",
@@ -801,7 +801,7 @@ spec:
           }
         ],
         "refresh": "5s",
-        "schemaVersion": 36,
+        "schemaVersion": 42,
         "style": "dark",
         "tags": [
           "llm",
@@ -812,6 +812,18 @@ spec:
         "templating": {
           "list": [
             {
+              "current": {},
+              "hide": 0,
+              "includeAll": false,
+              "label": "Datasource",
+              "multi": false,
+              "name": "DS_PROMETHEUS",
+              "options": [],
+              "query": "prometheus",
+              "refresh": 1,
+              "type": "datasource"
+            },
+            {
               "current": {
                 "selected": false,
                 "text": "meta-llama/Llama-3.2-1B",
@@ -819,7 +831,7 @@ spec:
               },
               "datasource": {
                 "type": "prometheus",
-                "uid": "prometheus"
+                "uid": "${DS_PROMETHEUS}"
               },
               "definition": "label_values(vllm:num_requests_running, model_name)",
               "hide": 0,
