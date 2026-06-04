@@ -1,0 +1,9 @@
+apiVersion: vendir.k14s.io/v1alpha1
+kind: Config
+directories:
+  - path: vendor/gatus-helmchart
+    contents:
+      - path: .
+        git:
+          url: https://github.com/betterthanbot/gatus-helmchart.git
+          ref: 1.0.2
