@@ -24,7 +24,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 type: Opaque
 data:
-  SECRET_KEY: TTB4dVZUZE1lWHBQVTNkYU5tVnBWMmRZZUdGTVZHeHdZMVpEU1VwQ2RXaFBXVm96VDNSb2RrOTI=
+  SECRET_KEY: UnpkclRYRlBlRlJNZGpSclVWTmpTa3RTYkd0WGFEUkxRVGg0YUUwMVdqUktSR2xDZWxKS01HdE0=
 ---
 # Source: ctfd/templates/persistantvolumeclaim.yaml
 apiVersion: v1
@@ -102,6 +102,8 @@ spec:
           env:
             - name: "TZ"
               value: "UTC"
+            - name: "DATABASE_URL"
+              value: "sqlite:////opt/CTFd/.data/ctfd.db"
             - name: UPLOAD_FOLDER
               value: /data/uploads
             - name: LOG_FOLDER

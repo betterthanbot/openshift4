@@ -79,6 +79,8 @@ env:
   # -- Timezone for the container.
   - name: TZ
     value: UTC
+  - name: DATABASE_URL
+    value: sqlite:////opt/CTFd/.data/ctfd.db
 
 ports:
   http:
