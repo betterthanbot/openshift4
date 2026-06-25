@@ -1,0 +1,342 @@
+---
+# To update the cluster FQDN: find-and-replace the APPS_DOMAIN below in this file only.
+# APPS_DOMAIN: apps.cluster.example.com
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gatus-config
+  namespace: gatus
+data:
+  config.yaml: |
+    ui:
+      title: "Platform Status Dashboard"
+      header: "API, Route & Internal Probe Health"
+      description: "Real-time health status of OpenShift services and internal microservices"
+      logo: "https://upload.wikimedia.org/wikipedia/commons/3/3a/OpenShift-LogoType.svg"
+      theme: "dark"
+
+    storage:
+      type: sqlite
+      path: /data/gatus.db
+
+    endpoints:
+
+      # ---------------------------------------------------------------------------
+      # Platform Endpoints
+      # ---------------------------------------------------------------------------
+
+      - name: "OpenShift Console"
+        group: "Platform Endpoints"
+        url: "https://console-openshift-console.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "OpenShift Downloads"
+        group: "Platform Endpoints"
+        url: "https://downloads-openshift-console.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "OAuth"
+        group: "Platform Endpoints"
+        url: "https://oauth-openshift.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "OpenShift GitOps"
+        group: "Platform Endpoints"
+        url: "https://openshift-gitops-server-openshift-gitops.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Ingress Canary"
+        group: "Platform Endpoints"
+        url: "https://canary-openshift-ingress-canary.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Data Science Gateway"
+        group: "Platform Endpoints"
+        url: "https://data-science-gateway.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Grafana"
+        group: "Platform Endpoints"
+        url: "https://grafana-a-route-grafana.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Gatus"
+        group: "Platform Endpoints"
+        url: "https://gatus-gatus.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Vault"
+        group: "Platform Endpoints"
+        url: "https://vault-default.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      # ---------------------------------------------------------------------------
+      # Route Endpoints (demo apps)
+      # ---------------------------------------------------------------------------
+
+      - name: "National Parks"
+        group: "Route Endpoints"
+        url: "https://nationalparks-demo.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Parks Map"
+        group: "Route Endpoints"
+        url: "https://parksmap-demo.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "CTFd"
+        group: "Route Endpoints"
+        url: "https://ctfd-ctfd.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      # ---------------------------------------------------------------------------
+      # Logging
+      # ---------------------------------------------------------------------------
+
+      - name: "Loki Gateway"
+        group: "Logging"
+        url: "https://logging-loki-openshift-logging.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      # ---------------------------------------------------------------------------
+      # Monitoring
+      # ---------------------------------------------------------------------------
+
+      - name: "Alertmanager"
+        group: "Monitoring"
+        url: "https://alertmanager-main-openshift-monitoring.apps.cluster.example.com/api"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Prometheus"
+        group: "Monitoring"
+        url: "https://prometheus-k8s-openshift-monitoring.apps.cluster.example.com/api"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Prometheus Federate"
+        group: "Monitoring"
+        url: "https://prometheus-k8s-federate-openshift-monitoring.apps.cluster.example.com/federate"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Thanos Querier"
+        group: "Monitoring"
+        url: "https://thanos-querier-openshift-monitoring.apps.cluster.example.com/api"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      # ---------------------------------------------------------------------------
+      # Security
+      # ---------------------------------------------------------------------------
+
+      - name: "StackRox Central"
+        group: "Security"
+        url: "https://central-stackrox.apps.cluster.example.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      # ---------------------------------------------------------------------------
+      # External Clusters
+      # ---------------------------------------------------------------------------
+
+      - name: "8mxg2 Demo OCP Cluster"
+        group: "External Cluster"
+        url: "https://console-openshift-console.apps.cluster-8mxg2.8mxg2.sandbox1240.opentlc.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      # ---------------------------------------------------------------------------
+      # Image Repositories
+      # ---------------------------------------------------------------------------
+
+      - name: "Docker Hub"
+        group: "Image Repositories"
+        url: "https://hub.docker.com"
+        interval: 1m
+        client:
+          insecure: false
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Docker Registry (index.docker.io)"
+        group: "Image Repositories"
+        url: "https://index.docker.io/v2/"
+        interval: 1m
+        client:
+          insecure: false
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Quay.io"
+        group: "Image Repositories"
+        url: "https://quay.io/health"
+        interval: 1m
+        client:
+          insecure: false
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: "Red Hat Registry (registry.access.redhat.com)"
+        group: "Image Repositories"
+        url: "https://registry.access.redhat.com/v2/"
+        interval: 1m
+        client:
+          insecure: false
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Red Hat Registry (registry.redhat.io)"
+        group: "Image Repositories"
+        url: "https://registry.redhat.io/v2/"
+        interval: 1m
+        client:
+          insecure: false
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      # ---------------------------------------------------------------------------
+      # LLM Endpoints
+      # ---------------------------------------------------------------------------
+
+      - name: "OpenAI API"
+        group: "LLM Endpoints"
+        url: "https://api.openai.com/v1/models"
+        interval: 1m
+        client:
+          insecure: false
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "OpenAI Status"
+        group: "LLM Endpoints"
+        url: "https://status.openai.com/api/v2/summary.json"
+        interval: 1m
+        client:
+          insecure: false
+        conditions:
+          - "[STATUS] == 200"
+          - "[BODY] == pat(*operational*)"
+
+      - name: "Anthropic (Claude) API"
+        group: "LLM Endpoints"
+        url: "https://api.anthropic.com/v1/models"
+        interval: 1m
+        client:
+          insecure: false
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Anthropic Status"
+        group: "LLM Endpoints"
+        url: "https://status.anthropic.com/api/v2/summary.json"
+        interval: 1m
+        client:
+          insecure: false
+        conditions:
+          - "[STATUS] == 200"
+
+      - name: "Google Gemini API"
+        group: "LLM Endpoints"
+        url: "https://generativelanguage.googleapis.com/v1beta/models"
+        interval: 1m
+        client:
+          insecure: false
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
