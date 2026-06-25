@@ -79,6 +79,10 @@ env:
   # -- Timezone for the container.
   - name: TZ
     value: UTC
+  - name: CACHE_TYPE
+    value: filesystem
+  - name: CACHE_DIR
+    value: /data/cache
 
 ports:
   http:
@@ -193,10 +197,10 @@ extraContainers: {}
   #   image: my-org/my-image
 
 # -- Specify extra volume mounts for the default containers.
-extraVolumeMounts: []
-  # - name: my-volume
-  #   mountPath: /path/to/volume
-  #   readOnly: false
+extraVolumeMounts:
+  - name: ctfd-storage
+    mountPath: /data/cache
+    subPath: cache
 
 # -- Specify extra volumes for the workload.
 extraVolumes: []

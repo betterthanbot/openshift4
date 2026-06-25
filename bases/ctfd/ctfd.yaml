@@ -24,7 +24,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 type: Opaque
 data:
-  SECRET_KEY: YlZKSU1tSk5kVlUyTjIwMGJWQm5WMmxLTkVwSmFFWkVjMnM0YzJONFZ6bDFOMDFRVGpneE5sUnk=
+  SECRET_KEY: WlU5cU1UQXlXWEpOU1Zkc1FrSm1SbXRWV1RKWmVXZHJNV1pzTVVKM1IwMVhkVzlhY25WcVRGTTI=
 ---
 # Source: ctfd/templates/persistantvolumeclaim.yaml
 apiVersion: v1
@@ -102,6 +102,10 @@ spec:
           env:
             - name: "TZ"
               value: "UTC"
+            - name: "CACHE_TYPE"
+              value: "filesystem"
+            - name: "CACHE_DIR"
+              value: "/data/cache"
             - name: UPLOAD_FOLDER
               value: /data/uploads
             - name: LOG_FOLDER
@@ -118,6 +122,9 @@ spec:
             - name: ctfd-storage
               mountPath: /data/logs
               subPath: logs
+            - mountPath: /data/cache
+              name: ctfd-storage
+              subPath: cache
           livenessProbe:
             httpGet:
               path: /healthcheck
