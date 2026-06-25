@@ -146,6 +146,9 @@ securityContext: {}
 # -- Pod-level security attributes. More info [here](https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#security-context).
 podSecurityContext:
   runAsNonRoot: true
+  fsGroup: null
+  runAsGroup: null
+  runAsUser: null
 
 # -- Compute resources used by the container. More info [here](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/).
 resources: {}

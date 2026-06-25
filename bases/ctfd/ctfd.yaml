@@ -24,7 +24,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 type: Opaque
 data:
-  SECRET_KEY: UW5NMmJVbFZSSEI2V0dOVFFqTjRWVGR1YkhSdFRXODRka1ZQTlZkTFNHTTVNVGRVY1RkdmEyOVM=
+  SECRET_KEY: YlZKSU1tSk5kVlUyTjIwMGJWQm5WMmxLTkVwSmFFWkVjMnM0YzJONFZ6bDFOMDFRVGpneE5sUnk=
 ---
 # Source: ctfd/templates/persistantvolumeclaim.yaml
 apiVersion: v1
@@ -133,7 +133,4 @@ spec:
           persistentVolumeClaim:
             claimName: ctfd-storage
       securityContext:
-        fsGroup: 1001
-        runAsGroup: 1001
         runAsNonRoot: true
-        runAsUser: 1001
