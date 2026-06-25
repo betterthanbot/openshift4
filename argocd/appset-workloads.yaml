@@ -49,8 +49,6 @@ spec:
       namespace: openshift-gitops
       annotations:
         argocd.argoproj.io/sync-wave: "3"
-      finalizers:
-        - resources-finalizer.argocd.argoproj.io
     spec:
       project: openshift4-community
 
@@ -71,6 +69,7 @@ spec:
         automated:
           prune: true
           selfHeal: true
+        allowEmpty: true
         syncOptions:
           - CreateNamespace=true
           - ApplyOutOfSyncOnly=true
