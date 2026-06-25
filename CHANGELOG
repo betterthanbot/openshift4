@@ -7,6 +7,31 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [1.2.0] - 2026-06-26
+### Added
+- `bases/ctfd/Makefile` — Helm fetch/template workflow using `pascaliske/ctfd` chart v2.0.0 from `https://charts.pascaliske.dev`; targets: `repo`, `fetch`, `template`
+- `bases/ctfd/kustomization.yaml` — base Kustomization referencing pre-rendered `ctfd.yaml`; image override pinning `ghcr.io/ctfd/ctfd` to `3.8.6`; `labels` patch updating `app.kubernetes.io/version` across all resources without touching selectors
+- `bases/ctfd/values.yaml` — Helm values with OpenShift-compatible security context (`runAsNonRoot: true` only; no fixed UIDs); `DATABASE_URL` pointing SQLite to PVC-backed `/opt/CTFd/.data/ctfd.db`; PVC subPath mount at `/opt/CTFd/.data` to satisfy CTFd's hardcoded cache/data path
+- `bases/ctfd/ctfd.yaml` — pre-rendered Helm manifests (ServiceAccount, Secret, PVC, Service, Deployment)
+- `overlay/my-sno-cluster/ctfd/kustomization.yaml` — cluster overlay extending CTFd base
+- `overlay/my-sno-cluster/ctfd/namespace.yaml` — `ctfd` namespace
+- `overlay/my-sno-cluster/ctfd/route.yaml` — OpenShift Route with TLS edge termination pointing to `ctfd-web` service; hostname auto-assigned by OpenShift
+- `overlay/my-sno-cluster/gatus/gatus-config-patch.yaml` — Kustomize strategic merge patch replacing the base `gatus-config` ConfigMap data with full endpoint configuration across 8 groups: Platform Endpoints, Route Endpoints, Logging, Monitoring, Security, External Cluster, Image Repositories, LLM Endpoints
+- `overlay/my-sno-cluster/gatus/README.md` — documentation covering FQDN update workflow, adding/removing endpoints, and how the Kustomize patch interacts with `ignoreDifferences`
+
+### Changed
+- `argocd/appset-workloads.yaml` — added `allowEmpty: true` to sync policy; removed `resources-finalizer.argocd.argoproj.io` finalizer from template; added `RespectIgnoreDifferences=true` to syncOptions to prevent ArgoCD from overwriting runtime-generated gatus config; excluded `overlay/my-sno-cluster/kyverno` from git directory generator (folder retained for future use)
+- `argocd/appset-operators.yaml` — added `allowEmpty: true` to sync policy; removed `resources-finalizer.argocd.argoproj.io` finalizer from template
+- `overlay/my-sno-cluster/gatus/kustomization.yaml` — added `patches` entry referencing `gatus-config-patch.yaml`
+
+### Fixed
+- **ArgoCD applications stuck deleting** — removed `resources-finalizer.argocd.argoproj.io` from both ApplicationSets so newly created Applications are not blocked from deletion when cluster resources are already gone; added `allowEmpty: true` to prevent sync errors when all managed resources are pruned
+- **CTFd SCC violation** — removed hardcoded `runAsUser: 1001`, `runAsGroup: 1001`, `fsGroup: 1001` from `podSecurityContext`; OpenShift's restricted SCC rejects fixed UIDs outside the namespace UID range; pod now inherits a UID from the allowed range
+- **CTFd permission denied on `/opt/CTFd/.data`** — CTFd hardcodes its cache and database path to `/opt/CTFd/.data` at import time, ignoring `CACHE_DIR` env var; fixed by mounting the PVC at that exact path via `extraVolumeMounts` subPath `dotdata`
+
+### Removed
+- Kyverno excluded from ArgoCD auto-discovery (not deleted); re-enable by removing the exclude entry from `appset-workloads.yaml`
+
 ## [1.1.1] - 2026-06-04
 ### Changed
 - Changed Gatus repo pull skeleton
