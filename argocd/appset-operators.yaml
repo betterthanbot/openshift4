@@ -44,8 +44,6 @@ spec:
       namespace: openshift-gitops
       annotations:
         argocd.argoproj.io/sync-wave: "{{wave}}"
-      finalizers:
-        - resources-finalizer.argocd.argoproj.io
     spec:
       project: openshift4-community
 
@@ -65,6 +63,7 @@ spec:
         automated:
           prune: false       # never auto-delete operator namespaces or CRDs
           selfHeal: true
+        allowEmpty: true
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true          # required for large ArgoCD / operator CRs

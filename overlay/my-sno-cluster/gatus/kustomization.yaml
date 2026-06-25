@@ -6,3 +6,6 @@ kind: Kustomization
 resources:
   - ../../../bases/gatus/
   - namespace.yaml
+
+patches:
+  - path: gatus-config-patch.yaml

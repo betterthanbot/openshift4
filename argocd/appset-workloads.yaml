@@ -34,10 +34,9 @@ spec:
           # Each subdirectory here becomes one ArgoCD Application.
           # Add new workloads by creating overlay/my-sno-cluster/<name>/kustomization.yaml
           - path: overlay/my-sno-cluster/*
-            # Exclude the shared patches directory — it's not a standalone app
-            exclude: false
-        # Exclude helper directories that aren't self-contained apps
-        # (uncomment and add names if you add non-app directories)
+          # To disable a workload without deleting the folder, add it here with exclude: true
+          - path: overlay/my-sno-cluster/kyverno
+            exclude: true
         # template:
         #   metadata:
         #     annotations:
@@ -49,8 +48,6 @@ spec:
       namespace: openshift-gitops
       annotations:
         argocd.argoproj.io/sync-wave: "3"
-      finalizers:
-        - resources-finalizer.argocd.argoproj.io
     spec:
       project: openshift4-community
 
@@ -71,9 +68,11 @@ spec:
         automated:
           prune: true
           selfHeal: true
+        allowEmpty: true
         syncOptions:
           - CreateNamespace=true
           - ApplyOutOfSyncOnly=true
+          - RespectIgnoreDifferences=true
 
       ignoreDifferences:
         # Gatus config is generated at runtime by the discovery CronJob

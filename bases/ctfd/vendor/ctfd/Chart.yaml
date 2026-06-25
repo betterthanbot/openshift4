@@ -1,0 +1,38 @@
+annotations:
+  artifacthub.io/changes: |
+    - kind: changed
+      description: 'Breaking change: Renamed key for specifying extra containers.'
+    - kind: changed
+      description: 'Support specifying container-level security context.'
+    - kind: added
+      description: 'Support custom nodeSelector block.'
+    - kind: added
+      description: 'Support specifying priority class name.'
+    - kind: added
+      description: 'Support specifying extra init containers.'
+    - kind: added
+      description: 'Support specifying extra volumes and volume mounts.'
+    - kind: added
+      description: 'Support creation of extra templated objects.'
+apiVersion: v2
+appVersion: 3.8.2
+dependencies:
+- name: base
+  repository: https://charts.pascaliske.dev
+  version: 1.3.0
+description: A Helm chart for CTFd
+home: https://charts.pascaliske.dev/charts/ctfd/
+keywords:
+- ctfd
+maintainers:
+- email: info@pascaliske.dev
+  name: pascaliske
+  url: https://pascaliske.dev
+name: ctfd
+sources:
+- https://github.com/pascaliske/helm-charts
+- https://github.com/ctfd/ctfd
+- https://docs.ctfd.io
+- https://ctfd.io
+type: application
+version: 2.0.0
