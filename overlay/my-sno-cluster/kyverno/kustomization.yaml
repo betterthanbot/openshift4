@@ -5,12 +5,12 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  # - ../../../bases/kyverno/
+  - ../../../bases/kyverno/
 
 # Apply the OpenShift cluster-monitoring label to the kyverno namespace
-# patches:
-#   - path: ./psm.yaml
-#     target:
-#       version: v1
-#       kind: Namespace
-#       name: kyverno
+patches:
+  - path: ./psm.yaml
+    target:
+      version: v1
+      kind: Namespace
+      name: kyverno
