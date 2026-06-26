@@ -65,7 +65,7 @@ operators:
       channel: v26.3
       source: certified-operators
       installPlanApproval: Automatic
-      startingCSV: "gpu-operator-certified.v26.3.0"
+      startingCSV: "gpu-operator-certified.v26.3.2"
 
   # ----------------------------------------------------------------------------
   # Cluster Observability Operator (Red Hat)
@@ -136,7 +136,7 @@ operators:
       channel: latest
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "openshift-gitops-operator.v1.20.1"
+      startingCSV: "openshift-gitops-operator.v1.20.4"
 
   # ----------------------------------------------------------------------------
   # Kernel Module Management Hub (Red Hat)
@@ -181,10 +181,10 @@ operators:
     subscription:
       name: cluster-logging
       namespace: openshift-logging
-      channel: stable-6.3
+      channel: stable-6.4
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "cluster-logging.v6.3.4"
+      startingCSV: "cluster-logging.v6.4.3"
 
   # ----------------------------------------------------------------------------
   # Node Feature Discovery (Red Hat)
@@ -233,10 +233,10 @@ operators:
     subscription:
       name: loki-operator
       namespace: openshift-operators-redhat
-      channel: stable-6.3
+      channel: stable-6.4
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "loki-operator.v6.3.4"
+      startingCSV: "loki-operator.v6.4.3"
 
   # ----------------------------------------------------------------------------
   # DevWorkspace Operator (Red Hat)
@@ -256,7 +256,7 @@ operators:
       channel: fast
       source: redhat-operators
       installPlanApproval: Manual
-      startingCSV: "devworkspace-operator.v0.40.0"
+      startingCSV: "devworkspace-operator.v0.41.0"
 
   # ----------------------------------------------------------------------------
   # Red Hat OpenShift AI / RHODS (Red Hat)
@@ -275,10 +275,35 @@ operators:
     subscription:
       name: rhods-operator
       namespace: redhat-ods-operator
-      channel: stable-3.3
+      channel: stable-3.4
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "rhods-operator.3.3.0"
+      startingCSV: "rhods-operator.3.4.1"
+
+  # ----------------------------------------------------------------------------
+  # Network Observability (Red Hat)
+  # FlowCollector is cluster-scoped — operator needs AllNamespaces OG.
+  # ----------------------------------------------------------------------------
+  netobserv:
+    enabled: true
+    namespace:
+      create: true
+      name: netobserv
+      labels:
+        kubernetes.io/metadata.name: netobserv
+        openshift.io/cluster-monitoring: "true"
+        security.openshift.io/scc.podSecurityLabelSync: "true"
+    operatorGroup:
+      create: true
+      name: netobserv
+      targetNamespaces: []   # AllNamespaces — FlowCollector is cluster-scoped
+    subscription:
+      name: netobserv-operator
+      namespace: netobserv
+      channel: stable
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: ""
 
   # ----------------------------------------------------------------------------
   # Red Hat Advanced Cluster Security (RHACS) (Red Hat)
@@ -300,4 +325,4 @@ operators:
       channel: stable
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "rhacs-operator.v4.10.0"
+      startingCSV: "rhacs-operator.v4.11.0"

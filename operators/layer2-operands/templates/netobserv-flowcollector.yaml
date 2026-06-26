@@ -1,0 +1,14 @@
+{{- if and .Values.netobserv .Values.netobserv.enabled .Values.netobserv.flowCollector.enabled }}
+---
+# FlowCollector — cluster-scoped singleton; name must be "cluster".
+# The operator deploys eBPF agents, a flow processor, and the console plugin
+# into the namespace specified in spec.namespace.
+apiVersion: flows.netobserv.io/v1beta2
+kind: FlowCollector
+metadata:
+  name: cluster
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+spec:
+  {{- toYaml .Values.netobserv.flowCollector.spec | nindent 2 }}
+{{- end }}

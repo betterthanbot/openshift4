@@ -8,8 +8,8 @@ A community GitOps platform for Single Node OpenShift (SNO) managed entirely via
 
 | Layer | Contents |
 |-------|----------|
-| **Operators (layer1)** | 11 operators installed via OLM |
-| **Operands (layer2)** | Grafana, LokiStack, RHACS, OpenShift AI, NFD, GPU, Compliance, Logging |
+| **Operators (layer1)** | 12 operators installed via OLM |
+| **Operands (layer2)** | Grafana, LokiStack (logging + netobserv), FlowCollector, RHACS, OpenShift AI, NFD, GPU, Compliance, Logging |
 | **Workloads** | Gatus, Grafana Dashboards, Kyverno |
 
 ---
@@ -60,20 +60,31 @@ Allow 10–15 minutes for all operators to reach `Succeeded` and operands to bec
 
 ### 3. Enter LokiStack S3 credentials
 
-LokiStack requires an S3 bucket for log storage. A placeholder secret is created by ArgoCD on first sync — fill it in with your real credentials:
+Two LokiStack instances require separate S3 buckets — one for cluster logging, one for network observability. Placeholder secrets are created by ArgoCD on first sync; fill them in with your real credentials:
 
 ```bash
+# Cluster Logging LokiStack
 oc create secret generic logging-loki-s3 \
   -n openshift-logging \
   --from-literal=access_key_id=<your-access-key-id> \
   --from-literal=access_key_secret=<your-secret-access-key> \
-  --from-literal=bucketnames=<your-bucket-name> \
+  --from-literal=bucketnames=<your-logging-bucket-name> \
+  --from-literal=endpoint=https://s3.<region>.amazonaws.com \
+  --from-literal=region=<region> \
+  --dry-run=client -o yaml | oc apply -f -
+
+# Network Observability LokiStack
+oc create secret generic netobserv-loki-s3 \
+  -n netobserv \
+  --from-literal=access_key_id=<your-access-key-id> \
+  --from-literal=access_key_secret=<your-secret-access-key> \
+  --from-literal=bucketnames=<your-netobserv-bucket-name> \
   --from-literal=endpoint=https://s3.<region>.amazonaws.com \
   --from-literal=region=<region> \
   --dry-run=client -o yaml | oc apply -f -
 ```
 
-ArgoCD will never overwrite this secret after credentials are entered. See [LokiStack S3 Setup](docs/tutorials/lokistack-s3-setup.md) for full details.
+ArgoCD will never overwrite these secrets after credentials are entered. See [LokiStack S3 Setup](docs/tutorials/lokistack-s3-setup.md) for full details.
 
 ### 4. Configure RHACS (post-install)
 
@@ -108,16 +119,17 @@ After the RHACS operator installs and `Central` is `Ready`, you must generate an
 | Operator | Version | Channel | Source |
 |----------|---------|---------|--------|
 | Grafana Community | `v5.22.2` | `v5` | community-operators |
-| NVIDIA GPU Operator | `v26.3.0` | `v26.3` | certified-operators |
+| NVIDIA GPU Operator | `v26.3.2` | `v26.3` | certified-operators |
 | Cluster Observability | `v1.4.0` | `stable` | redhat-operators |
 | Compliance Operator | `v1.8.2` | `stable` | redhat-operators |
 | Kernel Module Management Hub | `v2.6.0` | `stable` | redhat-operators |
-| Cluster Logging | `v6.3.4` | `stable-6.3` | redhat-operators |
+| Cluster Logging | `v6.4.3` | `stable-6.4` | redhat-operators |
 | Node Feature Discovery | `4.20.0` | `stable` | redhat-operators |
-| Loki Operator | `v6.3.4` | `stable-6.3` | redhat-operators |
-| DevWorkspace Operator | `v0.40.0` | `fast` | redhat-operators |
-| Red Hat OpenShift AI | `3.3.0` | `stable-3.3` | redhat-operators |
-| RHACS | `v4.10.0` | `stable` | redhat-operators |
+| Loki Operator | `v6.4.3` | `stable-6.4` | redhat-operators |
+| DevWorkspace Operator | `v0.41.0` | `fast` | redhat-operators |
+| Red Hat OpenShift AI | `3.4.1` | `stable-3.4` | redhat-operators |
+| RHACS | `v4.11.0` | `stable` | redhat-operators |
+| Network Observability | latest | `stable` | redhat-operators |
 
 See [VERSIONS.md](VERSIONS.md) for full version details and upgrade instructions.
 
@@ -135,11 +147,15 @@ oc get route -n grafana
 # RHACS route
 oc get route -n stackrox
 
-# LokiStack status
+# LokiStack status (logging)
 oc get lokistack -n openshift-logging
 
 # Log collection flowing
 oc get clusterlogforwarder -n openshift-logging
+
+# Network Observability — LokiStack + FlowCollector
+oc get lokistack -n netobserv
+oc get flowcollector cluster
 
 # Compliance scans running
 oc get compliancescan -n openshift-compliance
