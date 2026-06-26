@@ -7,6 +7,124 @@
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
+# Network Observability — LokiStack + FlowCollector
+# CHANGE ME: storageClassName, lokiStack name/namespace if different from defaults.
+# The S3 secret (netobserv-loki-s3) is a placeholder — edit it after first sync:
+#   oc edit secret netobserv-loki-s3 -n netobserv
+# ------------------------------------------------------------------------------
+netobserv:
+  enabled: true
+
+  lokiStack:
+    enabled: true
+    name: netobserv-loki
+    namespace: netobserv
+    spec:
+      managementState: Managed
+      limits:
+        global:
+          retention:
+            days: 14
+      size: 1x.pico  # production: 1x.extra-small | 1x.small | 1x.medium
+      storage:
+        schemas:
+          - effectiveDate: "2024-01-01"
+            version: v13
+        secret:
+          name: netobserv-loki-s3
+          type: s3
+      storageClassName: gp3-csi  # CHANGE ME: match your cluster's storage class
+      tenants:
+        mode: openshift-network
+
+  flowCollector:
+    enabled: true
+    spec:
+      namespace: netobserv
+      deploymentModel: Service
+      networkPolicy:
+        enable: true
+      loki:
+        enable: true
+        mode: LokiStack
+        lokiStack:
+          name: netobserv-loki    # CHANGE ME: must match lokiStack.name above
+          namespace: netobserv    # CHANGE ME: must match lokiStack.namespace above
+        readTimeout: 30s
+        writeTimeout: 10s
+        writeBatchWait: 1s
+        writeBatchSize: 10485760
+      agent:
+        type: eBPF
+        ebpf:
+          sampling: 50
+          cacheMaxFlows: 120000
+          cacheActiveTimeout: 15s
+          privileged: true
+          resources:
+            limits:
+              memory: 800Mi
+            requests:
+              cpu: 100m
+              memory: 50Mi
+          features:
+            - PacketDrop
+            - DNSTracking
+            - FlowRTT
+            - TLSTracking
+            - PacketTranslation
+            - UDNMapping
+            - IPSec
+      processor:
+        logLevel: info
+        logTypes: Flows
+        consumerReplicas: 3
+        resources:
+          limits:
+            memory: 800Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+      consolePlugin:
+        enable: true
+        replicas: 1
+        portNaming:
+          enable: true
+        resources:
+          limits:
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 50Mi
+        quickFilters:
+          - name: Applications
+            default: true
+            filter:
+              flow_layer: '"app"'
+          - name: Infrastructure
+            filter:
+              flow_layer: '"infra"'
+          - name: Pods network
+            default: true
+            filter:
+              dst_kind: '"Pod"'
+              src_kind: '"Pod"'
+          - name: Services network
+            filter:
+              dst_kind: '"Service"'
+          - name: External ingress
+            filter:
+              src_subnet_label: '"",EXT:'
+          - name: External egress
+            filter:
+              dst_subnet_label: '"",EXT:'
+      prometheus:
+        querier:
+          enable: true
+          mode: Auto
+          timeout: 30s
+
+# ------------------------------------------------------------------------------
 # Red Hat Advanced Cluster Security (RHACS)
 # ------------------------------------------------------------------------------
 rhacs:

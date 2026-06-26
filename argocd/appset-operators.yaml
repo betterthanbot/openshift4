@@ -110,6 +110,12 @@ spec:
           namespace: openshift-logging
           jsonPointers:
             - /data
+        - group: ""
+          kind: Secret
+          name: netobserv-loki-s3
+          namespace: netobserv
+          jsonPointers:
+            - /data
         # Grafana datasource bearer token is injected by the grafana-auth-job sync hook.
         # Ignore secureJsonData so ArgoCD does not reset it to empty on each sync.
         - group: grafana.integreatly.org
