@@ -29,7 +29,7 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/betterthanbot/openshift4.git
-        revision: feature/netobserv
+        revision: main
         directories:
           # Each subdirectory here becomes one ArgoCD Application.
           # Add new workloads by creating overlay/my-sno-cluster/<name>/kustomization.yaml
@@ -53,7 +53,7 @@ spec:
 
       source:
         repoURL: https://github.com/betterthanbot/openshift4.git
-        targetRevision: feature/netobserv
+        targetRevision: main
         path: "{{ .path.path }}"
         # ArgoCD auto-detects kustomize (kustomization.yaml present)
         # or Helm (Chart.yaml present) — no explicit config needed
