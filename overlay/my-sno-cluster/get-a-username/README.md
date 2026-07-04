@@ -19,18 +19,52 @@ by hand — it's now just another GitOps-managed workload.
    `LAB_DURATION_HOURS` in `configmap.yaml` as needed per workshop run.
    Currently set to 100 users / "Keycloak Workshop" / 8h.
 
-3. **Workshop user password** — `secret.yaml` holds `LAB_USER_ACCESS_TOKEN`, `LAB_USER_PASS`,
-   and `LAB_ADMIN_PASS` (all the same value). This must match whatever password the workshop
-   `userN` accounts actually have on the cluster (e.g. via HTPasswd IDP) — it is **not**
-   validated against anything by this tool itself, it's just what the tool tells attendees to
-   log in with. Rotate it per workshop run if desired.
+3. **Workshop user password — never committed to git.** `secret.yaml` only holds placeholder
+   values (`<set-me-oc-edit>`). ArgoCD creates it once with those placeholders and then never
+   touches its data again (`Prune=false` annotation + `ignoreDifferences` on `/data` in
+   `argocd/appset-workloads.yaml`). Set the real value directly on the cluster:
+
+   ```bash
+   oc edit secret get-a-username-secret -n guides
+   # set LAB_USER_ACCESS_TOKEN, LAB_USER_PASS, LAB_ADMIN_PASS to the same real value
+   ```
+
+   This must match the password baked into the `workshop-htpasswd` identity provider (see
+   below) — it's just what this tool tells attendees to log in with, not a credential it
+   enforces itself.
+
+## Authentication — letting attendees actually log in
+
+Creating `User` objects (e.g. via `bases/get-a-username/label-ns.sh`) is not enough — OpenShift
+needs an identity provider before anyone can authenticate as `user1`..`userN`. This repo manages
+one via `operators/layer2-operands/templates/workshop-htpasswd.yaml` (an `HTPasswd` entry on
+`OAuth/cluster`), backed by a Secret (`workshop-htpasswd`, in `openshift-config`) that — same as
+above — is committed only as an empty placeholder and never holds real password hashes in git.
+
+Set the real hashes directly on the cluster after first sync:
+
+```bash
+PASS='<workshop-password>'          # must match secret.yaml above
+> htpasswd.txt
+for i in $(seq 1 100); do htpasswd -Bbn "user${i}" "$PASS" >> htpasswd.txt; done
+
+oc create secret generic workshop-htpasswd -n openshift-config \
+  --from-file=htpasswd=htpasswd.txt \
+  --dry-run=client -o yaml | oc apply -f -
+
+rm htpasswd.txt   # don't leave the real hashes lying around locally either
+```
+
+The `authentication` cluster operator briefly rolls (~30-60s) after this — expect a short
+disruption to *all* console logins, not just workshop users.
 
 ## How it works
 
 - `bases/get-a-username/` — Redis (Deployment + Service + PVC + Secret) and the
   `get-a-username` Deployment/Service, generic across clusters.
-- `configmap.yaml` / `secret.yaml` here — cluster- and workshop-run-specific env vars, injected
-  into the `get-a-username` container via `envFrom`.
+- `configmap.yaml` here — cluster- and workshop-run-specific env vars, injected into the
+  `get-a-username` container via `envFrom`. Non-sensitive, safe to commit.
+- `secret.yaml` here — placeholder only; see "Workshop user password" above.
 - `route.yaml` — exposes the tool on the default cluster wildcard domain (empty `host`).
 
 ## Verifying

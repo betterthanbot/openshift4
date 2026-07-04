@@ -116,6 +116,14 @@ spec:
           namespace: netobserv
           jsonPointers:
             - /data
+        # Workshop HTPasswd secret — placeholder (empty) is committed; real user
+        # hashes are set manually via `oc edit`/`oc apply`, never committed to git.
+        - group: ""
+          kind: Secret
+          name: workshop-htpasswd
+          namespace: openshift-config
+          jsonPointers:
+            - /data
         # Grafana datasource bearer token is injected by the grafana-auth-job sync hook.
         # Ignore secureJsonData so ArgoCD does not reset it to empty on each sync.
         - group: grafana.integreatly.org

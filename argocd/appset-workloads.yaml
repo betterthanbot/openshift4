@@ -82,3 +82,11 @@ spec:
           namespace: gatus
           jsonPointers:
             - /data
+        # get-a-username secret — placeholder is committed; real password is set
+        # manually via `oc edit`, never committed to git.
+        - group: ""
+          kind: Secret
+          name: get-a-username-secret
+          namespace: guides
+          jsonPointers:
+            - /data
