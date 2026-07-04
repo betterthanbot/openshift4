@@ -10,7 +10,7 @@ A community GitOps platform for Single Node OpenShift (SNO) managed entirely via
 |-------|----------|
 | **Operators (layer1)** | 12 operators installed via OLM |
 | **Operands (layer2)** | Grafana, LokiStack (logging + netobserv), FlowCollector, RHACS, OpenShift AI, NFD, GPU, Compliance, Logging |
-| **Workloads** | Gatus, Grafana Dashboards, Kyverno |
+| **Workloads** | Gatus, Grafana Dashboards, Kyverno, get-a-username (workshop user provisioning) |
 
 ---
 
@@ -112,6 +112,26 @@ After the RHACS operator installs and `Central` is `Ready`, you must generate an
 
 > The init bundle contains cluster-specific secrets. Do not commit it to git.
 
+### 5. Provision workshop users (get-a-username)
+
+`overlay/my-sno-cluster/get-a-username/` deploys the [username-distribution](https://quay.io/openshiftlabs/username-distribution) tool, which hands each attendee a `userN` login and their assigned modules/console links. ArgoCD only ever creates **placeholder** Secrets for this (no real password is committed to git) — after first sync, run the setup script locally:
+
+```bash
+# Edit WORKSHOP_PASSWORD at the top of the script first — never commit that edit.
+vi bases/get-a-username/init.sh
+./bases/get-a-username/init.sh
+```
+
+This creates the `userN` namespaces/`User` objects, sets up an `HTPasswd` identity provider on `oauth/cluster` so those accounts can actually log in, points the tool's console/DevSpaces links at this cluster's real routes, and restarts the tool so it picks everything up.
+
+To tear a workshop run down afterward (deletes the namespaces, users, identity provider, and everything attendees deployed inside their namespaces):
+
+```bash
+./bases/get-a-username/cleanup.sh
+```
+
+See [overlay/my-sno-cluster/get-a-username/README.md](overlay/my-sno-cluster/get-a-username/README.md) for the full workflow.
+
 ---
 
 ## Operator Versions
@@ -171,7 +191,7 @@ argocd/             # AppProject, ApplicationSets, RBAC
 operators/
   layer1-install/   # Helm chart: Namespaces, OperatorGroups, Subscriptions
   layer2-operands/  # Helm chart: Operator CRs / operands
-bases/              # Shared Helm/Kustomize bases (gatus, grafana, kyverno)
+bases/              # Shared Helm/Kustomize bases (gatus, grafana, kyverno, get-a-username)
 overlay/            # Cluster-specific Kustomize overlays
 docs/               # GitHub Pages documentation
 ```
