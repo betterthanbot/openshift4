@@ -1,0 +1,29 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: get-a-username
+  labels:
+    app: get-a-username
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: get-a-username
+  template:
+    metadata:
+      labels:
+        app: get-a-username
+    spec:
+      containers:
+        - name: get-a-username
+          image: quay.io/openshiftlabs/username-distribution:1.4
+          ports:
+            - name: 8080-tcp
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: get-a-username-config
+            - secretRef:
+                name: get-a-username-secret
