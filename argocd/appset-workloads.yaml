@@ -37,6 +37,8 @@ spec:
           # To disable a workload without deleting the folder, add it here with exclude: true
           - path: overlay/my-sno-cluster/kyverno
             exclude: true
+          - path: overlay/my-sno-cluster/get-a-username
+            exclude: true
         # template:
         #   metadata:
         #     annotations:
@@ -80,5 +82,13 @@ spec:
           kind: ConfigMap
           name: gatus-config
           namespace: gatus
+          jsonPointers:
+            - /data
+        # get-a-username secret — placeholder is committed; real password is set
+        # manually via `oc edit`, never committed to git.
+        - group: ""
+          kind: Secret
+          name: get-a-username-secret
+          namespace: guides
           jsonPointers:
             - /data

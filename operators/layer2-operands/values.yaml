@@ -627,3 +627,22 @@ gpuOperator:
         enabled: false
       vgpuManager:
         enabled: false
+
+# ------------------------------------------------------------------------------
+# Workshop HTPasswd identity provider — lets workshop attendees (user1..userN,
+# created by bases/get-a-username/label-ns.sh) actually log in to the OpenShift
+# console. Without an identity provider, `oc create user` only creates orphaned
+# User objects with no way to authenticate.
+#
+# The Secret referenced below (workshop-htpasswd, in openshift-config) is NOT
+# managed by git — it must exist on the cluster before this syncs, or the OAuth
+# CR will reference a Secret that doesn't exist yet (console login just won't
+# offer that IDP until it's created). Create/rotate it with:
+#   oc apply -f <local-only-file, never committed>
+# See overlay/my-sno-cluster/get-a-username/README.md for the template and the
+# regeneration one-liner.
+# ------------------------------------------------------------------------------
+workshopAuth:
+  enabled: false
+  identityProviderName: workshop-htpasswd
+  secretName: workshop-htpasswd
