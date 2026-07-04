@@ -93,6 +93,12 @@ spec:
           jsonPointers:
             - /status
             - /metadata/ownerReferences
+        # HCO operator defaults and reconciles most spec fields (certConfig,
+        # featureGates, etc.) and status after HyperConverged creation
+        - group: hco.kubevirt.io
+          kind: HyperConverged
+          jsonPointers:
+            - /status
         # RHACS operator manages status after Central creation
         - group: platform.stackrox.io
           kind: Central

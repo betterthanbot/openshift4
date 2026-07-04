@@ -584,6 +584,36 @@ rhods:
           workbenchNamespace: rhods-notebooks
 
 # ------------------------------------------------------------------------------
+# OpenShift Virtualization (CNV) — HyperConverged instance
+#
+# IMPORTANT: this cluster's nodes (m6a.4xlarge on AWS) do not expose hardware
+# virtualization extensions (no /dev/kvm, no vmx/svm CPU flags) — AWS only
+# passes through VT-x/AMD-V on `.metal` instance types. The
+# kubevirt.kubevirt.io/jsonpatch annotation below forces KubeVirt's
+# developerConfiguration.useEmulation to true, which is what's already live
+# on the cluster's existing HyperConverged CR (confirmed nodes report
+# kubevirt.io/schedulable=true). This is NOT supported by Red Hat for
+# production and VMs run 10-50x slower than with KVM acceleration — fine for
+# templates/testing, not for real workloads. To get real performance, move VM
+# workloads to bare-metal (.metal) worker nodes and remove this annotation.
+# See docs/tutorials/openshift-virtualization-on-ec2.md.
+#
+# Common boot-source templates (Fedora, CentOS Stream, RHEL 8/9/10) are
+# deployed automatically by the SSP operand once this CR reconciles — no
+# extra config needed for "basic templates".
+# ------------------------------------------------------------------------------
+cnv:
+  enabled: false   # turned off for now — flip to true to reinstall (see layer1-install cnvOperator)
+
+  hyperConverged:
+    enabled: true
+    name: kubevirt-hyperconverged
+    namespace: openshift-cnv
+    annotations:
+      kubevirt.kubevirt.io/jsonpatch: '[{"op":"add","path":"/spec/configuration/developerConfiguration","value":{"useEmulation":true}}]'
+    spec: {}
+
+# ------------------------------------------------------------------------------
 # NVIDIA GPU Operator — ClusterPolicy
 # Manages driver, toolkit, device-plugin, DCGM, GFD daemonsets on GPU nodes.
 # ------------------------------------------------------------------------------
