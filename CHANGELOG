@@ -7,6 +7,18 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ## [Released]
+## [1.5.0] - 2026-07-04
+### Added
+- `operators/layer1-install/values.yaml` — added `cnvOperator` (OpenShift Virtualization / CNV) Subscription entry: package `kubevirt-hyperconverged`, namespace `openshift-cnv`, channel `stable`, source `redhat-operators`, own `OperatorGroup`; **disabled by default** (`enabled: false`)
+- `operators/layer2-operands/templates/cnv-hyperconverged.yaml` + `values.yaml` (`cnv`) — `HyperConverged` CR; carries a `kubevirt.kubevirt.io/jsonpatch` annotation forcing `developerConfiguration.useEmulation: true`, required because this cluster's EC2 nodes (`m6a.4xlarge`) are not bare metal and don't expose `/dev/kvm` or vmx/svm CPU flags — AWS only passes hardware virtualization extensions through on `.metal` instance types; **disabled by default** (`enabled: false`)
+- `argocd/appset-operators.yaml` — `ignoreDifferences` entry for `HyperConverged` `/status`, since the HCO operator defaults and reconciles most spec fields itself
+- `docs/tutorials/openshift-virtualization-on-ec2.md` — new tutorial: why labels/annotations alone can't work around missing hardware virtualization on non-metal EC2, the two real options (bare-metal MachineSet vs. software emulation), and how to verify VMs are running / migrate to bare metal later
+- `operators/cleanup-cnv-stale.sh` — teardown script for a previous manual CNV install whose Subscription/CSV had been deleted without uninstalling `HyperConverged` first, orphaning every operand (`virt-*`, `cdi-*`, `kubemacpool-*`, etc.) with no operator left to reconcile them. Deletes the stale webhook configs (`virt-api-validator`, `virt-operator-validator`, `virt-template-validator`, `virt-api-mutator`, `cdi-api-*`) and `APIService` entries (`v1[alpha3].subresources.kubevirt.io`, `v1beta1.upload.cdi.kubevirt.io`) that break namespace-deletion API discovery **cluster-wide**, not just for `openshift-cnv`; strips finalizers nothing will ever clear with the operator gone; and auto-heals CRs that can be orphaned when a namespace's finalizer is force-cleared before all its content finishes deleting
+- `.github/workflows/pages.yml` — GitHub Actions workflow building/deploying `docs/` to GitHub Pages via `actions/jekyll-build-pages` + `actions/deploy-pages`
+
+### Changed
+- `argocd/appset-workloads.yaml` — re-enabled `get-a-username` (removed from the git-directory generator's exclude list)
+
 ## [1.4.0] - 2026-07-04
 ### Added
 - `bases/get-a-username/` — new Kustomize base for the [username-distribution](https://quay.io/openshiftlabs/username-distribution) workshop tool, replacing the old Ansible playbook (`oc process redis-persistent` + `oc new-app --as-deployment-config`) with plain `apps/v1` Deployments, consistent with the rest of this repo (no `DeploymentConfig` anywhere):
@@ -17,10 +29,6 @@ and this project adheryou des to [Semantic Versioning](http://semver.org/).
 - `overlay/my-sno-cluster/get-a-username/` — cluster overlay: `kustomization.yaml`, `namespace.yaml` (`guides`), `route.yaml` (edge TLS, empty host), `configmap.yaml` (non-sensitive env: title, duration, user count/prefix, module URLs), `secret.yaml` (placeholder-only — see Security below), `README.md` documenting the full auth + password workflow
 - `operators/layer2-operands/templates/workshop-htpasswd.yaml` + `values.yaml` (`workshopAuth`) — cluster-wide `OAuth/cluster` `HTPasswd` identity provider (name `workshop-htpasswd`) so `userN` accounts created by `init.sh` can actually authenticate; without this, `oc create user` only creates orphaned `User` objects with no way to log in. Placed in `layer2-operands` (alongside other cluster-singleton CRs like the ArgoCD CR and RHACS `Central`) rather than in `bases/get-a-username`, since `OAuth/cluster` is cluster-wide — deleting the namespaced workload overlay must never risk also deleting the platform's identity provider config.
 - `argocd/appset-operators.yaml` / `argocd/appset-workloads.yaml` — `ignoreDifferences` entries for the `workshop-htpasswd` Secret (`openshift-config`) and `get-a-username-secret` (`guides`), same `Prune=false` + ignore-`/data` pattern already used for the LokiStack S3 secrets
-
-### Security
-- No real secrets are committed to git for this feature. `workshop-htpasswd` (the Secret backing the identity provider) and `get-a-username-secret` (the tool's displayed password) are both committed as empty/placeholder-only manifests; real password hashes and values are set out-of-band via `init.sh` (which reads `WORKSHOP_PASSWORD` from an untracked local edit) and are never round-tripped back into git
-- An earlier iteration of this feature briefly committed real bcrypt password hashes and a plaintext workshop password to `operators/layer2-operands/values.yaml` and `overlay/my-sno-cluster/get-a-username/secret.yaml` before this placeholder pattern was adopted; both were rotated and scrubbed from the working tree. Anyone with access to the `feature/username` branch history should treat that original password as burned.
 
 ## [1.3.0] - 2026-06-26
 ### Added

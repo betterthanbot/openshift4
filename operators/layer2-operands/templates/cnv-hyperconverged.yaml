@@ -1,0 +1,19 @@
+{{- if and .Values.cnv .Values.cnv.enabled .Values.cnv.hyperConverged .Values.cnv.hyperConverged.enabled }}
+{{- $h := .Values.cnv.hyperConverged }}
+---
+apiVersion: hco.kubevirt.io/v1beta1
+kind: HyperConverged
+metadata:
+  name: {{ $h.name }}
+  namespace: {{ $h.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+  {{- if $h.annotations }}
+  annotations:
+    {{- range $k, $v := $h.annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- end }}
+spec:
+  {{- toYaml $h.spec | nindent 2 }}
+{{- end }}

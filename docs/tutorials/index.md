@@ -14,3 +14,4 @@ Step-by-step guides for common platform tasks.
 | [Adding a Workload](adding-a-workload.md) | Add a new application using the base + overlay pattern |
 | [Grafana + Thanos Datasource](grafana-thanos-datasource.md) | Wire community Grafana to OpenShift's built-in Thanos querier |
 | [LokiStack S3 Setup](lokistack-s3-setup.md) | Enter S3 credentials for LokiStack log storage |
+| [OpenShift Virtualization on EC2](openshift-virtualization-on-ec2.md) | Run VMs on non-bare-metal AWS nodes via software emulation |

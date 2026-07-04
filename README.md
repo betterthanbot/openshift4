@@ -9,7 +9,7 @@ A community GitOps platform for Single Node OpenShift (SNO) managed entirely via
 | Layer | Contents |
 |-------|----------|
 | **Operators (layer1)** | 12 operators installed via OLM |
-| **Operands (layer2)** | Grafana, LokiStack (logging + netobserv), FlowCollector, RHACS, OpenShift AI, NFD, GPU, Compliance, Logging |
+| **Operands (layer2)** | Grafana, LokiStack (logging + netobserv), FlowCollector, RHACS, OpenShift AI, NFD, GPU, Compliance, Logging, OpenShift Virtualization (disabled by default — see [tutorial](docs/tutorials/openshift-virtualization-on-ec2.md)) |
 | **Workloads** | Gatus, Grafana Dashboards, Kyverno, get-a-username (workshop user provisioning) |
 
 ---
@@ -210,6 +210,7 @@ Full documentation is published via GitHub Pages:
   - [Grafana + Thanos Datasource](docs/tutorials/grafana-thanos-datasource.md)
   - [LokiStack S3 Setup](docs/tutorials/lokistack-s3-setup.md)
   - [Adding GPU Nodes](docs/tutorials/adding-gpu-nodes.md)
+  - [OpenShift Virtualization on EC2](docs/tutorials/openshift-virtualization-on-ec2.md)
 
 ---
 

@@ -306,6 +306,42 @@ operators:
       startingCSV: ""
 
   # ----------------------------------------------------------------------------
+  # OpenShift Virtualization / CNV (Red Hat)
+  #
+  # A previous manual install of this operator was torn down with
+  # operators/cleanup-cnv-stale.sh (its Subscription/CSV had been deleted
+  # without a clean uninstall, orphaning all operand Deployments — see
+  # PLAN.md Known Issue #8). This entry is a from-scratch install.
+  #
+  # This cluster's nodes (m6a.4xlarge on AWS) are not bare-metal, so they have
+  # no /dev/kvm and no vmx/svm CPU flags — AWS only exposes hardware
+  # virtualization on .metal instance types. VMs run via QEMU software
+  # emulation instead (see layer2-operands HyperConverged CR annotation).
+  # See docs/tutorials/openshift-virtualization-on-ec2.md.
+  # ----------------------------------------------------------------------------
+  cnvOperator:
+    enabled: false   # turned off for now — flip to true to reinstall
+    namespace:
+      create: true
+      name: openshift-cnv
+      labels:
+        kubernetes.io/metadata.name: openshift-cnv
+        openshift.io/cluster-monitoring: "true"
+        security.openshift.io/scc.podSecurityLabelSync: "true"
+    operatorGroup:
+      create: true
+      name: openshift-cnv
+      targetNamespaces:
+        - openshift-cnv
+    subscription:
+      name: kubevirt-hyperconverged
+      namespace: openshift-cnv
+      channel: stable
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "kubevirt-hyperconverged-operator.v4.20.15"
+
+  # ----------------------------------------------------------------------------
   # Red Hat Advanced Cluster Security (RHACS) (Red Hat)
   # ----------------------------------------------------------------------------
   rhacsOperator:
