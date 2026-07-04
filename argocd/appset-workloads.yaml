@@ -37,6 +37,8 @@ spec:
           # To disable a workload without deleting the folder, add it here with exclude: true
           - path: overlay/my-sno-cluster/kyverno
             exclude: true
+          - path: overlay/my-sno-cluster/get-a-username
+            exclude: true
         # template:
         #   metadata:
         #     annotations:
