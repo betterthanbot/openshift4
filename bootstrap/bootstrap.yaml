@@ -24,7 +24,7 @@ spec:
   source:
     repoURL: https://github.com/betterthanbot/openshift4.git
     path: argocd/
-    targetRevision: main
+    targetRevision: feature/username
   syncPolicy:
     automated:
       prune: false      # never auto-delete argocd/ resources
