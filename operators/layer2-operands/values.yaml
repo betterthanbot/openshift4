@@ -627,3 +627,128 @@ gpuOperator:
         enabled: false
       vgpuManager:
         enabled: false
+
+# ------------------------------------------------------------------------------
+# Workshop HTPasswd identity provider — lets workshop attendees (user1..userN,
+# created by bases/get-a-username/label-ns.sh) actually log in to the OpenShift
+# console. Without an identity provider, `oc create user` only creates orphaned
+# User objects with no way to authenticate.
+#
+# IMPORTANT: the password baked into every line of htpasswdContent below must
+# match LAB_USER_PASS in overlay/my-sno-cluster/get-a-username/secret.yaml —
+# that's the password get-a-username tells attendees to use.
+#
+# Regenerate both together when rotating the workshop password or user count:
+#   PASS='<new-password>'
+#   > htpasswd.txt
+#   for i in $(seq 1 100); do htpasswd -Bbn "user${i}" "$PASS" >> htpasswd.txt; done
+# then paste the file contents in as htpasswdContent (indented under the `|`).
+#
+# NOTE: OAuth/cluster is a singleton CR fully owned by this chart — any identity
+# provider added manually outside git will be reverted on the next ArgoCD sync.
+# ------------------------------------------------------------------------------
+workshopAuth:
+  enabled: true
+  identityProviderName: workshop-htpasswd
+  secretName: workshop-htpasswd
+  htpasswdContent: |
+    user1:$2y$05$Am.hIDxzwgxI1rE3tKULIe/n9c3qskiu1JQey/ABmmkyU2tb5TE1e
+    user2:$2y$05$cWRtlW3OOx1rWOi.gIODi.hQTR3c1lGR3N863g5.lzPZmOfMzl/PO
+    user3:$2y$05$rsjjB/.4rZKr9qSZqnH.1edrtaglFniKos2wBh4vzwaj4UyZ2t5ka
+    user4:$2y$05$bxzxjppIWrQaQY2GX3OLS.7ieZbT9bmPw.CJZJUS3u8MeGNa.n5l2
+    user5:$2y$05$GPJgHzM2ObpCEZGCVX3gFOYNvN/ElYntPBjvaTmeFC1R/Eh6S.PuC
+    user6:$2y$05$pXJWayLmejWCC44VnCDBN.W.BLiRLKOp5HrId0wYh1g2ecfRQCMqW
+    user7:$2y$05$o42rG4w8yT1Y0Wb2ds4EkuQBymqITHhMwQrO9RGd6UEynUTbd0kj2
+    user8:$2y$05$7GqJR34JeZQr0QAA7h99zOHtbI3YciFWrh3np8AnAPF/mylvbN59m
+    user9:$2y$05$uoVLScuFtI8GadtIFvXQ0./RD8bX2fsCD/oBLhTJHZqz4AIQbkn7i
+    user10:$2y$05$9Dzb3BReqXhK9s7l.fTM8ebnZ6IV3OZMpFmJHvOSj8vRDT2d4JU2S
+    user11:$2y$05$V/9eAOuGwdGt8CIN9oRahOcs6LPtVovkyxfJbjSdjbd1uYM2takmu
+    user12:$2y$05$VwC8BfHMNna1RcPqEyYCreswDGJ8pzcUQzcw1XgAWkIgItzHNhEui
+    user13:$2y$05$z5J3oRtdJkp/niPCd.gdsu/qE.x3FXfoXUoa/GhNcMeItuk1TUbYy
+    user14:$2y$05$rAO0fG8TCS4AB/xK8uhcNOS7e6mtv48EY2ViGcVA.KSEPkZ4tP./a
+    user15:$2y$05$iKrfVeBY9gRZcpzdDfsd0.7.INyvZNcFIT3p5WjMN1wczqmVcbWmK
+    user16:$2y$05$cWoNdkGnPu98eev6z/njb.Bp4YD7Ydm9z1nBX4UA0wIgSL0f6UViq
+    user17:$2y$05$2DMyG7CmsiSU.XVnmoonjeT5ZVzVvf2./TgcKN8vH7NT/2LKfLLAe
+    user18:$2y$05$kv0diPTrk/H4MURkTyBPYex2xt1..2tEN9bxLQzDFK0OUo9YZ7YMW
+    user19:$2y$05$i4HO3TalhoZKhbTKTnI5we6znw0oljcaBk/qziyPMYWHhhZrqHIfe
+    user20:$2y$05$TD2oe5/ldkewnOIqqzYJWu0GWcxXT2unyl88Icm6jAHkEdem6g/dO
+    user21:$2y$05$pg1wSwx.fAmjqBP8obWhkOeMQSyxs6efcFO/JhZhOJJ3dD37ZuDn2
+    user22:$2y$05$i8yLPmCRD0slQez3uBCNo.naIqyYusVlnYJymhza8AEzDbBGN/EmW
+    user23:$2y$05$jR2Qh5EiA/OZA1jLbxkkVue84lwtgBXqoyeJvjsAm280jKLkiHp3i
+    user24:$2y$05$dAomyTG0BzY5vjQrrGBEzOm.TR.UJrteZadpDvAplWDJ7O6UEEmQe
+    user25:$2y$05$ZlFymjv9E3iPw3q1ITcK3eVftwSNAaBGOzvxmQ75V6FZg2mavZdCG
+    user26:$2y$05$F2KXCnV0Fv3XmYGMa2lmauZsvig8Yx660NPVWp2jk/mA/fNaBJf9.
+    user27:$2y$05$xSFvdtYy/GVVK3orgrvl/OQRfubmUKffg04ww6P3qrsjTNiD7BaH.
+    user28:$2y$05$eEk1QlFO9wVnmYvaiRzSi.7msTE5vrKqO0E9KptZyMNoGcWWCCznC
+    user29:$2y$05$qyCu5171vGx10RtXv4xcouLA3bITrbRGu/4wvVBeGsTmLjypqNj4i
+    user30:$2y$05$VXtKDxBzTpR3JDacguKlS.Bm6yOYReWx8KexhZeH1jPsTxmGg.4/2
+    user31:$2y$05$8xL9DXqYumi3xhYV.tTsrOpL5W1I7ewJxxgdNQETSx8BffcraypAe
+    user32:$2y$05$EInWKkE/Uje5EqGKC8Xxru.vOoJwdF3M/v2pU/easPZQ7.C1rxOAm
+    user33:$2y$05$DBV3BoHldkjJ13c9l7WKVOS/Xe1HGddt8H1Z6rPXT1iWMSy5/A8Mq
+    user34:$2y$05$WfVqDbWcc3TrrmHONsp8..3yfOXKYTlIqt73lr0zCbH40H3Hnl9ka
+    user35:$2y$05$8zvanI4Pbp/DkZxk8A9duut3/DDKEYi0IfTyNN4rxl9LtkNc4BSr6
+    user36:$2y$05$juRZMO/SFyfvS1SN9RXOAufwPrXghbhzrvXN.7GBDuZvNE4G1n3BW
+    user37:$2y$05$fiZ4fem4tev3uULbXxbFPOps2nTzY2sYQP9bL4Of18j5OlHifaKs2
+    user38:$2y$05$HUJPXh6STY.TxX/3UOiy7.WKEJmisCnoqQP1NPOqG2eLxcfW6XZm2
+    user39:$2y$05$JzJm0OzVurZEegS/54OWq.Yf5bLuTL3NdaxvS/Bq./VPPno2Ky7pO
+    user40:$2y$05$uSx9T4tXrg2OzdlQ0Q5PPuzkEape//1WV9EOvbuATv2ZaVJLfrmX2
+    user41:$2y$05$rmSCz/pluFe0RS0LtrF4EONKow3i2p7d8HlKPi6Wy62myANlad7KK
+    user42:$2y$05$K1XL8d/FIvY4uFSegcqhneYL6.Zc2tkbPO3B/CY8/J9970MLT4oUa
+    user43:$2y$05$d5ees47S9/bECUPNd1vdaeKHiN9EnqKifdbF.XQNYg8WLQDkw72w.
+    user44:$2y$05$sPuD786A5nliqhuam3oV8uuAJhAc8oZF3P1xGvglwD0u5QtRouXrK
+    user45:$2y$05$.N0ytZOHpzAF3QYfOitZFO6RYxgB6zBIHXV6xyHS5xEgsStOG7lde
+    user46:$2y$05$D4ZRd0jgAGJqSc09eXZW3OZONQ/Je8ztlLiptjoSH6c8rhm/LHeEq
+    user47:$2y$05$STDqU1NQcNSYv1DtMACUEe88l3eGt.NppOduwo1/RlFaI6Yz1FHa2
+    user48:$2y$05$jze2H9gJukxa1JWG.BhrF.54zNlBTtDBgkYJmRTb0B2pMHO2LXnUm
+    user49:$2y$05$XiAyEIhS9/2aJz.fkaEQhOwoSU76s/BdH.nJNyL2Z4exKl6My6dtS
+    user50:$2y$05$evGiANCtexyY/ZwJrXLq0ufpITyNfupNmqcPfdHluXreM/WPDNAZa
+    user51:$2y$05$QGzPiGWeVErB9JNMByjNBeSlzQXd2zXldtSxro6xgilKBr3JaXMh2
+    user52:$2y$05$vzzYAqCpI5WvZojXICQvYeBc3/IbYkHfPgFUO4IQdPKppyh4bq/Cq
+    user53:$2y$05$KUrFb3DyMZ4wgLyMvgKBCOgytxxV7QvcRhAltMT6Ly3OCdrCJIOJG
+    user54:$2y$05$4aIHGgs19i0ledxDi5VLQuqCtMw8aDvTh2XU32ZbhlYjdh/9F0Qc.
+    user55:$2y$05$rRXS7uAoMV4fn6URLZOD/elvEBJHXN3jBenz.K.K9LlG/7i9gJxu.
+    user56:$2y$05$13eo5nM5.tM4Zlc7cRoczexsbdX4qJmgzVZoRtSn74RskRJU3Qzyy
+    user57:$2y$05$SA9ZrmuHuXsihrSuGLpb5.NJMU0nNzo4wwRb61JwUTJqWC4hCb2D2
+    user58:$2y$05$wXHRDxDdhmi.oaojBjcpqO5GICLJK36Zz5rP6NKqn0zSPH8K4vlT2
+    user59:$2y$05$OtiPSiHgp2xIf//e7BRBT.IYAXFB9/m9zJWDL6ZNsJTfKK3GHdA4y
+    user60:$2y$05$NWH/gve7bvE6dY5qjSzvJei1hYRt2HRxLQ71v8WE3/PqzRDPQieZq
+    user61:$2y$05$RZLOQsaJFziuIPxONLqo3uoGazVYLRRocNObI/uOOIyMcUc30Ltei
+    user62:$2y$05$XxMdeA3k7AYomZ215Dv.9.jrAFAm8qsm3DuxfT25Aqs4Tu04TAM36
+    user63:$2y$05$lKFI1llMGWOlALxvfKaVfeJfIi5N4E0eY/2pP.B0VKLfOhBtB3fyq
+    user64:$2y$05$sNul4KMkZ/57yVzIby0GU.Ph4HY9M6b7DU8iOdtSaeGlX5y9ZXv/6
+    user65:$2y$05$bJ/1WPdfBR2xzlJCGgiDquF0RPpePcWRGkNMTUeb8DuCtYS0itWHu
+    user66:$2y$05$pHEEdca/hwYcSIww8EpYCOnQm0tTlBOrkQTxXoEVbjbiPjqdXLo.i
+    user67:$2y$05$KyXOk0objPFC73W84MkIAe.t4u8YEX7XsqpVITC6EJ32gh6IjiORC
+    user68:$2y$05$1Dp1di.JExsThXnnpEmmDu76Uw/9J47qEM5nAXNGsD7a.bKecfdcS
+    user69:$2y$05$RBU7206jBF9GX6Cl3ZjOrekDDGWw/XKzhJMnsIsF1wk4yDkZcBzBO
+    user70:$2y$05$cJOduIxzfpbOwJKcwWSUsexG6j250WuTvPRDNWaAzQKBMzB9v9bxy
+    user71:$2y$05$AJwtAuTx5ZPeWuv.0OuKZO3/uMMVF.U/ZmXFXvIh5qx5LzK4QDhCm
+    user72:$2y$05$xC0AVhezhgsNEakQw6qe/O7w/TIRGkgZPOdGrj4O5yQfgCSHMJfq2
+    user73:$2y$05$omp1r3yKfYIt2aY6qLuS3.Q2KmmbvMLginbRdUAWKnX8Uum/D0u4G
+    user74:$2y$05$bmOu6EnhfFILJb43lXLuXe55pSJ7QFtepUrbIQPtn8ejgz5f4MKE2
+    user75:$2y$05$FB8.z.xrMAV3Opdi2XFjv.XTki4.R95qLjbKPuujCXUuaLbnxH.gu
+    user76:$2y$05$o79jP7s7tPx8SBxqpVLLc.h0.GAmKDdhyZeYGxZbayH/Ei5sDgkbi
+    user77:$2y$05$N2L11W3stGAOYoYZnkCjTeuU/tf5unvXaJhSqCMylCjN7aXhzL/nO
+    user78:$2y$05$Y4kKM2.QFHDpTjQtNK7jhe.w82WYj2h9li36KBi5ZCSaZ8ll8svFa
+    user79:$2y$05$0tNpYgt.s9ZRxxcrUG6hNOCwkMpkEwerRYDaQyZrxQMJdEZtpQEaW
+    user80:$2y$05$JcYX7Tx5War3bNBXbGCBeugT/BLnZ5wvkungXSwFb./dhDr7SJ5pm
+    user81:$2y$05$NiL2TcLJPlk7HQ7Vll0c7.EdWo8PnVHHyYeJA3pAny4mhc9Niqy6K
+    user82:$2y$05$5Y2hElSsiZXF0Su1Ehc49ef17y/B2/uVPL1VQS6B3paR/Q46OL16S
+    user83:$2y$05$znxTUh5wKCWjOL353kAGzOYGm1cBApymmlPmjSJ/A4ySxjU1Ppjmm
+    user84:$2y$05$qEf1cmXZnB9JHNCMpFyoWOqZajqahxMjwn7wzdVxzaFJB/S.I9zZK
+    user85:$2y$05$9sVZr6.wsb8YM4stUhaBle1eA76Iqr8C6feFOCVYMDVL.7rDwEQWa
+    user86:$2y$05$Puvud8JzANtEhPt284RmMeB6O.R9nQCSQtp3on/U3LPDUlTcGmGC6
+    user87:$2y$05$eku971gWSa56/kEVwS9Ls.k28R4ha.PtXLaGytMGm9KPa6uMhDIhS
+    user88:$2y$05$0qzvyB8JNDIqHZ9B8bAI5.XUFDKnuSmHYzYbno0bEA3p4ZcMiem/K
+    user89:$2y$05$QIOxW6XG8LRIe2k0zfhDmeV.ZyYRf9eitUyPTFkRV.JnMBUxDVjE.
+    user90:$2y$05$ELhw.SpkD1Fcvp6pO5TGjuzaMRTe4IOuOg9g52a0.aIYlPeJyTeAG
+    user91:$2y$05$v.TWf2ITDo/uFkywhtW/gOPy0.OIoV9qM3LvDPCROGSgE9p3qwwPq
+    user92:$2y$05$81ExUYOxTSPPT5o2yK/Q.uvyTuGq83yc3xRoBj.J1mfrQiwAOUJZq
+    user93:$2y$05$ANCogujZtA5vfunlMfIgQu4l5GXrfW2fQdMLWMn.Qs15f4ywxHr8i
+    user94:$2y$05$dN6bYVWuDPxea4I8A.DAMOhOOU9qxZaHhN1YWWEiRdJJ.m2UissPG
+    user95:$2y$05$AY0L2DMXSYtuuqsxtYskk.3I6B/djz9HwnySu0fYAoTjNlE/e9M8i
+    user96:$2y$05$NEZqyAWIQTuZjZLudFTksOfdP5z3Cpaw6hUxvn/Sxzs1vfcvCZ/y.
+    user97:$2y$05$74RnUEsLu7tGHSD6t5ZmiOagzjXk.X/3oAWf0IixTBi2Xujupf4Se
+    user98:$2y$05$YdBf1JeHBhkNERCVjSjq9ejGddPabbOKMEXXqlNcOBX45av.Xqjwe
+    user99:$2y$05$TU9tR.pXPsvjP7P.A0GKeeNLqG6IJ.OhB8RpGtOwxr5ikWnLompf2
+    user100:$2y$05$QMoAXw.6HZvruvJLohLnDOyvm4GQ/CPpqRABXvM2xJZjh0N0NsUxa

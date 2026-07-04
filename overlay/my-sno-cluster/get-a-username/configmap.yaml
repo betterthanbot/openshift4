@@ -1,0 +1,17 @@
+---
+# To update the cluster FQDN: find-and-replace the APPS_DOMAIN below in this file only.
+# APPS_DOMAIN: apps.cluster.example.com
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: get-a-username-config
+  namespace: guides
+data:
+  LAB_TITLE: "Openshift Workshop"
+  LAB_DURATION_HOURS: "8h"
+  LAB_USER_COUNT: "100"
+  LAB_USER_PREFIX: "user"
+  LAB_USER_PAD_ZERO: "false"
+  LAB_MODULE_URLS: "http://web-guides.apps.cluster.example.com/workshop/sso-workshop/lab/preface?userid=%USERNAME%;Getting Started with Single Sign-on Hands-on Lab"
+  LAB_EXTRA_URLS: "https://console-openshift-console.apps.cluster.example.com;OpenShift Console,https://devspaces.apps.cluster.example.com;OpenShift Dev Spaces Console"
+  LAB_REDIS_HOST: "redis"
