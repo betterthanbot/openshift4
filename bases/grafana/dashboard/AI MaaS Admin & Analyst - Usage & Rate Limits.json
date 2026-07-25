@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Consolidated MaaS usage & rate-limit accounting for MaaS admins and analysts: who's using the platform, how much, and how close to their limits. Replaces 'RHOAI MaaS Group Monitoring', 'RHOAI MaaS Group Monitoring (Detailed)', 'RHOAI MaaS Usage Overview', and 'RHOAI MaaS Per-User Token Usage' \u2014 all four sliced the same Limitador request/token accounting data with overlapping panels. Built once authorized_calls/authorized_hits/limited_calls confirmed live with real user/subscription/cost_center/organization_id labels (2026-07-26; previously these had zero active series). Note: authorized_calls has NO limit_name label in this Limitador build (only limited_calls does) \u2014 group breakdowns here use `subscription` instead, fixing a broken filter that silently no-op'd in the dashboard this replaces.",
+  "description": "Consolidated MaaS usage & rate-limit accounting for MaaS admins and analysts: who's using the platform, how much, and how close to their limits. Replaces 'RHOAI MaaS Group Monitoring', 'RHOAI MaaS Group Monitoring (Detailed)', 'RHOAI MaaS Usage Overview', and 'RHOAI MaaS Per-User Token Usage' — all four sliced the same Limitador request/token accounting data with overlapping panels. Built once authorized_calls/authorized_hits/limited_calls confirmed live with real user/subscription/cost_center/organization_id labels (2026-07-26; previously these had zero active series). Note: authorized_calls has NO limit_name label in this Limitador build (only limited_calls does) — group breakdowns here use `subscription` instead, fixing a broken filter that silently no-op'd in the dashboard this replaces.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -432,7 +432,7 @@
       ],
       "title": "Active Users (Distinct, Trailing 1h Window)",
       "type": "timeseries",
-      "description": "How many distinct users hit the gateway in the trailing hour, at each point in the selected range \u2014 use a 7d range to see day/week usage patterns.",
+      "description": "How many distinct users hit the gateway in the trailing hour, at each point in the selected range — use a 7d range to see day/week usage patterns.",
       "gridPos": {
         "h": 9,
         "w": 24,
@@ -520,7 +520,7 @@
       ],
       "title": "Authorized Requests/min by Subscription",
       "type": "timeseries",
-      "description": "Grouped by subscription (team-alpha/team-bravo), the tier each user belongs to.",
+      "description": "Grouped by subscription — whatever tier/group names exist on this cluster (sourced live from the Subscription/Group variable, not hardcoded).",
       "gridPos": {
         "h": 9,
         "w": 12,
@@ -671,7 +671,7 @@
       ],
       "title": "Token-Limit Hits by Group + Model (Total)",
       "type": "barchart",
-      "description": "Limit names encode group + model, e.g. models-as-a-service-team-alpha-qwen25-05b-instruct-maas-tokens.",
+      "description": "Limit names encode group + model, e.g. models-as-a-service-<subscription>-<model>-tokens (exact naming depends on how TokenRateLimitPolicy objects are named on this cluster).",
       "gridPos": {
         "h": 8,
         "w": 24,
@@ -824,22 +824,12 @@
           },
           "decimals": 0,
           "mappings": [],
-          "max": 5,
-          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 4
-              },
-              {
-                "color": "red",
-                "value": 5
               }
             ]
           },
@@ -848,8 +838,9 @@
         "overrides": []
       },
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -858,24 +849,27 @@
           "fields": "",
           "values": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "textMode": "auto"
       },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(authorized_calls{subscription=\"team-alpha\"}[1m])) * 60",
+          "expr": "sum(rate(authorized_calls{subscription=\"$subscription\"}[1m])) * 60",
           "legendFormat": "__auto",
           "refId": "A"
         }
       ],
-      "title": "Team Alpha Request Rate (limit: 5/min)",
-      "type": "gauge",
+      "title": "Request Rate — $subscription",
+      "type": "stat",
+      "description": "One tile per subscription (driven by the Subscription/Group variable above, so it tracks whatever tenant/group names this cluster actually has — set that variable to 'All' to see every group). Compare against your RateLimitPolicy's configured request-rate limit; Prometheus has no metric for the configured threshold itself, so it can't be drawn as a gauge max here — see the reference panel below.",
+      "repeat": "subscription",
+      "repeatDirection": "h",
       "gridPos": {
-        "h": 8,
+        "h": 7,
         "w": 6,
         "x": 0,
         "y": 46
@@ -894,22 +888,12 @@
           },
           "decimals": 0,
           "mappings": [],
-          "max": 30,
-          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 24
-              },
-              {
-                "color": "red",
-                "value": 30
               }
             ]
           },
@@ -918,8 +902,9 @@
         "overrides": []
       },
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -928,169 +913,32 @@
           "fields": "",
           "values": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "textMode": "auto"
       },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(authorized_calls{subscription=\"team-bravo\"}[1m])) * 60",
+          "expr": "sum(rate(authorized_hits{subscription=\"$subscription\"}[1m])) * 60",
           "legendFormat": "__auto",
           "refId": "A"
         }
       ],
-      "title": "Team Bravo Request Rate (limit: 30/min)",
-      "type": "gauge",
+      "title": "Token Rate — $subscription",
+      "type": "stat",
+      "description": "Same as Request Rate, but token throughput — compare against your TokenRateLimitPolicy's configured limit.",
+      "repeat": "subscription",
+      "repeatDirection": "h",
       "gridPos": {
-        "h": 8,
+        "h": 7,
         "w": 6,
         "x": 6,
         "y": 46
       },
       "id": 12
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 0,
-          "mappings": [],
-          "max": 20000,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 16000
-              },
-              {
-                "color": "red",
-                "value": 20000
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "sum(rate(authorized_hits{subscription=\"team-alpha\"}[1m])) * 60",
-          "legendFormat": "__auto",
-          "refId": "A"
-        }
-      ],
-      "title": "Team Alpha Token Rate (combined limit: 20000/min, 2 models)",
-      "type": "gauge",
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 12,
-        "y": 46
-      },
-      "id": 13
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 0,
-          "mappings": [],
-          "max": 20000,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 16000
-              },
-              {
-                "color": "red",
-                "value": 20000
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "sum(rate(authorized_hits{subscription=\"team-bravo\"}[1m])) * 60",
-          "legendFormat": "__auto",
-          "refId": "A"
-        }
-      ],
-      "title": "Team Bravo Token Rate (combined limit: 20000/min, 2 models)",
-      "type": "gauge",
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 18,
-        "y": 46
-      },
-      "id": 14
     },
     {
       "options": {
@@ -1099,7 +947,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "Limits are set on the `RateLimitPolicy`/`TokenRateLimitPolicy` CRs (Limitador itself doesn't expose configured thresholds as a metric, only usage) \u2014 see `dumps/rhcl-ratelimitpolicy-*.yaml` and `dumps/rhcl-tokenratelimitpolicy-*.yaml`.\n\n| Tier | Request-rate limit | Token-rate limit (per model) |\n|---|---|---|\n| team-alpha | 5 req/min | 10,000 tokens/min |\n| team-bravo | 30 req/min | 10,000 tokens/min |\n",
+        "content": "Limits are configured per-subscription on the `RateLimitPolicy`/`TokenRateLimitPolicy` CRs — Limitador exposes usage (the tiles above) but not the configured thresholds themselves as a metric, so this dashboard can't render 'usage vs. limit' automatically. To see the actual configured limits on this cluster:\n\n```\noc get ratelimitpolicy,tokenratelimitpolicy -A -o yaml\n```\n\nor check the exported `dumps/rhcl-ratelimitpolicy-*.yaml` / `dumps/rhcl-tokenratelimitpolicy-*.yaml` files if this repo's dumps folder has them for your cluster.",
         "mode": "markdown"
       },
       "title": "Configured Limits Reference",
@@ -1108,9 +956,9 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 53
       },
-      "id": 15
+      "id": 13
     },
     {
       "collapsed": false,
@@ -1118,7 +966,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 59
       },
       "id": 105,
       "panels": [],
@@ -1195,14 +1043,14 @@
       ],
       "title": "KV Cache Usage % by Model",
       "type": "timeseries",
-      "description": "High sustained usage means a model is close to needing request queueing/eviction \u2014 a capacity-planning signal for MaaS admins, not just platform ops.",
+      "description": "High sustained usage means a model is close to needing request queueing/eviction — a capacity-planning signal for MaaS admins, not just platform ops.",
       "gridPos": {
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 61
+        "y": 60
       },
-      "id": 16
+      "id": 14
     },
     {
       "collapsed": false,
@@ -1210,7 +1058,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 69
+        "y": 68
       },
       "id": 106,
       "panels": [],
@@ -1277,9 +1125,9 @@
         "h": 9,
         "w": 8,
         "x": 0,
-        "y": 70
+        "y": 69
       },
-      "id": 17
+      "id": 15
     },
     {
       "datasource": {
@@ -1341,9 +1189,9 @@
         "h": 9,
         "w": 8,
         "x": 8,
-        "y": 70
+        "y": 69
       },
-      "id": 18
+      "id": 16
     },
     {
       "datasource": {
@@ -1417,9 +1265,9 @@
         "h": 9,
         "w": 8,
         "x": 16,
-        "y": 70
+        "y": 69
       },
-      "id": 19
+      "id": 17
     }
   ],
   "refresh": "1m",
@@ -1486,7 +1334,7 @@
           "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(authorized_calls, subscription)",
-        "description": "Filter by tier/subscription (team-alpha, team-bravo, ...).",
+        "description": "Filter by tier/subscription — values are discovered live from this cluster's actual groups, also drives the repeated panels in 'Rate Limits & Token Limits' below.",
         "includeAll": true,
         "label": "Subscription / Group",
         "multi": true,
