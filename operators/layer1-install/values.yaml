@@ -244,7 +244,7 @@ operators:
   # has the "global-operators" OperatorGroup — no Namespace/OG creation needed.
   # ----------------------------------------------------------------------------
   devWorkspace:
-    enabled: true
+    enabled: false
     namespace:
       create: false   # openshift-operators is a built-in OCP namespace
       name: openshift-operators
@@ -275,10 +275,10 @@ operators:
     subscription:
       name: rhods-operator
       namespace: redhat-ods-operator
-      channel: stable-3.4
+      channel: stable-3.3
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "rhods-operator.3.4.1"
+      startingCSV: "rhods-operator.3.3.2"
 
   # ----------------------------------------------------------------------------
   # Network Observability (Red Hat)
@@ -320,7 +320,7 @@ operators:
   # See docs/tutorials/openshift-virtualization-on-ec2.md.
   # ----------------------------------------------------------------------------
   cnvOperator:
-    enabled: false   # turned off for now — flip to true to reinstall
+    enabled: true   # turned off for now — flip to true to reinstall
     namespace:
       create: true
       name: openshift-cnv
@@ -361,4 +361,4 @@ operators:
       channel: stable
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "rhacs-operator.v4.11.0"
+      startingCSV: "rhacs-operator.v4.10.0"

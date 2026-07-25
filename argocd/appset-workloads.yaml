@@ -29,13 +29,15 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/betterthanbot/openshift4.git
-        revision: main
+        revision: argocd/demo
         directories:
           # Each subdirectory here becomes one ArgoCD Application.
           # Add new workloads by creating overlay/my-sno-cluster/<name>/kustomization.yaml
           - path: overlay/my-sno-cluster/*
           # To disable a workload without deleting the folder, add it here with exclude: true
           - path: overlay/my-sno-cluster/kyverno
+            exclude: true
+          - path: overlay/my-sno-cluster/get-a-username
             exclude: true
         # template:
         #   metadata:
@@ -53,7 +55,7 @@ spec:
 
       source:
         repoURL: https://github.com/betterthanbot/openshift4.git
-        targetRevision: main
+        targetRevision: argocd/demo
         path: "{{ .path.path }}"
         # ArgoCD auto-detects kustomize (kustomization.yaml present)
         # or Helm (Chart.yaml present) — no explicit config needed
@@ -65,9 +67,9 @@ spec:
         namespace: default
 
       syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
+        # automated:
+        #   prune: true
+        #   selfHeal: true
         allowEmpty: true
         syncOptions:
           - CreateNamespace=true

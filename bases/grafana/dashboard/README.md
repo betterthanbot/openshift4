@@ -1,6 +1,6 @@
 # RHOAI & Cluster Monitoring Dashboards
 
-A suite of 9 production-ready Grafana dashboards for Red Hat OpenShift and RHOAI environments. Covers cluster infrastructure, API traffic, VPA right-sizing, ACM namespace optimization, and AI/ML model serving (vLLM/GPU).
+A suite of 9 production-ready Grafana dashboards for Red Hat OpenShift and RHOAI environments, organized around who's actually looking at them: cluster/platform admins, AI platform admins, MaaS admins/analysts, and non-technical stakeholders.
 
 All dashboards are provisioned automatically via the Grafana Operator using ConfigMaps in [../generated/](../generated/). Run `make` in [../](../) to regenerate ConfigMaps after editing JSON files here.
 
@@ -8,18 +8,80 @@ All dashboards are provisioned automatically via the Grafana Operator using Conf
 
 ## Dashboards
 
-| # | Dashboard | UID | Refresh | Time Range | Key Metrics |
-|---|-----------|-----|---------|------------|-------------|
-| 1 | [Admin: API & Network Analysis](#1-admin-api--network-analysis) | `net-status-adv` | 5s | 1h | HTTP status codes, latency, network I/O |
-| 2 | [Admin: Cluster Health](#2-admin-cluster-health) | `d192c7df-...` | 10s | 6h | Nodes, GPU (DCGM), pods, OOMKill, CrashLoop |
-| 3 | [Admin: OCP Cluster Overview](#3-admin-ocp-cluster-overview) | `d74d470f-...` | 10s | 6h | Capacity vs usage, HAProxy, disk pressure |
-| 4 | [Admin: VPA Optimization & Health](#4-admin-vpa-optimization--health) | `vpa-comprehensive` | — | 6h | VPA recommendations vs actual provisioning |
-| 5 | [ACM: Right-Sizing Namespace](#5-acm-right-sizing-namespace) | `bnqQIPySE` | — | 7d | ACM right-sizing CPU/memory per namespace |
-| 6 | [RHOAI: GPU Utilization & Consumption](#6-rhoai-gpu-utilization--consumption) | `87d09980-...` | 10s | 6h | DCGM GPU util, VRAM, temp, power |
-| 7 | [RHOAI: Inference Endpoint Monitoring](#7-rhoai-inference-endpoint-monitoring) | `ron9fzt` | 10s | 6h | HAProxy success rate, 4xx/5xx, vLLM outcomes |
-| 8 | [RHOAI: vLLM & GPU Master Dashboard](#8-rhoai-vllm--gpu-master-dashboard) | `60699702-...` | 10s | 6h | RPS, P95 latency, KV cache, GPU util |
-| 9 | [RHOAI: vLLM Performance Monitor](#9-rhoai-vllm-performance-monitor) | `perf-triple-ns-1` | 10s | 1h | Ingress vs app traffic, TTFT, TPOT, pod resources |
-| 10 | [vLLM: Advanced Performance Dashboard](#10-vllm-advanced-performance-dashboard) | `vllm-advanced-performance` | 5s | 15m | Latency P50/P95/P99, KV cache hit rate, queue depth |
+| # | Dashboard | UID | Refresh | Time Range | Persona | Key Metrics |
+|---|-----------|-----|---------|------------|---------|-------------|
+| 1 | [Admin: Cluster Health](#1-admin-cluster-health) | `d192c7df-...` | 10s | 6h | Cluster admin | Nodes, GPU (DCGM), pods, OOMKill, CrashLoop, capacity budget, ingress, disk pressure |
+| 2 | [Admin: API & Network Analysis](#2-admin-api--network-analysis) | `net-status-adv` | 5s | 1h | Cluster admin | HTTP status codes, latency, network I/O |
+| 3 | [Admin: VPA Optimization & Health](#3-admin-vpa-optimization--health) | `vpa-comprehensive` | — | 6h | Cluster admin | VPA recommendations vs actual provisioning |
+| 4 | [ACM: Right-Sizing Namespace](#4-acm-right-sizing-namespace) | `bnqQIPySE` | — | 7d | Cluster admin | ACM right-sizing CPU/memory per namespace |
+| 5 | [Platform: GitOps & Multi-Tenancy Health](#5-platform-gitops--multi-tenancy-health) | `platform-gitops-multitenancy` | 1m | 6h | Cluster admin | ArgoCD app sync/health, tenant ResourceQuota utilization, HPA status |
+| 6 | [AI Platform Admin: Overview](#6-ai-platform-admin-overview) | `ai-platform-admin-overview` | 1m | 6h | AI platform admin | Deployed models, GPU inventory/utilization, per-project resource use, gateway/control-plane health |
+| 7 | [AI Platform Admin: Model Performance](#7-ai-platform-admin-model-performance) | `ai-platform-admin-model-performance` | 10s | 1h | AI platform admin | TTFT/TPOT/E2E latency (P50/95/99), throughput, queue depth, KV cache, GPU correlation |
+| 8 | [AI MaaS Admin & Analyst: Usage & Rate Limits](#8-ai-maas-admin--analyst-usage--rate-limits) | `ai-maas-admin-analyst-usage` | 1m | 24h | MaaS admin / analyst | Requests/tokens by user & group, rejection rate, active users over time, rate/token limits vs actual, cost-center breakdown |
+| 9 | [MaaS Stakeholder Summary](#9-maas-stakeholder-summary) | `maas-stakeholder-summary` | 5m | 7d | Stakeholder / exec | Active users, total requests/tokens, success rate, adoption by team/model/cost-center |
+
+---
+
+## 2026-07-26: Consolidation & Persona Rebuild
+
+The dashboard folder had grown to 19 dashboards across several sessions with heavy, undocumented overlap — 8 dashboards independently slicing the same Kuadrant/Limitador request-accounting data, and 4 more repeating the same TTFT/TPOT/KV-cache/GPU vLLM panels at slightly different scopes. This pass cut that down to the 9 above, organized around personas instead of ad-hoc topics.
+
+**What triggered it:** the cluster's metrics catalog (`../../../metrics`, refreshed 2026-07-26) confirmed `authorized_calls`, `authorized_hits`, and `limited_calls` are now live with real data — as of the 2026-07-24 audit below, these had **zero active series**. Verified live against Thanos:
+
+- `authorized_calls` labels: `user, subscription, limitador_namespace, cost_center, organization_id` — **no `limit_name`**. The old "RHOAI MaaS Group Monitoring" dashboard's `authorized_calls{limit_name=~"$limit_name"}` filter was a real bug (silently matched nothing), not just metric staleness. Fixed by grouping on `subscription` instead everywhere in the new dashboard 8.
+- `authorized_hits` labels: adds `model` — this is the per-request token-count metric.
+- `limited_calls` labels: adds `limit_name` (both `*-tier-requests` and `*-tokens` limit names exist, though only `*-tokens` has ever actually fired on this cluster).
+- `user` label values confirmed real (`user1`, `user3` seen live) — resolves the "unverified caveat" that blocked per-user usage in the old dashboard 12.
+- `cost_center` / `organization_id` are present and were unused by any prior dashboard — now powering the cost-center breakdown in dashboards 8 and 9.
+
+**Deleted (15 files, all content merged or dead):**
+| File | Disposition |
+|---|---|
+| `Admin OCP Cluster Overview.json` | unique panels (capacity budget, ingress-by-status, disk pressure) merged into dashboard 1 |
+| `RHOAI GPU Utilization & Consumption.json` | merged into dashboard 6 |
+| `RHOAI Inference Endpoint Monitoring.json` | merged into dashboard 7 |
+| `RHOAI vLLM & GPU Master Dashboard.json` | merged into dashboard 7 |
+| `RHOAI vLLM Performance Monitor.json` | merged into dashboard 7 |
+| `vLLM Advanced Performance Dashboard.json` | merged into dashboard 7 |
+| `RHOAI MaaS Cluster Overview.json` | merged into dashboard 6 |
+| `RHOAI MaaS Model Serving.json` | merged into dashboard 6 |
+| `RHOAI MaaS Kuadrant Gateway Health.json` | merged into dashboard 6 |
+| `RHOAI MaaS Group Monitoring.json` | strict subset of "(Detailed)"; merged into dashboard 8 |
+| `RHOAI MaaS Group Monitoring (Detailed).json` | merged into dashboard 8 |
+| `RHOAI MaaS Usage Overview.json` | merged into dashboard 8 |
+| `RHOAI MaaS Per-User Token Usage.json` | merged into dashboard 8 (the `user`-label caveat is now resolved) |
+| `RHOAI MaaS User & API Key Drilldown.json` | obsolete — existed *because* `user` wasn't a Prometheus label; now that it is, the blocked Loki/log-based approach (tagged `not-yet-wired`) isn't needed |
+| `RHOAI MaaS Dashboard.json` | legacy v2 schema, already documented as superseded |
+
+**Note on "Admin" vs "Analyst":** the ask was for both an "AI MaaS Admin" and an "Analyst" persona, but Kuadrant/Limitador usage data doesn't actually differ by role — both would look at the same requests/tokens/rejections/limits. Built as one combined dashboard (8) instead of two near-duplicates, to avoid recreating the exact overlap problem this pass fixes. Split it if the two audiences turn out to need materially different views in practice.
+
+---
+
+## Metrics Verification (2026-07-24)
+
+Every dashboard in this folder was audited against a fresh curl of this cluster's live metrics catalog ([../../../metrics](../../../metrics), 4253 metric names at the time). Where a query referenced a metric name that isn't in that catalog, it was either fixed (renamed to the current real metric) or clearly flagged as environment-dependent rather than a bug. Findings (dashboard numbers below refer to the pre-2026-07-26 numbering; see the table above for where that content lives now):
+
+**Renamed on this vLLM version:**
+| Old name (no longer exists) | Current name |
+|---|---|
+| `vllm:time_per_output_token_seconds_bucket` | `vllm:inter_token_latency_seconds_bucket` |
+| `vllm:gpu_prefix_cache_hits_total` / `..._queries_total` | `vllm:prefix_cache_hits_total` / `..._queries_total` |
+| `vllm:gpu_cache_usage_perc` + `vllm:cpu_cache_usage_perc` | `vllm:kv_cache_usage_perc` (unified - CPU swap offload no longer exists in the V1 engine, so the CPU series was dropped rather than left dangling) |
+| `vllm:request_prefix_cache_hits` / `..._misses` | `vllm:prefix_cache_hits_total` / `..._queries_total` (hit rate = hits / queries) |
+| `haproxy_backend_sessions_total` | `haproxy_backend_connections_total` |
+
+**Confirmed present, contrary to an earlier `techdebt.md` finding** that these recording rules didn't exist anywhere on the cluster: `kserve_vllm:*` and `accelerator_gpu_utilization` are both in the live catalog.
+
+**Confirmed absent as of 2026-07-24 (later resolved — see the 2026-07-26 section above):**
+- `authorized_calls`, `limited_calls`, `authorized_hits` (Limitador request counters) — now live with real data.
+
+**Still confirmed absent cluster-wide as of 2026-07-26 (not a dashboard bug — genuinely no active series):**
+| Missing | Affects | What still works instead |
+|---|---|---|
+| `kube_customresource_verticalpodautoscaler_*` (all of them) | Dashboard 3 (VPA) | Nothing - VPA CRD-state isn't installed/exposed at all right now. Queries are correct for when it is; dashboard description says so explicitly. |
+| `acm_rs:*` (all of them) | Dashboard 4 (ACM) | Nothing - needs an ACM hub relationship this standalone SNO cluster doesn't have. Dashboard description says so explicitly. |
+
+**Also fixed:** a dead `or nginx_ingress_controller_requests` fallback clause (that metric never existed here) and a hardcoded literal `65592` masquerading as a query in a "GPU Memory Blocks" gauge (replaced with a real `vllm:kv_cache_usage_perc` query) — both in dashboards later merged into dashboard 7.
 
 ---
 
@@ -27,13 +89,17 @@ All dashboards are provisioned automatically via the Grafana Operator using Conf
 
 | Requirement | Dashboards |
 |---|---|
-| `kube-state-metrics` | 1, 2, 3, 4 |
-| `node-exporter` | 2, 3 |
-| OpenShift HAProxy metrics (`haproxy_*`) | 3, 7, 9 |
-| NVIDIA GPU Operator / DCGM Exporter | 2, 3, 6, 8, 9 |
-| VPA deployed + kube-state-metrics CRD support | 4 |
-| Red Hat ACM with right-sizing enabled | 5 |
-| vLLM runtime exposing Prometheus metrics | 7, 8, 9, 10 |
+| `kube-state-metrics` | 1, 3, 5 |
+| `node-exporter` | 1 |
+| OpenShift HAProxy metrics (`haproxy_*`) | 1, 7 |
+| NVIDIA GPU Operator / DCGM Exporter | 1, 6, 7 |
+| VPA deployed + kube-state-metrics CRD support | 3 |
+| Red Hat ACM with right-sizing enabled | 4 |
+| ArgoCD metrics exporter (`argocd_*`) | 5 |
+| kube-state-metrics ResourceQuota/HPA collectors (`kube_resourcequota`, `kube_horizontalpodautoscaler_*`) | 5 |
+| vLLM runtime exposing Prometheus metrics (`vllm:*`) | 6, 7 |
+| Kuadrant control-plane metrics (`kuadrant_*`) | 6 |
+| Kuadrant/Limitador with `exhaustive` telemetry (`authorized_calls`/`authorized_hits`/`limited_calls` with `user`/`subscription`/`cost_center`/`organization_id` labels) | 8, 9 |
 
 ---
 
@@ -45,274 +111,126 @@ All dashboards use a `DS_PROMETHEUS` template variable (type: datasource) so the
 
 ---
 
-## 1. Admin: API & Network Analysis
+## 1. Admin: Cluster Health
 
-High-level view of HTTP API health, status code distribution, and cluster network traffic. Useful for quickly spotting ingress degradation or network saturation.
-
-### Panels
-
-#### HTTP Status Codes
-| Panel | Query | Description |
-|---|---|---|
-| Requests per Second | `sum by (code) (rate(http_requests_total[1m]))` | Request rate grouped by HTTP status code |
-| 5xx Errors (1h) | `sum(increase(http_requests_total{code=~"5.."}[1h]))` | Server error count over last hour |
-| Success Rate % | `sum(rate(http_requests_total{code!~"5.."}[5m])) / sum(rate(http_requests_total[5m])) * 100` | Non-5xx percentage. Green >99%, Orange <99%, Red <95% |
-| Total 4xx Errors (1h) | `sum(increase(http_requests_total{code=~"4.."}[1h]))` | Client error count over last hour |
-
-#### Latency & Performance
-| Panel | Query | Description |
-|---|---|---|
-| Global Latency (P99 & P95) | `histogram_quantile(0.99/0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))` | Response time at P99 and P95 |
-| Top 5 Busiest Pods | `topk(5, sum by (pod) (rate(http_requests_total[5m])))` | Highest-traffic pods; useful for detecting load imbalance |
-
-#### Network Traffic
-| Panel | Query | Description |
-|---|---|---|
-| Network Bandwidth (In vs Out) | `container_network_receive/transmit_bytes_total` | Bytes/sec for vLLM/LLM namespaces |
-| Network Health (Dropped Packets) | `container_network_receive/transmit_packets_dropped_total` | Non-zero values indicate CNI issues |
-
-**Prerequisites:** Prometheus datasource, application `http_requests_total` metrics, cAdvisor/kubelet
-
-**Tags:** `network`, `http`, `status-codes`, `detailed`
-
----
-
-## 2. Admin: Cluster Health
-
-"Single Pane of Glass" for overall cluster health — infrastructure (nodes, GPU, network) through to workload stability (pods, OOMKills, CrashLoops). Includes per-node breakdown and NVIDIA GPU health via DCGM.
+"Single Pane of Glass" for overall cluster health — infrastructure (nodes, GPU, network) through to workload stability (pods, OOMKills, CrashLoops), plus the capacity-budget, ingress-by-status-code, and disk-pressure panels absorbed from the now-deleted "Admin: OCP Cluster Overview".
 
 **Variables:** `DS_PROMETHEUS`, `namespace`
 
-### Panels
-
-#### Cluster Health Overview
-| Panel | Query | Description |
-|---|---|---|
-| Cluster Version | `max by (version) (cluster_version{type="current"})` | Current OCP version |
-| Ready / Unready Nodes | `kube_node_status_condition{condition="Ready"}` | Node availability at a glance |
-| Firing Alerts | `sum(ALERTS{alertstate="firing", severity=~"warning\|critical"})` | Active warning/critical alerts |
-| CPU Utilization % | `100 * (1 - sum(rate(node_cpu_seconds_total{mode="idle"}[5m])) / sum(rate(node_cpu_seconds_total[5m])))` | Cluster-wide CPU usage |
-| Memory Utilization % | `100 * (1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes))` | Cluster-wide memory usage |
-
-#### Node-Level Breakdown
-Per-node CPU and memory utilization time-series for hot-node identification.
-
-#### GPU Monitoring (DCGM)
-| Panel | Query | Description |
-|---|---|---|
-| Avg GPU Utilization % | `avg(DCGM_FI_DEV_GPU_UTIL)` | Cluster-wide GPU compute usage |
-| Avg GPU VRAM % | `100 * avg(DCGM_FI_DEV_FB_USED / (DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE))` | VRAM saturation |
-| GPU Temperature | `avg(DCGM_FI_DEV_GPU_TEMP)` | Thermal health (throttle risk >85°C) |
-| Total Power Draw | `sum(DCGM_FI_DEV_POWER_USAGE)` | Aggregate GPU power (Watts) |
-
-#### Workload & Events
-OOMKill timeline, CrashLoopBackOff tracker, pod status breakdown, top restart table.
-
-**Prerequisites:** kube-state-metrics, node-exporter, NVIDIA GPU Operator / DCGM Exporter
+Rows: Cluster Health Overview, Node-Level Breakdown, GPU Monitoring (DCGM), Network I/O, Workload Summary, Critical Events & Errors, Capacity Budget (CPU/Memory/GPU allocatable vs requested), Ingress & Storage Pressure.
 
 **Tags:** `kubernetes`, `openshift`, `gpu`, `nvidia`, `cluster`
 
 ---
 
-## 3. Admin: OCP Cluster Overview
+## 2. Admin: API & Network Analysis
 
-Infrastructure-first view bridging physical node health with workload stability. Includes HAProxy ingress traffic (OpenShift Router), GPU inventory, and disk pressure monitoring.
+High-level view of HTTP API health, status code distribution, and cluster network traffic. Useful for quickly spotting ingress degradation or network saturation.
 
-**Variables:** `DS_PROMETHEUS`, `namespace`
-
-### Panels
-
-#### Cluster Health & Node Status
-Ready/Unready nodes, CrashLoop count, OOMKill timeline, running vs failed pods.
-
-#### Resource Budget (Capacity vs Allocated vs Usage)
-| Panel | Description |
-|---|---|
-| CPU Overview | Allocatable cores vs requested by pods; shows free headroom |
-| Memory Overview | Total RAM vs pod memory requests |
-| GPU Overview | Physical GPU count vs GPU resources claimed (`nvidia.com/gpu`) |
-
-#### Workload & Traffic
-| Panel | Query | Description |
-|---|---|---|
-| ReplicaSet Health | `kube_replicaset_spec_replicas` vs `kube_replicaset_status_replicas` | Gap = scheduling failure |
-| Ingress Traffic by Status Code | `haproxy_backend_http_responses_total` | HTTP response codes via OpenShift HAProxy |
-
-#### Storage & Node Pressure
-DiskPressure node count, root filesystem usage % per node.
-
-**Prerequisites:** kube-state-metrics, node-exporter, OpenShift HAProxy metrics
-
-**Tags:** `kubernetes`, `ocp`, `infrastructure`
+**Tags:** `network`, `http`, `status-codes`, `detailed`
 
 ---
 
-## 4. Admin: VPA Optimization & Health
+## 3. Admin: VPA Optimization & Health
 
 Tracks VPA adoption, recommendation trends, and compares VPA targets against actual pod limits/requests for data-driven right-sizing.
 
 **Variables:** `DS_PROMETHEUS`, `namespace`, `vpa`
 
-### Panels
-
-| Panel | Query | Description |
-|---|---|---|
-| Total VPAs Monitored | `count(max by (verticalpodautoscaler, namespace) (...))` | Active VPA objects in selected namespace |
-| VPA Update Mode Distribution | `kube_customresource_verticalpodautoscaler_spec_updatepolicy_updatemode` | Pie chart: Auto / Off / Initial / Recreate |
-| CPU Recommendations Over Time | `kube_customresource_verticalpodautoscaler_status_recommendation_containerrecommendations_target_cpu` | Per-container VPA CPU target trend |
-| Memory Recommendations Over Time | `...target_memory` | Per-container VPA memory target trend |
-| VPA Recommendations vs Actual | Multi-query: LowerBound, Target, UpperBound vs Requests and Limits | Master right-sizing table for identifying waste or risk |
-
-**Prerequisites:** kube-state-metrics with VPA CRD support, VPA deployed
-
 **Tags:** `vpa`, `autoscaling`, `kubernetes`
 
 ---
 
-## 5. ACM: Right-Sizing Namespace
+## 4. ACM: Right-Sizing Namespace
 
-Uses ACM right-sizing recording rules (`acm_rs:*`) to identify over-provisioned namespaces across the fleet. Compares CPU and memory usage against requests and ACM recommendations.
+Uses ACM right-sizing recording rules (`acm_rs:*`) to identify over-provisioned namespaces across the fleet.
 
 **Variables:** `datasource`, `cluster`, `profile`, `days`
 
-> **Note:** This dashboard requires Red Hat ACM with the right-sizing feature and ACM Observability (Thanos) configured to collect `acm_rs:*` recording rules from managed clusters. It will not work without ACM.
-
-### Panels
-
-#### CPU Right-Sizing
-ACM CPU recommendation, actual usage, current requests, utilization ratio, top 20 namespaces by CPU efficiency.
-
-#### Memory Right-Sizing
-ACM memory recommendation, actual usage, current requests, utilization ratio, top 20 namespaces by memory efficiency.
-
-**Prerequisites:** Red Hat ACM with right-sizing + ACM Observability
+> **Note:** Requires Red Hat ACM with the right-sizing feature and ACM Observability (Thanos). Will not work without ACM.
 
 **Tags:** `ACM`, `Right-Sizing`
 
 ---
 
-## 6. RHOAI: GPU Utilization & Consumption
+## 5. Platform: GitOps & Multi-Tenancy Health
 
-Deep dive into NVIDIA GPU performance and health within RHOAI, scoped to specific pods and namespaces. Powered by DCGM Exporter.
+Is the GitOps pipeline that manages this entire platform actually healthy, and are the tenant namespaces it deploys workloads into anywhere near their resource limits.
 
-**Variables:** `DS_PROMETHEUS`, `namespace`, `pod`
+**Variables:** `DS_PROMETHEUS`
 
-### Panels
-
-| Panel | Query | Description |
-|---|---|---|
-| GPU Duty Cycle (%) | `avg by (pod, device) (DCGM_FI_DEV_GPU_UTIL{namespace="$namespace", pod=~"$pod"})` | Active compute time per pod/device |
-| VRAM Used (Absolute) | `max by (pod, device) (DCGM_FI_DEV_FB_USED{...}) * 1024 * 1024` | VRAM in bytes per device |
-| VRAM Saturation (%) | `DCGM_FI_DEV_FB_USED / (DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE) * 100` | >100% = OOM risk |
-| Power Usage (W) | `DCGM_FI_DEV_POWER_USAGE{namespace="$namespace", pod=~"$pod"}` | Per-GPU instantaneous power |
-| GPU Temperature | `DCGM_FI_DEV_GPU_TEMP{namespace="$namespace", pod=~"$pod"}` | Core temp; >85°C risks throttling |
-
-**Prerequisites:** NVIDIA GPU Operator / DCGM Exporter
-
-**Tags:** `rhoai`, `gpu`, `nvidia`, `ai`, `ml`, `monitoring`
+**Tags:** `maas`, `platform`, `gitops`, `argocd`, `multi-tenancy`
 
 ---
 
-## 7. RHOAI: Inference Endpoint Monitoring
+## 6. AI Platform Admin: Overview
 
-Monitors AI inference endpoint health by correlating OpenShift HAProxy ingress metrics with internal vLLM engine metrics. Covers success rates, error breakdown, and request outcomes.
+Fleet-level technical health for AI platform admins: what's deployed, GPU inventory/utilization, per-project resource consumption, and gateway/control-plane health. Replaces "RHOAI MaaS Cluster Overview", "RHOAI MaaS Model Serving", "RHOAI MaaS Kuadrant Gateway Health", and "RHOAI GPU Utilization & Consumption".
 
-**Variables:** `DS_PROMETHEUS`, `namespace`, `route`, `interval`
+**Variables:** `DS_PROMETHEUS`, `namespace`, `model_name`
 
-### Panels
+### Rows
 
-| Panel | Query | Description |
-|---|---|---|
-| Global Success Rate (%) | `sum(rate(haproxy_backend_http_responses_total{code=~"2.."}[$interval])) / sum(rate(...)) * 100` | Green >95%, Orange >80%, Red <80% |
-| Total 4xx Errors | `sum by (code) (increase(haproxy_backend_http_responses_total{code=~"4.."}[$interval]))` | Client errors (bad request, auth failure) |
-| Total 5xx Errors | `sum by (code) (increase(haproxy_backend_http_responses_total{code=~"5.."}[$interval]))` | Server errors (crash, timeout) |
-| vLLM Request Outcomes | `sum by (finished_reason) (rate(vllm:request_success_total{namespace="$namespace"}[$interval]))` | stop / length / abort breakdown |
-| vLLM Aborts | `sum(rate(vllm:request_success_total{finished_reason="abort"}[$interval]))` | Client disconnects / upstream timeouts |
+- **Fleet KPIs** — system health %, deployed models count, GPU utilization, request success rate, gateway ready.
+- **Model Deployments** — one table row per (model, namespace): active signal, requests, P90 E2E latency, error rate, GPU util, CPU util.
+- **GPU Inventory & Utilization** — total NVIDIA PCI devices, GPUs reporting DCGM, per-device utilization/power.
+- **Project Resource Usage** — GPU/CPU/memory utilization by namespace, stacked.
+- **Gateway & Control-Plane Health** — `kuadrant_ready`, policies enforced/total, allow/deny/error rate, per-gateway-pod breakdown.
 
-**Prerequisites:** OpenShift Router (HAProxy) metrics, vLLM Prometheus metrics
+**Prerequisites:** vLLM PodMonitors exposing `vllm:*` with `model_name`/`namespace`/`pod` labels, NVIDIA GPU Operator/DCGM, Kuadrant operator metrics.
 
-**Tags:** `rhoai`, `vllm`, `inference`, `nvidia`, `redhat`
+**Tags:** `ai-platform-admin`, `rhoai`, `maas`, `gpu`, `kuadrant`
 
 ---
 
-## 8. RHOAI: vLLM & GPU Master Dashboard
+## 7. AI Platform Admin: Model Performance
 
-"Single Pane of Glass" for LLMs on RHOAI. Correlates vLLM application metrics (latency, queue, cache) with NVIDIA GPU hardware metrics in one view.
+Deep-dive vLLM/model-serving performance: ingress-to-engine traffic correlation, latency (TTFT/TPOT/E2E at P50/95/99), throughput and queue saturation, KV cache efficiency, and GPU/pod resource correlation. Replaces "RHOAI Inference Endpoint Monitoring", "RHOAI vLLM & GPU Master Dashboard", "RHOAI vLLM Performance Monitor", and "vLLM Advanced Performance Dashboard" — four dashboards that had converged on repeating the same panels at slightly different namespace/pod scopes.
 
-**Variables:** `DS_PROMETHEUS`, `namespace`, `pod` (multi-select), `interval`
+**Variables:** `DS_PROMETHEUS`, `namespace`, `pod` (multi), `model` (multi), `interval`
 
-### Panels
+### Rows
 
-#### Executive KPIs
-| Panel | Query | Description |
-|---|---|---|
-| Current RPS | `sum(rate(vllm:request_success_total{...}[$interval]))` | Successful requests per second |
-| Avg Latency (P95) | `histogram_quantile(0.95, sum(rate(vllm:e2e_request_latency_seconds_bucket{...}[$interval])) by (le))` | End-to-end P95 latency |
-| Concurrency | `sum(vllm:num_requests_running{...})` | Active parallel requests |
-| GPU Utilization | `avg(DCGM_FI_DEV_GPU_UTIL{...})` | Average compute utilization |
+Executive KPIs → Traffic Flow (ingress↔vLLM↔KServe correlation, error rates, request outcomes) → Latency Deep Dive (TTFT/TPOT/E2E, P50/95/99) → Throughput & Queue → KV Cache (usage %, prefix hit rate, per-pod) → GPU Correlation → Pod System Resources.
 
-#### Model Performance
-TTFT P95, TPOT P95, latency breakdown by queue / prefill / decode phase.
+**Prerequisites:** OpenShift Router (HAProxy) metrics, vLLM Prometheus metrics, KServe wrapper metrics (`kserve_http_*`), DCGM Exporter, cAdvisor/kubelet.
 
-#### Throughput & Queue
-Token throughput (prompt vs generation), running vs waiting request counts (saturation signal).
-
-#### KV Cache
-GPU and CPU cache usage %, prefix cache hit rate.
-
-**Prerequisites:** vLLM metrics, NVIDIA GPU Operator
-
-**Tags:** `vllm`, `rhoai`, `gpu`
+**Tags:** `ai-platform-admin`, `vllm`, `rhoai`, `gpu`, `performance`
 
 ---
 
-## 9. RHOAI: vLLM Performance Monitor
+## 8. AI MaaS Admin & Analyst: Usage & Rate Limits
 
-Full-stack performance trace: Ingress → Model → GPU. Uses a triple-namespace selector (`vllm_ns`, `gpu_ns`, `ingress_ns`) so metrics can be correlated even when components are in different namespaces. Also exposes pod-level CPU/memory for the vLLM containers.
+Who's using MaaS, how much, and how close to their limits — for MaaS admins and analysts. Replaces "RHOAI MaaS Group Monitoring", "RHOAI MaaS Group Monitoring (Detailed)", "RHOAI MaaS Usage Overview", and "RHOAI MaaS Per-User Token Usage".
 
-**Variables:** `DS_PROMETHEUS`, `vllm_ns`, `vllm_pod`, `gpu_ns`, `gpu_pod`, `interval`
+**Variables:** `DS_PROMETHEUS`, `user` (multi), `subscription` (multi)
 
-### Panels
+### Rows
 
-| Section | Key Panels |
-|---|---|
-| Traffic Flow | Ingress sessions vs app successes (gap = dropped requests), HAProxy error rates |
-| Latency | HAProxy avg response time vs vLLM TTFT/TPOT P95 (isolates network vs model lag) |
-| Application Network | Pod-level bandwidth and packet drops (`container_network_*`) |
-| GPU Resources | Per-pod GPU utilization and VRAM usage |
-| System Resources | vLLM pod CPU and memory working set |
+- **Overview** — total requests, total tokens, rejected requests, rejection rate %, active users.
+- **Active Users Over Time** — distinct users in a trailing 1h window, graphed across the selected range (the "how many users throughout the day/week" view).
+- **Requests & Rejections by Group** — authorized/rejected requests per minute by subscription, plus token-limit hits by group+model.
+- **Token Usage by User** — table of tokens/requests/rejected per (user, subscription, model).
+- **Rate Limits & Token Limits** — live usage gauged against the configured per-tier limits (team-alpha: 5 req/min, 10k tokens/min per model; team-bravo: 30 req/min, 10k tokens/min per model — see `dumps/rhcl-ratelimitpolicy-*.yaml` / `dumps/rhcl-tokenratelimitpolicy-*.yaml` for the source of truth; Limitador itself doesn't expose configured thresholds as a metric).
+- **KV Cache by Model** — capacity-planning signal, not just a platform-ops one.
+- **Cost Center & Organization Breakdown** — requests/tokens by `cost_center`/`organization_id`.
 
-**Prerequisites:** OpenShift Router metrics, vLLM metrics, DCGM Exporter, cAdvisor/kubelet
+**Prerequisites:** Kuadrant/Limitador with `exhaustive` telemetry, `user`/`subscription`/`cost_center`/`organization_id` labels on `authorized_calls`/`authorized_hits`/`limited_calls` (confirmed live 2026-07-26).
 
-**Tags:** `performance`, `triple-split-ns`, `traffic-analysis`
+**Note:** `authorized_calls` has **no** `limit_name` label in this Limitador build (only `limited_calls` does) — group breakdowns here use `subscription` instead, fixing a filter that silently matched nothing in the dashboard this replaces.
+
+**Tags:** `maas`, `usage`, `kuadrant`, `analyst`, `admin`
 
 ---
 
-## 10. vLLM: Advanced Performance Dashboard
+## 9. MaaS Stakeholder Summary
 
-Deepest vLLM observability — latency distributions (P50/P95/P99), KV cache internals, and throughput analysis at the per-pod level. Does not require GPU Operator metrics.
+Executive-level snapshot of MaaS adoption and health — no filters, a handful of big numbers, meant to be glanceable. New dashboard, not a port of anything.
 
-**Variables:** `DS_PROMETHEUS`, `model`
+**Variables:** `DS_PROMETHEUS` only (no filters — fixed exec view)
 
-### Panels
+Rows: MaaS at a Glance (active users, total requests, total tokens, success rate — 7d), Adoption Over Time (active users per day), Usage Breakdown (by team / cost center / model), Platform Health (node readiness, gateway ready).
 
-#### Latency Analysis
-| Panel | Queries | Description |
-|---|---|---|
-| Time to First Token (TTFT) | `histogram_quantile(0.50/0.95, rate(vllm:time_to_first_token_seconds_bucket[5m]))` | P50/P95; high TTFT = prefill bottleneck |
-| Inter-Token Latency (TPOT) | `histogram_quantile(0.50/0.95, rate(vllm:time_per_output_token_seconds_bucket[5m]))` | P50/P95; high TPOT = GPU saturated |
-| End-to-End Latency | `histogram_quantile(0.50/0.95, rate(vllm:e2e_request_latency_seconds_bucket[5m]))` | Full request lifecycle; use for SLA monitoring |
+For per-user, per-limit, or per-model detail, see dashboard 8.
 
-#### KV Cache Efficiency
-| Panel | Description |
-|---|---|
-| GPU Memory Blocks | KV cache blocks allocated; thresholds: Green <40K, Yellow <60K, Red >60K |
-| KV Cache Hit Rate | `vllm:gpu_prefix_cache_hits_total / vllm:gpu_prefix_cache_queries_total`; Green >60% |
-| Per-Pod Cache Hit Rates | Bar chart of cache efficiency per pod; identifies uneven routing |
-
-#### Throughput & Queue
-Running vs waiting requests (saturation signal), request throughput vs success rate, token processing rates.
-
-**Prerequisites:** vLLM Prometheus metrics (no GPU Operator required)
-
-**Tags:** `llm`, `vllm`, `performance`, `inference`
+**Tags:** `maas`, `stakeholder`, `executive`

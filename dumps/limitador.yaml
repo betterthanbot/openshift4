@@ -1,0 +1,97 @@
+apiVersion: limitador.kuadrant.io/v1alpha1
+kind: Limitador
+metadata:
+  name: limitador
+  namespace: kuadrant-system
+spec:
+  limits:
+    - conditions:
+        - descriptors[0]["limit.team_alpha_tier_requests__097fc256"] == "1"
+      max_value: 5
+      name: team-alpha-tier-requests
+      namespace: vllm-project/llama-32-1b-instruct-maas-kserve-route
+      seconds: 60
+      variables:
+        - descriptors[0]["auth.identity.userid"]
+    - conditions:
+        - descriptors[0]["limit.team_bravo_tier_requests__f60fffd6"] == "1"
+      max_value: 30
+      name: team-bravo-tier-requests
+      namespace: vllm-project/llama-32-1b-instruct-maas-kserve-route
+      seconds: 60
+      variables:
+        - descriptors[0]["auth.identity.userid"]
+    - conditions:
+        - descriptors[0]["limit.team_bravo_tier_requests__f60fffd6"] == "1"
+      max_value: 30
+      name: team-bravo-tier-requests
+      namespace: vllm-project/qwen25-05b-instruct-maas-kserve-route
+      seconds: 60
+      variables:
+        - descriptors[0]["auth.identity.userid"]
+    - conditions:
+        - descriptors[0]["limit.team_alpha_tier_requests__097fc256"] == "1"
+      max_value: 5
+      name: team-alpha-tier-requests
+      namespace: vllm-project/qwen25-05b-instruct-maas-kserve-route
+      seconds: 60
+      variables:
+        - descriptors[0]["auth.identity.userid"]
+    - conditions:
+        - descriptors[0]["limit.team_alpha_tier_requests__097fc256"] == "1"
+      max_value: 5
+      name: team-alpha-tier-requests
+      namespace: redhat-ods-applications/maas-api-route
+      seconds: 60
+      variables:
+        - descriptors[0]["auth.identity.userid"]
+    - conditions:
+        - descriptors[0]["limit.team_bravo_tier_requests__f60fffd6"] == "1"
+      max_value: 30
+      name: team-bravo-tier-requests
+      namespace: redhat-ods-applications/maas-api-route
+      seconds: 60
+      variables:
+        - descriptors[0]["auth.identity.userid"]
+    - conditions:
+        - descriptors[0]["tokenlimit.models_as_a_service_team_bravo_llama_32_1b_instruct_maas_tokens__9859cfe3"] == "1"
+      max_value: 10000
+      name: models-as-a-service-team-bravo-llama-32-1b-instruct-maas-tokens
+      namespace: vllm-project/llama-32-1b-instruct-maas-kserve-route
+      seconds: 60
+      variables:
+        - descriptors[0]["auth.identity.userid"]
+    - conditions:
+        - descriptors[0]["tokenlimit.models_as_a_service_team_alpha_llama_32_1b_instruct_maas_tokens__bdaf7ca7"] == "1"
+      max_value: 10000
+      name: models-as-a-service-team-alpha-llama-32-1b-instruct-maas-tokens
+      namespace: vllm-project/llama-32-1b-instruct-maas-kserve-route
+      seconds: 60
+      variables:
+        - descriptors[0]["auth.identity.userid"]
+    - conditions:
+        - descriptors[0]["tokenlimit.models_as_a_service_team_bravo_qwen25_05b_instruct_maas_tokens__cf15e7d7"] == "1"
+      max_value: 10000
+      name: models-as-a-service-team-bravo-qwen25-05b-instruct-maas-tokens
+      namespace: vllm-project/qwen25-05b-instruct-maas-kserve-route
+      seconds: 60
+      variables:
+        - descriptors[0]["auth.identity.userid"]
+    - conditions:
+        - descriptors[0]["tokenlimit.models_as_a_service_team_alpha_qwen25_05b_instruct_maas_tokens__8edfa51e"] == "1"
+      max_value: 10000
+      name: models-as-a-service-team-alpha-qwen25-05b-instruct-maas-tokens
+      namespace: vllm-project/qwen25-05b-instruct-maas-kserve-route
+      seconds: 60
+      variables:
+        - descriptors[0]["auth.identity.userid"]
+    - conditions:
+        - descriptors[0]["tokenlimit.deny_all_by_default__6d45535f"] == "1"
+      max_value: 0
+      name: deny-all-by-default
+      namespace: redhat-ods-applications/maas-api-route
+      seconds: 60
+      variables:
+        - descriptors[0]["auth.identity.userid"]
+  metricLabelsDefault: descriptors[1]
+  telemetry: exhaustive

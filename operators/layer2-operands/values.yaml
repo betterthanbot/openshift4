@@ -479,7 +479,7 @@ lokiStack:
       global:
         retention:
           days: 14
-    size: 1x.pico # Supported size options for production instances of Loki are 1x.extra-small, 1x.small, or 1x.medium. Additionally, 1x.pico is available for testing and development purposes only.
+    size: 1x.demo # Supported size options for production instances of Loki are 1x.extra-small, 1x.small, or 1x.medium. Additionally, 1x.pico is available for testing and development purposes only.
     storage:
       schemas:
         - effectiveDate: "2024-01-01"
@@ -552,17 +552,18 @@ rhods:
           managementState: Managed
         feastoperator: {}
         kserve:
-          managementState: Removed
+          managementState: Managed
           modelsAsService:
-            managementState: Removed
-          nim:
             managementState: Managed
-          rawDeploymentServiceConfig: Headless
+          nim:
+            managementState: Removed
+          rawDeploymentServiceConfig: Headed
         kueue:
           defaultClusterQueueName: default
           defaultLocalQueueName: default
-          managementState: Removed
-        llamastackoperator: {}
+          managementState: Managed
+        llamastackoperator: 
+          managementState: Managed
         mlflowoperator:
           managementState: Removed
         modelregistry:
@@ -603,7 +604,7 @@ rhods:
 # extra config needed for "basic templates".
 # ------------------------------------------------------------------------------
 cnv:
-  enabled: false   # turned off for now — flip to true to reinstall (see layer1-install cnvOperator)
+  enabled: true   # turned off for now — flip to true to reinstall (see layer1-install cnvOperator)
 
   hyperConverged:
     enabled: true
@@ -629,12 +630,12 @@ gpuOperator:
       sandboxWorkloads:
         defaultWorkload: container
       migManager:
-        enabled: false
+        enabled: true
       nodeStatusExporter:
         enabled: true
       daemonsets:
         rollingUpdate:
-          maxUnavailable: "1"
+          maxUnavailable: "0"
       driver:
         enabled: true
         useNvidiaDriverCRD: true

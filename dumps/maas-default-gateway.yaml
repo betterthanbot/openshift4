@@ -1,0 +1,38 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  annotations:
+    opendatahub.io/managed: "false"
+    security.opendatahub.io/authorino-tls-bootstrap: "true"
+  labels:
+    istio.io/rev: openshift-gateway
+  name: maas-default-gateway
+  namespace: openshift-ingress
+spec:
+  gatewayClassName: openshift-default
+  infrastructure:
+    parametersRef:
+      group: ""
+      kind: ConfigMap
+      name: maas-default-gateway-options
+  listeners:
+    - allowedRoutes:
+        namespaces:
+          from: All
+      hostname: maas.apps.cluster-7xdhm.7xdhm.sandbox5348.opentlc.com
+      name: http
+      port: 80
+      protocol: HTTP
+    - allowedRoutes:
+        namespaces:
+          from: All
+      hostname: maas.apps.cluster-7xdhm.7xdhm.sandbox5348.opentlc.com
+      name: https
+      port: 443
+      protocol: HTTPS
+      tls:
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: cert-manager-ingress-cert
+        mode: Terminate

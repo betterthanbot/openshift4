@@ -1,0 +1,23 @@
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSAuthPolicy
+metadata:
+  annotations:
+    openshift.io/description: Auth policy created for subscription "team-alpha"
+    openshift.io/display-name: team-alpha-policy
+  finalizers:
+    - maas.opendatahub.io/authpolicy-cleanup
+  name: team-alpha-policy
+  namespace: models-as-a-service
+spec:
+  modelRefs:
+    - name: llama-32-1b-instruct-maas
+      namespace: vllm-project
+    - name: qwen25-05b-instruct-maas
+      namespace: vllm-project
+    - name: llama-32-1b-instruct-llmd-2
+      namespace: vllm-project
+    - name: qwen25-05b-instruct-llmd
+      namespace: vllm-project
+  subjects:
+    groups:
+      - name: team-alpha

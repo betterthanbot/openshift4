@@ -1,0 +1,57 @@
+apiVersion: monitoring.rhobs/v1alpha1
+kind: MonitoringStack
+metadata:
+  finalizers:
+    - monitoring.observability.openshift.io/finalizer
+  labels:
+    platform.opendatahub.io/part-of: monitoring
+  name: data-science-monitoringstack
+  namespace: redhat-ods-monitoring
+spec:
+  alertmanagerConfig:
+    disabled: false
+    matcherStrategy:
+      type: None
+    replicas: 2
+    resources:
+      limits:
+        cpu: 250m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+  createClusterRoleBindings: CreateClusterRoleBindings
+  logLevel: debug
+  prometheusConfig:
+    enableOtlpHttpReceiver: true
+    persistentVolumeClaim:
+      resources:
+        requests:
+          storage: 50Gi
+    replicas: 1
+    thanosResources:
+      limits:
+        cpu: 250m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+    webTLSConfig:
+      certificate:
+        key: tls.crt
+        name: prometheus-operated-tls
+      certificateAuthority:
+        key: service-ca.crt
+        name: prometheus-web-tls-ca
+      privateKey:
+        key: tls.key
+        name: prometheus-operated-tls
+  resourceSelector: {}
+  resources:
+    limits:
+      cpu: 1
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  retention: 90d
