@@ -320,7 +320,7 @@ operators:
   # See docs/tutorials/openshift-virtualization-on-ec2.md.
   # ----------------------------------------------------------------------------
   cnvOperator:
-    enabled: true   # turned off for now — flip to true to reinstall
+    enabled: true   # set false to uninstall (also disable layer2-operands cnv)
     namespace:
       create: true
       name: openshift-cnv

@@ -6,6 +6,136 @@ Replaces the interactive per-user flow with a single declarative config plus one
 so a cluster admin can stand up groups, subscriptions and API keys for a whole roster in
 one shot and hand out a CSV.
 
+```bash
+cd dumps/identity-management
+./provision-maas-keys.sh --dry-run    # show the plan, change nothing
+./provision-maas-keys.sh              # reconcile + mint (prompts once)
+```
+
+---
+
+## What the script does, in order
+
+You edit `config.json` (groups → subscription + users) and run the script. Everything
+below happens in one pass, and every step is safe to re-run — the script converges on
+the config rather than replaying from scratch.
+
+```
+./provision-maas-keys.sh
+        │
+        ▼
+┌─ 1. PREFLIGHT ─────────────────────────────────────────────────────────────┐
+│  oc, jq, curl, htpasswd on PATH?  ──── no ──► exit                         │
+│  logged in, can read openshift-config secrets? ── no ──► exit              │
+│  config.json valid, no duplicate users in a group? ── no ──► exit          │
+│  discover from the cluster (nothing is hardcoded):                         │
+│    • oauth-openshift route          → where to exchange passwords          │
+│    • Gateway listener hostname      → the MaaS base URL                    │
+│    • maas-parameters ConfigMap      → api-key-max-expiration-days          │
+│  keyExpiration longer than the cluster max? ──── yes ──► exit              │
+└────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─ 2. IDENTITIES ── for every user in config.json ───────────────────────────┐
+│                                                                            │
+│   Does the user already have BOTH an htpass-secret entry                   │
+│   AND a password stored in out/.passwords.json?                            │
+│        │                                                                   │
+│        ├── yes ──► leave alone. The existing password is reused, so        │
+│        │          re-runs never invalidate a user's credentials.           │
+│        │                                                                   │
+│        └── no  ──► generate a random password (passwordLength)             │
+│                    → htpasswd -bB into the local copy                      │
+│                    → record it in out/.passwords.json                      │
+│                                                                            │
+│   Any new entries at all?  ──► apply htpass-secret ONCE for the whole      │
+│                                batch (one API call, not one per user)      │
+│                                                                            │
+│   Note: the script never creates User or Identity objects. OpenShift        │
+│   creates those itself the first time each account authenticates — which    │
+│   happens in step 5.                                                        │
+└────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─ 3. GROUPS, SUBSCRIPTIONS & AUTH POLICIES ── for every group ──────────────┐
+│   apply Group/<name>                  ← membership is DECLARATIVE:         │
+│                                         replaced with exactly the config   │
+│   apply MaaSSubscription/<sub>        ← models + token rate limits         │
+│   apply MaaSAuthPolicy/<sub>-policy   ← which group may call which models  │
+│                                                                            │
+│   The MaaS controller then derives the Kuadrant objects from these —       │
+│   a per-model TokenRateLimitPolicy and the AuthPolicy/AuthConfigs that     │
+│   actually enforce at the gateway. The script does not create those.       │
+└────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─ 4. ROLLOUT WAIT ── only if step 2 changed htpass-secret ──────────────────┐
+│   New htpasswd identities are NOT usable until the oauth pods restart.     │
+│   Wait for clusteroperator/authentication: Progressing=False,              │
+│   Available=True (up to 300s), otherwise every token request in step 5     │
+│   fails with a 401.                                                        │
+│   Nothing changed? ──► skip the wait entirely.                             │
+└────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─ 5. MINT ── for every user × keysPerUser  (│ up to --parallel at a time) ──┐
+│                                                                            │
+│   Is this key name already in out/.minted-index.json?                      │
+│        │                                                                   │
+│        ├── yes, and no --rotate ──► skip (this is what makes an            │
+│        │                            interrupted run resumable)             │
+│        │                                                                   │
+│        └── no ──► POST the user's password to the OAuth challenge          │
+│                   endpoint  →  short-lived bearer token                    │
+│                   (no `oc login`; your admin kubeconfig is untouched)      │
+│                        │                                                   │
+│                        ├─ no token? ──► record `no-token`, move on         │
+│                        │                                                   │
+│                        └─► POST /maas-api/v1/api-keys                      │
+│                             header X-MaaS-Subscription: <sub>              │
+│                                  │                                         │
+│                                  ├─ non-2xx? ──► record the HTTP code      │
+│                                  │                                         │
+│                                  └─► the secret is in this response and    │
+│                                      NOWHERE ELSE, ever                    │
+│                                        │                                   │
+│                                        └─► GET /v1/models with the new     │
+│                                            key (skipped by --no-verify)    │
+│                                            → verified = yes / no(code)     │
+│                                              │                             │
+│                                              └─► append to the run buffer  │
+└────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─ 6. EXPORT ────────────────────────────────────────────────────────────────┐
+│   run buffer ──► append to out/.keys-ledger.jsonl   (durable, append-only) │
+│                                                                            │
+│   then rebuild EVERY export from the whole ledger, not from this run:      │
+│     ledger ──► out/subscriptions.json                                      │
+│            ──► out/subscriptions/<sub>.json                                │
+│            ──► out/maas-api-keys.csv                                       │
+│            ──► out/.minted-index.json      (idempotency for the next run)  │
+│                                                                            │
+│   Finally: any key the index says was issued but the ledger has no secret  │
+│   for is unrecoverable ──► print the exact --rotate command to re-mint.    │
+└────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+     Summary: groups / users / keys minted / failures by reason
+```
+
+Two properties fall out of that shape and are worth holding onto:
+
+- **Re-running is the normal case.** Add a user to `config.json`, re-run, and only
+  that user is touched — existing passwords and existing keys are left exactly as
+  they were.
+- **The ledger, not the cluster, is the source of truth for secrets.** maas-api
+  returns a key's secret once at creation and has no endpoint to read it back, so
+  step 6 rebuilds from the ledger rather than from the run. See
+  [Outputs are cumulative](#outputs-are-cumulative).
+
+---
+
 ## The flow this replaces
 
 ```
@@ -211,6 +341,28 @@ secret, revoking it is the right move.
 
 `users` entries may be plain strings (`"user1"`) or objects with a `displayName`.
 
+### What's actually shipped
+
+The committed `config.json` declares four groups, two users each, with deliberately
+different token budgets so the tiers are distinguishable in the dashboards:
+
+| Group | Subscription | Priority | Token limit (per model) | Cost centre |
+|---|---|---|---|---|
+| `team-alpha` | `team-alpha` | 10 | 10000 / 1m | `CC-00001` |
+| `team-bravo` | `team-bravo` | 9 | 5000 / 1m | `CC-00002` |
+| `team-Charlie` | `team-charlie` | 8 | 1000 / 1m | `CC-00003` |
+| `team-Delta` | `team-delta` | 7 | 100 / 1m | `CC-00004` |
+
+Two things in that table are intentional and worth not "fixing" by accident:
+
+- **`name` and `subscription.name` are independent.** The group can be
+  `team-Charlie` while its subscription is `team-charlie`. Key names are built from
+  the *subscription* name (`user-05-team-charlie-01`), and the tier mapping matches
+  on the *group* name — so the two must be kept straight.
+- **Mixed-case group names work.** `team-Charlie` / `team-Delta` exist to prove it;
+  OpenShift `Group` names are case-sensitive, so a tier mapping written as
+  `team-charlie` would silently not match `team-Charlie`.
+
 ### Adding a group or a user
 
 Append to `config.json` and re-run. The script is idempotent: existing users keep
@@ -265,13 +417,76 @@ Only models in `Ready` state can serve traffic. Current cluster state:
 | `llama-32-1b-instruct-llmd-2` | Stopped |
 | `qwen25-05b-instruct-llmd` | Stopped |
 
-The shipped config references only the two `Ready` models. The pre-existing
-subscriptions on the cluster also list the two stopped `llmd` models, which is why
-they report `Degraded / 2 of 4 model references are invalid or unavailable`. Running
-this script reconciles them to the Ready-only set and clears that condition.
+The shipped config references only the two `Ready` models, and all four subscriptions
+it creates report `Active`. Earlier hand-made subscriptions on this cluster also listed
+the two stopped `llmd` models and reported
+`Degraded / 2 of 4 model references are invalid or unavailable`; running this script
+reconciles them to the Ready-only set and clears that condition.
 
 To add the `llmd` models back once their `LLMInferenceService` resources are started,
 append them to the group's `models` array and re-run.
+
+> A `MaaSAuthPolicy` can still show `Degraded` with `AuthPolicy waiting for the
+> following components to sync: [AuthConfig (…)]` even when the subscription is
+> `Active` and keys work. That is a Kuadrant/Authorino convergence lag on the shared
+> per-model `AuthPolicy`, not a problem with the subscription — every `MaaSAuthPolicy`
+> targeting the same model reports the state of that one shared object, sampled at
+> different moments, which is why two policies can disagree. Confirm with real traffic
+> before chasing it. See [techdebt.md](../../techdebt.md) item 8.
+
+---
+
+## Two quotas, enforced independently
+
+Once keys are minted, a request can be rejected by either of two separate limits.
+They are configured in different places and it is easy to conflate them:
+
+| | Where it comes from | Counted per | Applies to |
+|---|---|---|---|
+| **Token limit** | `tokenRateLimits` in this repo's `config.json`, via the `MaaSSubscription` | subscription + model + user | **every** group the script creates |
+| **Request limit** | `RateLimitPolicy` on the gateway, keyed to a tier | `auth.identity.userid` | only groups listed in the `tier-to-group-mapping` ConfigMap |
+
+`tier-to-group-mapping` (`redhat-ods-applications`, dumped to
+[../tier-to-group-mapping.yaml](../tier-to-group-mapping.yaml)) currently maps only
+`team-alpha` and `team-bravo`. **A group with no tier entry has no request limit at
+all — only a token limit.** If you add a group to `config.json` and expect request
+throttling too, you must add it there as well; the script does not touch that
+ConfigMap.
+
+## Verified on this cluster
+
+Last full run: 2026-07-26, against the four groups in the shipped `config.json`.
+
+| | Result |
+|---|---|
+| Users provisioned (htpasswd + `User`/`Identity`) | 8 — `user-01` … `user-08` |
+| Groups / subscriptions / auth policies | 4 each, all subscriptions `Active` |
+| Keys minted and gateway-verified | 8 of 8 |
+| Inference calls served | `200` for team-alpha, -bravo, -charlie |
+| Token limit actually enforced | `429` for team-delta (100 tokens/min) and at the tail of team-charlie's run |
+| Telemetry labels on Limitador counters | `user`, `subscription`, `model`, `cost_center`, `organization_id` all populated |
+
+That last row is what makes the Grafana MaaS dashboards work — the `tokenMetadata`
+you put in `config.json` surfaces as `cost_center` / `organization_id` on every
+`authorized_hits` sample. See [techdebt.md](../../techdebt.md) items 6 and 7 for the
+history of that path.
+
+### Driving traffic through the keys
+
+[`testing.sh.tmp`](../../testing.sh.tmp) (repo root) exercises every key the script
+has issued and prints per-user and per-subscription tallies labelled to match those
+telemetry dimensions. It reads keys from `out/subscriptions.json` and limits from the
+cluster, so it needs no configuration of its own:
+
+```bash
+./testing.sh.tmp                     # 3 requests per user per model
+./testing.sh.tmp -n 10 --delay 0.2   # heavier run
+./testing.sh.tmp -u user-07,user-08  # just the delta users
+./testing.sh.tmp --burst             # also try to trip the request-rate limit
+```
+
+Results land in `dumps/identity-management/out/test-results.jsonl`, one line per
+request, which is what the table above was tallied from.
 
 ---
 
@@ -435,22 +650,20 @@ oc exec -n redhat-ods-applications "$POD" -- bash -c \
 
 ---
 
-## How it works, step by step
+## Interfaces the script depends on
 
-1. **Preflight** — verifies tooling, cluster-admin rights, and discovers the OAuth
-   route, MaaS gateway hostname, and max key lifetime from `maas-parameters`.
-2. **Identities** — reads `htpass-secret`, adds a bcrypt entry for each new user with
-   a generated password, applies the secret back. Passwords persist in
-   `out/.passwords.json` so re-runs are stable.
-3. **Groups & subscriptions** — applies `Group`, `MaaSSubscription`, and
-   `MaaSAuthPolicy` per configured group.
-4. **Rollout wait** — new htpasswd identities are unusable until the oauth pods
-   restart, so it waits for the `authentication` cluster operator to settle.
-5. **Minting** — for each user: exchange credentials for a token via
-   `/oauth/authorize?client_id=openshift-challenging-client`, then
-   `POST /maas-api/v1/api-keys` with an `X-MaaS-Subscription` header. Verifies each
-   key against `/v1/models`.
-6. **Export** — writes the CSV.
+The step-by-step flow is at the [top of this file](#what-the-script-does-in-order).
+What follows is the contract it relies on — the things that would break it if they
+changed.
+
+| Thing | Used for | Read or written |
+|---|---|---|
+| `openshift-config/htpass-secret` | user credentials | read + written (batched, once) |
+| `oauth-openshift` route (`openshift-authentication`) | `/oauth/authorize?client_id=openshift-challenging-client` password→token exchange | read |
+| `clusteroperator/authentication` | knowing when new identities are live | read |
+| `redhat-ods-applications/maas-parameters` | gateway name/namespace, `api-key-max-expiration-days` | read |
+| `Gateway` (default `openshift-ingress/maas-default-gateway`) | the MaaS base URL, from `spec.listeners[0].hostname` | read |
+| `Group`, `MaaSSubscription`, `MaaSAuthPolicy` | the declared roster | written |
 
 ### maas-api endpoints used
 

@@ -1,11 +1,27 @@
 # Tech Debt / Known Issues
 
-Findings from a MaaS + observability troubleshooting session on 2026-07-23/24, cluster
-`cluster.example.com`. Kept here so fixes/workarounds and their
-root causes aren't lost. Several of these are upstream/product bugs (RHOAI operator,
-RHCL/Kuadrant, Service Mesh) rather than something wrong in this repo.
+Findings from MaaS + observability troubleshooting sessions on 2026-07-23/24, kept here
+so fixes/workarounds and their root causes aren't lost. Several of these are
+upstream/product bugs (RHOAI operator, RHCL/Kuadrant, Service Mesh) rather than
+something wrong in this repo.
 
-## 1. Grafana dashboards missing datasource mapping (fixed in repo)
+**Every item below was re-verified against the live cluster on 2026-07-26.** Four have
+since resolved and are kept for the root cause; three are still open; three are new.
+
+| # | Item | Status as of 2026-07-26 |
+|---|---|---|
+| 1 | Grafana dashboards missing datasource mapping | ✅ **resolved** — verified on cluster |
+| 2 | RHOAI Tempo `PersesDatasource` blocks the Monitoring reconcile | ❌ **still broken** — still erroring ~1/sec |
+| 3 | NetworkPolicy blocks data-science Thanos → Prometheus sidecar | ⚠️ **worked around** — still not GitOps-tracked |
+| 4 | Data-science Prometheus can't see cross-namespace metrics | ⚠️ **worked around** — still not GitOps-tracked |
+| 5 | `maas-default-gateway` OOMKilled (WASM filter leak) | ✅ **resolved** by rhcl-operator 1.4.1 → 1.4.2 |
+| 6 | No per-user volume metrics | ✅ **obsolete** — the premise is no longer true |
+| 7 | Limitador emitted zero rate-limit metrics | ✅ **resolved** — full labelled counters now flowing |
+| 8 | `MaaSAuthPolicy` stuck `Degraded` on AuthConfig sync | 🆕 open, cosmetic so far |
+| 9 | ArgoCD applications `OutOfSync`, `ctfd` `Missing` | 🆕 open |
+| 10 | Installed operators have drifted ahead of `values.yaml` | 🆕 open |
+
+## 1. Grafana dashboards missing datasource mapping (RESOLVED)
 
 **Symptom:** All Grafana MaaS dashboards showed `No datasource found for kind
 'PrometheusDatasource' and name 'undefined'`.
@@ -23,9 +39,15 @@ spec:
     - inputName: "DS_PROMETHEUS"
       datasourceName: "Prometheus"
 ```
-All 15 dashboards under [bases/grafana/generated/](bases/grafana/generated/) were
+Every dashboard under [bases/grafana/generated/](bases/grafana/generated/) was
 regenerated. This affected every dashboard the script produces, not just the MaaS ones.
-**Status:** fixed in git; needs to sync out via GitOps/ArgoCD to take effect on cluster.
+
+**Status: resolved and verified on cluster (2026-07-26).** All 9 `GrafanaDashboard` CRs
+in the `grafana` namespace now report `spec.datasources[0].datasourceName: Prometheus`,
+and `Grafana/grafana-a` (13.0.1) is `complete / success`. The dashboard set itself was
+also consolidated from 19 to 9 persona-oriented dashboards in the same pass — see
+[bases/grafana/dashboard/README.md](bases/grafana/dashboard/README.md) for what was
+merged where.
 
 ## 2. Native RHOAI "Observe & monitor" dashboard — no default Prometheus datasource (operator bug, worked around manually)
 
@@ -54,6 +76,22 @@ at `thanos-querier-data-science-thanos-querier.redhat-ods-monitoring.svc:10902`.
 upgrade/reinstall could wipe or duplicate it. The underlying Tempo-datasource manifest bug
 should be filed against `opendatahub-operator`.
 
+**Status: still broken (re-verified 2026-07-26), survived the RHOAI 3.4.1 → 3.4.2 upgrade.**
+The `rhods-operator` Monitoring controller is still failing on exactly the same manifest,
+still retrying about once per second:
+
+```
+Reconciler error ... failure deploying resource redhat-ods-monitoring/tempo-datasource:
+PersesDatasource.perses.dev "tempo-datasource" is invalid: spec.client.tls.caCert:
+Invalid value: "object": namespace is required when type is secret or configmap
+```
+
+`PersesDatasource/tempo-datasource` still does not exist as a result. The manual
+`prometheus-datasource` workaround is present and carrying the Cluster/Models tabs.
+Because that reconcile loop never completes, **nothing else that controller would create
+gets created either** — keep this in mind before assuming a missing
+`redhat-ods-monitoring` object is a separate bug.
+
 ## 3. Missing NetworkPolicy rule blocks the data-science Thanos Querier from its own Prometheus (worked around manually)
 
 **Symptom:** After fixing #2, dashboard panels stopped showing the datasource error but showed
@@ -73,6 +111,12 @@ connections to become ready`), leaving `/api/v1/stores` empty and every query em
 OR'd together, so this doesn't touch or conflict with the operator-owned one.
 
 **Caveat:** same as #2 — not GitOps-tracked, should be filed upstream.
+
+**Status: workaround still in place and still needed (2026-07-26).**
+`NetworkPolicy/thanos-querier-data-science-to-prometheus-sidecar` is present in
+`redhat-ods-monitoring` alongside the operator-owned
+`data-science-prometheus-instance-ingress`, which still does not open 10901. It exists
+only because someone created it by hand — nothing in this repo would recreate it.
 
 ## 4. Data-science Prometheus (`monitoring.rhobs/v1`) can't see cross-namespace metrics — deliberate isolation, not a bug (worked around manually, 2026-07-24)
 
@@ -142,11 +186,21 @@ touches. If `kubernetesAuth` gets fixed upstream in a future COO release, this w
 dance can likely collapse back down to just `client.tls` + `client.kubernetesAuth: {enable: true}`
 — worth retesting after an operator upgrade.
 
-**Status:** working as of 2026-07-24. Not GitOps-tracked (same caveat as #2/#3) — an operator
-upgrade/reinstall could revert the datasource CR to its broken default, and none of the three new
-objects are declared anywhere in this repo.
+**Status: still working, still not GitOps-tracked (re-verified 2026-07-26).** On the cluster
+today, `PersesDatasource/prometheus-datasource` (`redhat-ods-monitoring`) is
+`default: true`, displays as `Prometheus (Cluster - global Thanos)`, has **no
+`spec.client`**, and proxies to `https://thanos-querier.openshift-monitoring.svc:9091`
+via `secret: prometheus-datasource-manual-secret` — i.e. the workaround shape described
+above, intact. `ClusterRoleBinding/data-science-perses-cluster-monitoring-view` is also
+still there.
 
-## 5. `maas-default-gateway` pod OOMKilled — RHCL/Service Mesh version-skew bug (mitigated, not fixed)
+**The clock on this one is running.** The bearer token inside that Perses-native secret
+was minted with `--duration=8760h` around 2026-07-24, so it expires ~2027-07-24. Nothing
+will warn you; the dashboards will simply go back to "No data". Contrast with #7, where
+the equivalent CR *has* been resynced back to its broken shape — that is the failure mode
+this item predicted, and it has now actually happened once.
+
+## 5. `maas-default-gateway` pod OOMKilled — RHCL/Service Mesh version-skew bug (RESOLVED by rhcl-operator 1.4.2)
 
 **Symptom:** `maas-default-gateway-openshift-default-*` pod in `openshift-ingress` in constant
 `CrashLoopBackOff`, `istio-proxy` container `OOMKilled` (exit 137) on a ~5 min cycle, taking the
@@ -173,15 +227,59 @@ supported, non-reverted customization point for Gateway-API-managed deployments)
 - replicas: `1 → 2`
 - `PodDisruptionBudget` with `minAvailable: 1`
 
-**Status:** mitigated, not fixed. The WASM leak is still present; each replica will still
-eventually OOM, just less often, and a second replica means one crashing doesn't take the
-hostname down entirely. Real fix needs either an RHCL/Service-Mesh compatibility patch or
-rolling `rhcl-operator` back to 1.3.5.
+**Status: resolved (verified 2026-07-26).** The compatibility patch arrived —
+`rhcl-operator` is now **1.4.2** (was 1.4.1), with `servicemeshoperator3` unchanged at
+3.4.0. Three independent checks confirm the leak is gone:
 
-## 6. MaaS Usage Overview dashboard — no per-user volume metrics (known/documented limitation, not a bug)
+- `EnvoyFilter/kuadrant-maas-default-gateway` no longer contains
+  `allow_on_headers_stop_iteration` anywhere — the operator stopped emitting the field
+  the proxy couldn't parse.
+- Both `maas-default-gateway-openshift-default-*` pods show **0 restarts over 2d17h**,
+  against a previous cycle of roughly one OOMKill every 5 minutes.
+- The `maas.apps.<cluster>` hostname has been continuously serving inference traffic
+  through those pods (see item 7).
+
+**The mitigation is still applied and was deliberately left in place:**
+`ConfigMap/maas-default-gateway-options` still sets istio-proxy to 3Gi/256Mi, 2 replicas
+and a PDB with `minAvailable: 1`. Nothing forces removing it, and the second replica is
+worth keeping for a single-hostname ingress path regardless. If you want the memory
+limit back at the 1Gi default, that is now safe to try — but do it as its own change so
+a regression is unambiguous.
+
+**Rollback of the rollback:** if `rhcl-operator` is ever downgraded to 1.4.1 while
+Service Mesh stays at 3.4.0, expect this to come straight back.
+
+## 6. MaaS Usage Overview dashboard — no per-user volume metrics (OBSOLETE — the premise turned out to be false)
+
+> **Resolved 2026-07-26.** Everything below is kept only to explain why several
+> dashboards were once built around a limitation that does not exist. Per-user volume
+> metrics are live; see item 7 and
+> [bases/grafana/dashboard/README.md](bases/grafana/dashboard/README.md). The
+> "MaaS Usage Overview" dashboard this describes was deleted and merged into
+> *AI MaaS Admin & Analyst — Usage & Rate Limits*.
+>
+> The mechanism that closed it is a **`TelemetryPolicy`** — `maas-telemetry` in
+> `openshift-ingress`, dumped to [dumps/maas-telemetry.yaml](dumps/maas-telemetry.yaml)
+> — which attaches labels to Limitador's counters from the authenticated identity:
+>
+> ```yaml
+> labels:
+>   user:            auth.identity.userid
+>   subscription:    auth.identity.selected_subscription
+>   model:           responseBodyJSON("/model")
+>   cost_center:     auth.identity.subscription_info.costCenter
+>   organization_id: auth.identity.subscription_info.organizationId
+> ```
+>
+> So the old framing was wrong in both directions: Kuadrant does not refuse per-user
+> cardinality, and the labels are richer than per-user — they carry the subscription's
+> `tokenMetadata` straight through to Prometheus.
+
+### Original write-up (superseded)
 
 Documented directly in the dashboard's own `description` field
-([bases/grafana/dashboard/RHOAI MaaS Usage Overview.json](bases/grafana/dashboard/RHOAI%20MaaS%20Usage%20Overview.json)):
+(`bases/grafana/dashboard/RHOAI MaaS Usage Overview.json`, since deleted — its content
+now lives in [AI MaaS Admin & Analyst - Usage & Rate Limits.json](bases/grafana/dashboard/AI%20MaaS%20Admin%20&%20Analyst%20-%20Usage%20&%20Rate%20Limits.json)):
 there is no per-user token/request volume anywhere on this cluster. Limitador and
 `istio_requests_total` carry no user label (Kuadrant deliberately avoids per-user Prometheus
 cardinality), and `maas-api`'s Postgres table only stores `last_used_at`, not a usage counter.
@@ -198,7 +296,53 @@ re-verified — but the "Kuadrant deliberately avoids per-user cardinality" fram
 stale. Either way, #7 found the more fundamental problem: right now these metrics have zero
 samples regardless of labels, because Limitador isn't recording the traffic at all.
 
-## 7. Native "Observe & monitor" dashboard, Usage tab — datasource auth fixed, but Limitador emits zero rate-limit metrics (2026-07-24)
+## 7. Native "Observe & monitor" dashboard, Usage tab — Limitador emitted zero rate-limit metrics (LAYER 2 RESOLVED; LAYER 1 HAS REGRESSED)
+
+> **Update 2026-07-26 — read this before the original write-up below.**
+>
+> **Layer 2 (zero metrics) is resolved.** Limitador's `/metrics` endpoint now exposes
+> `authorized_calls`, `authorized_hits` and `limited_calls` with real, incrementing
+> counts — e.g. `authorized_hits{user="user-02",subscription="team-alpha",
+> model="llama-32-1b-instruct-maas",cost_center="CC-00001",
+> organization_id="ORG-00001",...} 7370` and
+> `limited_calls{user="user-07",subscription="team-delta",
+> limit_name="models-as-a-service-team-delta-llama-32-1b-instruct-maas-tokens"} 134`.
+>
+> **What actually changed** — two things, neither of which was a Limitador fix:
+> 1. **Per-model `TokenRateLimitPolicy` objects now exist.** Previously the only TRLP
+>    was the gateway-wide `maas-default-gateway-token-rate-limits`. Creating
+>    `MaaSSubscription`s (via
+>    [dumps/identity-management/provision-maas-keys.sh](dumps/identity-management/README.md))
+>    makes the MaaS controller derive `maas-trlp-<model>` in `vllm-project` per model.
+>    Those are the objects whose limits Limitador actually counts against — which is
+>    why traffic was flowing (`istio_requests_total` was non-zero) while every counter
+>    stayed at zero. The original note guessed the traffic was bypassing the
+>    enforcement path; the real answer is that there was nothing at that scope to
+>    enforce.
+> 2. **The `TelemetryPolicy` supplies the labels** — see item 6.
+>
+> This is confirmed end to end, not just by reading `/metrics`: driving traffic through
+> minted keys produced `200`s for team-alpha/-bravo/-charlie and `429`s for team-delta
+> at its 100 tokens/min budget, and the rejections show up as `limited_calls`.
+>
+> **Layer 1 (the 401 datasource) has regressed** — and in exactly the way the note
+> below warned about. `PersesDatasource/kuadrant-prometheus-datasource`
+> (`redhat-ods-applications`) is back to `spec.client.tls` plus
+> `proxy.spec.secret: kuadrant-prometheus-datasource-secret`, the operator-managed name
+> — not the separately-named manual secret the fix installed.
+> `RoleBinding/data-science-perses-view` in `kuadrant-system` survived; the CR did not.
+> The `perses-operator` resync loop wins over hand-edits, as documented in item 4.
+>
+> **The "fixed and committed" claim below is also wrong about the repo.** It cites
+> `dumps/maas-extract/observability/perses-datasources.yaml` and
+> `perses-thanos-rbac.yaml` — **neither file, nor the `dumps/maas-extract/` directory,
+> exists.** `dumps/` was flattened since. There is no Perses YAML anywhere in this repo,
+> which means the only copy of that fix was on the cluster, and it has now been
+> overwritten. It has to be redone from item 4's recipe if the native Usage tab is
+> wanted; note the Grafana dashboards do not depend on it, since they read the global
+> Thanos directly.
+
+### Original write-up (partially superseded)
 
 **Symptom:** Unlike the Cluster/Models tabs (#4), the Usage tab (`dashboard-3-maas-usage-admin`)
 was previously believed to "just work" (see `perses-dashboard-maas-usage.yaml`'s original header).
@@ -247,31 +391,143 @@ It doesn't — every Overview stat (Total Tokens, Total Requests, Total Errors, 
    investigated further this session**, this needs its own trace-level dig (Envoy access logs on
    the gateway pod, or Kuadrant's own request-level tracing) to confirm.
 
-**Status:** datasource auth fixed and committed
+**Status (original, superseded — see the 2026-07-26 update at the top of this item):**
+datasource auth fixed and committed
 (`dumps/maas-extract/observability/perses-datasources.yaml`,
 `dumps/maas-extract/observability/perses-thanos-rbac.yaml`). The zero-metrics finding is not
 fixed — it's a genuine "Limitador isn't seeing this traffic" gap, separate from anything
 dashboard-related, and needs someone to trace an actual request through the gateway to find where
 it diverges from the Kuadrant enforcement path.
 
+## 8. `MaaSAuthPolicy` reports `Degraded` while the subscription works fine (2026-07-26)
+
+**Symptom:** of the four `MaaSAuthPolicy` objects the provisioning script creates,
+`team-alpha-policy` and `team-charlie-policy` sit at `Degraded` while `team-bravo-policy`
+and `team-delta-policy` are `Active` — even though all four `MaaSSubscription`s are
+`Active` and keys from all four subscriptions verify and serve traffic.
+
+```
+1 of 2 AuthPolicies not accepted/enforced   (PartialFailure)
+  reason: NotEnforced
+  message: AuthPolicy waiting for the following components to sync:
+           [AuthConfig (bcd1153…) AuthConfig (7ad42c0…) …]
+```
+
+**Root cause:** all four policies point at the *same two* underlying
+`AuthPolicy` objects (`maas-auth-llama-32-1b-instruct-maas` and
+`maas-auth-qwen25-05b-instruct-maas` in `vllm-project`). Each `MaaSAuthPolicy` copies
+that shared state into its own `status` when it last reconciled, so the four are really
+four snapshots of two objects, taken at different moments. Authorino's `AuthConfig`s are
+all `Ready 1/1` on the cluster, so the "waiting to sync" condition is stale rather than
+live.
+
+**Impact: cosmetic so far.** It is still worth watching, because a genuinely stuck
+`AuthPolicy` would look identical from the `MaaSAuthPolicy` status alone. Verify with
+traffic (a `200` from `/v1/models` with a minted key) before spending time on it.
+
+**Open question:** whether the status ever self-clears without a re-apply. It had not
+after ~2h.
+
+## 9. ArgoCD applications sit `OutOfSync`; `ctfd` is `Missing` (2026-07-26)
+
+Live state in `openshift-gitops`:
+
+| Application | Sync | Health |
+|---|---|---|
+| `gatus` | Synced | Healthy |
+| `bootstrap` | OutOfSync | Healthy |
+| `grafana` | OutOfSync | Healthy |
+| `operators-layer1` | OutOfSync | Healthy |
+| `operators-layer2` | OutOfSync | Healthy |
+| `ctfd` | OutOfSync | **Missing** |
+
+Three separate things are tangled here:
+
+1. **No automated sync policy.** `syncPolicy.automated` is commented out in
+   [argocd/appset-workloads.yaml](argocd/appset-workloads.yaml), so drift is expected by
+   design — nothing self-heals, and every repo change stays `OutOfSync` until someone
+   syncs by hand. Fine for a demo cluster; it does mean "OutOfSync" carries no signal.
+2. **`ctfd` is `Missing`** — the app exists but its resources were never created.
+   [overlay/my-sno-cluster/ctfd/](overlay/my-sno-cluster/ctfd/) holds only a
+   `kustomization.yaml`, `namespace.yaml` and `route.yaml`, with the CTFd chart itself
+   under `bases/ctfd/vendor/`. Either finish wiring it up or drop the overlay so the
+   ArgoCD UI stops showing a permanently-broken app.
+3. **`OrphanedResourceWarning: 134 orphaned resources`** on every workload app — the
+   AppProject has orphaned-resource monitoring on while most namespace content is not
+   ArgoCD-managed. Noise, not a fault; turn the warning off in
+   [argocd/appProject.yaml](argocd/appProject.yaml) or accept it permanently.
+
+Also note every source in `bootstrap/`, `argocd/appset-operators.yaml` and
+`argocd/appset-workloads.yaml` currently pins `targetRevision: argocd/demo`, not `main`.
+That is deliberate for this demo branch, but it is the first thing to change on a fork.
+
+## 10. Installed operator versions have drifted well ahead of `values.yaml` (2026-07-26)
+
+Every subscription in [operators/layer1-install/values.yaml](operators/layer1-install/values.yaml)
+uses `installPlanApproval: Automatic`, which means **`startingCSV` is a floor, not a
+pin** — OLM installs at least that version and then upgrades freely to the head of the
+channel. The docs describing these as "pinned versions" were misleading.
+
+Actual drift on the cluster today:
+
+| Operator | `startingCSV` in repo | Installed |
+|---|---|---|
+| Grafana | `v5.22.2` | **5.24.0** |
+| NVIDIA GPU | `v26.3.2` | **26.3.3** |
+| Cluster Observability | `v1.4.0` | **1.5.1** |
+| Compliance | `v1.8.2` | **1.9.1** |
+| KMM Hub | `v2.6.0` | **2.6.1** (still `Installing`) |
+| Cluster Logging | `v6.4.3` | **6.4.6** |
+| Loki | `v6.4.3` | **6.4.6** |
+| NFD | `4.20.0-202603051149` | **4.20.0-202607141145** |
+| RHACS | `v4.10.0` | **4.11.1** |
+| OpenShift Virtualization | `v4.20.15` | **4.20.21** |
+| RHOAI | `3.3.2` (channel `stable-3.3`) | **3.4.2** (channel `stable-3.4`) |
+
+RHOAI is the one to look at first: the repo declares channel `stable-3.3` while the
+cluster is on `stable-3.4`, so this is not just in-channel drift — a rebuild from this
+repo would land on a different minor version than what is running and validated here.
+
+Two decisions worth making explicitly rather than by default:
+
+- **Do you want pinning at all?** If yes, `installPlanApproval: Manual` is the
+  mechanism; `startingCSV` alone will not do it. If no, drop the version tables' claim
+  to be authoritative and treat them as "known-good floors".
+- **KMM Hub 2.6.1 has been `Installing` rather than `Succeeded`** — check it before
+  assuming the drift is otherwise benign.
+
+Note also that several operators on this cluster are **not** managed by this repo at all
+— Authorino 1.4.2, RHCL 1.4.2, Service Mesh 3.4.0, Limitador 1.4.1, Kueue 1.3.1,
+OpenTelemetry 0.152.0-1, Tempo 0.21.0-3, cert-manager 1.20.0, Quay 3.17.3,
+LeaderWorkerSet 1.0.0. They arrive with the RHOAI/MaaS stack and the sandbox base image.
+Items 5 and 7 both turn on the versions of ones in that list, so record them when
+troubleshooting even though nothing here installs them.
+
 ## Open follow-ups
 
-- [ ] Sync the Grafana `datasources` fix (#1) out via ArgoCD.
+- [x] ~~Sync the Grafana `datasources` fix (#1) out via ArgoCD.~~ Done — verified on cluster.
+- [x] ~~Track down an RHCL/Service-Mesh compatible version pairing for the WASM filter
+      crash (#5).~~ Fixed upstream in `rhcl-operator` 1.4.2.
+- [x] ~~Trace why real gateway traffic doesn't produce Limitador samples (#7).~~ Answered:
+      no per-model `TokenRateLimitPolicy` existed at that scope. Creating subscriptions
+      via the provisioning script generates them.
+- [x] ~~Loki/Istio-access-log path for per-user usage volume (#6).~~ Not needed — the
+      `TelemetryPolicy` provides `user` as a Prometheus label directly.
 - [ ] File upstream bug: `opendatahub-operator` Tempo-datasource CA cert manifest missing
-      `namespace` field (#2), and the resulting missing NetworkPolicy rule (#3).
+      `namespace` field (#2) — **still reproducing on RHOAI 3.4.2**, and the resulting
+      missing NetworkPolicy rule (#3).
 - [ ] File upstream bug: `perses-operator`'s `PersesDatasource.spec.client.kubernetesAuth`
-      doesn't attach a bearer token to outbound proxy calls (#4) — currently worked around with
-      a manually-managed Perses secret instead.
-- [ ] Consider GitOps-tracking the #4 workaround objects (ConfigMap, ClusterRoleBinding, and
-      re-creating the Perses secret) so an operator reinstall doesn't silently regress the
-      Cluster/Models dashboards back to "No data".
-- [ ] Track down an RHCL/Service-Mesh compatible version pairing, or wait for a patch, for the
-      WASM filter crash (#5). Current mitigation is memory/replica/PDB only.
-- [ ] Loki/Istio-access-log path for per-user usage volume (#6) — tracked separately in the
-      User & API Key Drilldown dashboard's own scope.
-- [ ] File the same upstream `kubernetesAuth` bug for `kuadrant-prometheus-datasource` (#7) as
-      already flagged for #4 — same operator, same gap.
-- [ ] Trace why real gateway traffic (`istio_requests_total`) doesn't produce any
-      `authorized_calls`/`limited_calls`/`authorized_hits` samples in Limitador (#7) — likely
-      needs Envoy access logs or Kuadrant request tracing on `maas-default-gateway`, possibly
-      related to the WASM filter instability in #5.
+      doesn't attach a bearer token to outbound proxy calls (#4, #7) — same operator, same
+      gap, two datasources.
+- [ ] GitOps-track the #4 workaround objects (ConfigMap, ClusterRoleBinding, and the
+      Perses secret). This is no longer hypothetical: the equivalent #7 objects have
+      already been wiped by an operator resync, and #4's are the only thing keeping the
+      native Cluster/Models tabs alive.
+- [ ] Re-apply the #7 `kuadrant-prometheus-datasource` fix, or decide the native Usage tab
+      is out of scope and say so — the Grafana dashboards don't depend on it.
+- [ ] Diarise the #4 Perses bearer token (~2027-07-24 expiry). Nothing warns before the
+      dashboards silently empty out.
+- [ ] Decide on operator pinning (#10), and reconcile the repo's RHOAI channel
+      (`stable-3.3`) with what is actually running (`stable-3.4`).
+- [ ] Resolve or remove the `ctfd` application (#9).
+- [ ] Confirm whether the `MaaSAuthPolicy` `Degraded` status (#8) ever self-clears.
