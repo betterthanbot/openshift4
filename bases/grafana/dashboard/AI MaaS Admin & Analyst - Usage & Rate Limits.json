@@ -858,7 +858,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(authorized_calls{subscription=\"$subscription\"}[1m])) * 60",
+          "expr": "sum(rate(authorized_calls{user=~\"$user\",subscription=~\"$subscription\"}[$__rate_interval])) * 60",
           "legendFormat": "__auto",
           "refId": "A"
         }
@@ -922,7 +922,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(authorized_hits{subscription=\"$subscription\"}[1m])) * 60",
+          "expr": "sum(rate(authorized_hits{user=~\"$user\",subscription=~\"$subscription\"}[$__rate_interval])) * 60",
           "legendFormat": "__auto",
           "refId": "A"
         }
