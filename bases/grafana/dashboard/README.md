@@ -203,7 +203,7 @@ Executive KPIs → Traffic Flow (ingress↔vLLM↔KServe correlation, error rate
 
 Who's using MaaS, how much, and how close to their limits — for MaaS admins and analysts. Replaces "RHOAI MaaS Group Monitoring", "RHOAI MaaS Group Monitoring (Detailed)", "RHOAI MaaS Usage Overview", and "RHOAI MaaS Per-User Token Usage".
 
-**Variables:** `DS_PROMETHEUS`, `user` (multi), `subscription` (multi)
+**Variables:** `DS_PROMETHEUS`, `user` (multi), `subscription` (multi), `model` (multi)
 
 ### Rows
 
@@ -211,13 +211,32 @@ Who's using MaaS, how much, and how close to their limits — for MaaS admins an
 - **Active Users Over Time** — distinct users in a trailing 1h window, graphed across the selected range (the "how many users throughout the day/week" view).
 - **Requests & Rejections by Group** — authorized/rejected requests per minute by subscription, plus token-limit hits by group+model.
 - **Token Usage by User** — table of tokens/requests/rejected per (user, subscription, model).
-- **Rate Limits & Token Limits** — live usage gauged against the configured per-tier limits (team-alpha: 5 req/min, 10k tokens/min per model; team-bravo: 30 req/min, 10k tokens/min per model — see `dumps/rhcl-ratelimitpolicy-*.yaml` / `dumps/rhcl-tokenratelimitpolicy-*.yaml` for the source of truth; Limitador itself doesn't expose configured thresholds as a metric).
+- **Rate Limits & Token Limits** — live usage gauged against the configured per-tier limits. Limitador doesn't expose configured thresholds as a metric, so the source of truth is on the cluster (verified 2026-07-26):
+
+  | Tier | Requests/min | Tokens/min per model |
+  |---|---|---|
+  | team-alpha | 5 | 10000 |
+  | team-bravo | 30 | 5000 |
+  | team-charlie | *(none)* | 1000 |
+  | team-delta | *(none)* | 100 |
+
+  Request limits come from `RateLimitPolicy/maas-default-gateway-request-rate-limits` and apply **only to groups listed in the `tier-to-group-mapping` ConfigMap** — team-charlie and team-delta aren't, so they have no request limit at all, only a token limit. Token limits come from the per-model `TokenRateLimitPolicy/maas-trlp-*`, which the MaaS controller derives from each `MaaSSubscription`; the declared values live in `dumps/identity-management/config.json`.
 - **KV Cache by Model** — capacity-planning signal, not just a platform-ops one.
 - **Cost Center & Organization Breakdown** — requests/tokens by `cost_center`/`organization_id`.
 
 **Prerequisites:** Kuadrant/Limitador with `exhaustive` telemetry, `user`/`subscription`/`cost_center`/`organization_id` labels on `authorized_calls`/`authorized_hits`/`limited_calls` (confirmed live 2026-07-26).
 
 **Note:** `authorized_calls` has **no** `limit_name` label in this Limitador build (only `limited_calls` does) — group breakdowns here use `subscription` instead, fixing a filter that silently matched nothing in the dashboard this replaces.
+
+**Note on the `model` variable (added 2026-07-26):** only `authorized_hits` carries a `model` label. Filtering the other two metrics on `model` would silently match nothing — the same class of bug as the `limit_name` one above. All three metrics do share `limitador_namespace`, whose value is `vllm-project/<model>-kserve-route`, so the variable is wired per metric:
+
+| Metric | Filter applied |
+|---|---|
+| `authorized_hits` | `model=~"$model"` |
+| `authorized_calls`, `limited_calls` | `limitador_namespace=~".*/$model-kserve-route"` |
+| `vllm:kv_cache_usage_perc` | `model_name=~"$model"` |
+
+All three resolve to the same model set; verified live against Thanos with every panel query, for both a single model and `All`. The variable's values come from `label_values(authorized_hits, model)`. **The one assumption to know about:** the `<model>-kserve-route` suffix is the KServe route naming convention — if a model is ever exposed through a differently-named route, it will drop out of the request/rejection panels (though not the token panels) even when `All` is selected.
 
 **Tags:** `maas`, `usage`, `kuadrant`, `analyst`, `admin`
 
