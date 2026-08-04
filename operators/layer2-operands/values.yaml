@@ -140,12 +140,37 @@ rhacs:
           route:
             enabled: true
 
+  # SecuredCluster registers this cluster's Sensor/Collector with Central.
+  #
+  # HARD PREREQUISITE — this is what broke on the source cluster: SecuredCluster
+  # cannot start until a cluster init bundle Secret exists in the `stackrox`
+  # namespace. The bundle is issued by Central, so it cannot exist on a cold
+  # bootstrap, and ArgoCD applying SecuredCluster in the same wave as Central
+  # leaves it stuck. The CR had to be deleted and re-applied by hand once the
+  # bundle was in place (the live CR carried no ArgoCD tracking-id as a result).
+  #
+  # Two ways to unblock it:
+  #   1. Leave enabled: false on first bootstrap. Once Central is Available,
+  #      generate the bundle and apply it, then flip to true:
+  #        oc -n stackrox get secret central-htpasswd \
+  #          -o go-template='{{index .data "password" | base64decode}}'
+  #        # log in to the Central route -> Platform Configuration -> Clusters
+  #        # -> Init bundles -> Generate -> download the "Operator" YAML
+  #        oc apply -f <cluster-init-bundle>.yaml -n stackrox
+  #   2. Leave it enabled and let ArgoCD retry — it will keep failing until the
+  #      bundle Secret lands, then converge on its own.
+  #
+  # The bundle Secret (`cluster-registration-secret` / the older
+  # `*-tls` trio) is NOT in git — it holds cluster-specific service certs.
   securedCluster:
     enabled: true
     name: stackrox-secured-cluster-services
     namespace: stackrox
     # CHANGE ME: logical name for this cluster shown in RHACS console
     clusterName: "my-cluster"
+    # Defaults to central.stackrox.svc:443 when empty — correct for a
+    # Central running in the same cluster, which is the case here.
+    centralEndpoint: ""
 
 # ------------------------------------------------------------------------------
 # OpenShift GitOps / ArgoCD
@@ -442,6 +467,54 @@ grafana:
     url: https://thanos-querier.openshift-monitoring.svc:9091
     authSecretName: grafana-thanos-auth
 
+  # ----------------------------------------------------------------------------
+  # extraDatasources — datasources that are not Thanos and not LokiStack.
+  #
+  # `bearerTokenAuth: true` opts a datasource in to the grafana-auth-job, which
+  # patches spec.datasource.secureJsonData.httpHeaderValue1 with a fresh
+  # grafana-sa token. Anything else (postgres, mysql, ...) must set it to false
+  # or the job would stamp an Authorization header onto a non-HTTP datasource.
+  # ----------------------------------------------------------------------------
+  extraDatasources:
+    enabled: true
+    namespace: grafana
+    instanceLabel: grafana-a
+    items:
+      # RHOAI's own monitoring stack, stood up by
+      # DSCInitialization.spec.monitoring (see rhods.dscInitialization).
+      # This is where vLLM / KServe / MaaS gateway metrics actually live —
+      # they are NOT in the cluster's default Thanos, which is why the MaaS
+      # dashboards in bases/grafana need this datasource to exist.
+      - name: data-science-prometheus
+        datasourceName: Prometheus (Data Science)
+        type: prometheus
+        access: proxy
+        url: http://thanos-querier-data-science-thanos-querier.redhat-ods-monitoring.svc:10902
+        isDefault: false
+        bearerTokenAuth: true
+        jsonData:
+          timeInterval: 5s
+          tlsSkipVerify: true
+          httpHeaderName1: Authorization
+
+      # Long-term MaaS usage / chargeback store — see maas.metricsDatabase.
+      # Credentials come from the Secret named in secretName, NOT from git.
+      - name: maas-postgres
+        datasourceName: MaaS Postgres
+        type: postgres
+        access: proxy
+        url: maas-postgres.redhat-ods-applications.svc.cluster.local:5432
+        isDefault: false
+        bearerTokenAuth: false
+        database: maas
+        user: maas
+        secretName: maas-postgres-grafana-auth
+        secretKey: password
+        jsonData:
+          postgresVersion: 1000
+          sslmode: disable
+          timescaledb: false
+
   lokiDatasources:
     enabled: true
     namespace: grafana
@@ -495,32 +568,28 @@ lokiStack:
 # Node Feature Discovery — NodeFeatureDiscovery instance
 # Detects hardware features (GPU, CPU flags, PCI devices) and labels nodes.
 # ------------------------------------------------------------------------------
+#
+# Captured from the working cluster: the instance is named `nfd` (not
+# `nfd-instance`) and runs the operator defaults — no PCI device-class
+# whitelist and no custom servicePort. The NVIDIA GPU operator only needs the
+# stock `feature.node.kubernetes.io/pci-10de.present` label, which the defaults
+# already produce, so the previous hand-tuned workerConfig was dropped.
 nfd:
   enabled: true
 
   instance:
     enabled: true
-    name: nfd-instance
+    name: nfd
     namespace: openshift-nfd
     spec:
+      enableTaints: false
+      instance: ""
       operand:
-        imagePullPolicy: IfNotPresent
-        servicePort: 12000
+        servicePort: 0
+      prunerOnDelete: false
+      topologyUpdater: false
       workerConfig:
-        configData: |
-          core:
-          #  labelWhiteList:
-          #  noPublish: false
-            sleepInterval: 60s
-          #  sources: [all]
-          sources:
-            pci:
-              deviceClassWhitelist:
-                - "0200"
-                - "03"
-                - "12"
-              deviceLabelFields:
-                - "vendor"
+        configData: ""
 
 # ------------------------------------------------------------------------------
 # Red Hat OpenShift AI (RHODS) — DSCInitialization + DataScienceCluster
@@ -530,6 +599,18 @@ nfd:
 rhods:
   enabled: true
 
+  # DSCInitialization
+  #
+  # The monitoring block is what makes RHOAI stand up its own observability
+  # stack in redhat-ods-monitoring, and it is the reason the OpenTelemetry and
+  # Tempo operators are now in layer1-install:
+  #   metrics -> OpenTelemetryCollector "data-science-collector"
+  #              + a Thanos querier at
+  #                thanos-querier-data-science-thanos-querier.redhat-ods-monitoring.svc:10902
+  #              (scraped by the "Prometheus (Data Science)" Grafana datasource
+  #               and by every MaaS dashboard in bases/grafana)
+  #   traces  -> TempoMonolithic "data-science-tempomonolithic"
+  # Both operands are created by the RHOAI operator, NOT by this chart.
   dscInitialization:
     enabled: true
     name: default-dsci
@@ -538,9 +619,37 @@ rhods:
       monitoring:
         managementState: Managed
         namespace: redhat-ods-monitoring
+        alerting: {}
+        metrics:
+          exporters: {}
+          replicas: 1
+          storage:
+            retention: 90d
+            size: 50Gi
+        traces:
+          exporters: {}
+          sampleRatio: "0.1"
+          storage:
+            backend: pv
+            retention: 2160h
       trustedCABundle:
         managementState: Managed
+        customCABundle: ""
 
+  # DataScienceCluster
+  #
+  # Deltas from the previous version of this file, all captured live:
+  #   kserve.modelsAsService: Managed    — the MaaS platform itself (maas-api +
+  #                                        maas-controller in
+  #                                        redhat-ods-applications, the
+  #                                        maas.opendatahub.io CRDs, and the
+  #                                        models-as-a-service namespace)
+  #   kserve.nim: Managed, airGapped:false
+  #   kueue: Managed -> Removed          — the standalone Red Hat Kueue operator
+  #                                        owns the Kueue instance instead; see
+  #                                        the `kueue:` block lower in this file
+  #   trustyai: Removed -> Managed       — guardrails / LM-Eval / detectors
+  #   trainer, trainingoperator, ray, mlflowoperator: Removed (unchanged)
   dataScientCluster:
     enabled: true
     name: default-dsc
@@ -556,13 +665,17 @@ rhods:
           modelsAsService:
             managementState: Managed
           nim:
-            managementState: Removed
+            managementState: Managed
+            airGapped: false
           rawDeploymentServiceConfig: Headed
         kueue:
+          # Removed here on purpose — the openshift-kueue-operator manages the
+          # Kueue instance (see `kueue:` further down). Setting this back to
+          # Managed makes the two controllers fight over the same CRDs.
+          managementState: Removed
           defaultClusterQueueName: default
           defaultLocalQueueName: default
-          managementState: Managed
-        llamastackoperator: 
+        llamastackoperator:
           managementState: Managed
         mlflowoperator:
           managementState: Removed
@@ -575,7 +688,8 @@ rhods:
         trainingoperator:
           managementState: Removed
         trustyai:
-          managementState: Removed
+          managementState: Managed
+          mcpGuardrailsMode: false
           eval:
             lmeval:
               permitCodeExecution: deny
@@ -583,6 +697,45 @@ rhods:
         workbenches:
           managementState: Managed
           workbenchNamespace: rhods-notebooks
+
+  # ----------------------------------------------------------------------------
+  # OdhDashboardConfig — the RHOAI dashboard's own feature flags.
+  #
+  # This CR is CREATED BY the RHOAI operator on first install, so this chart
+  # only ever patches it. The template uses ServerSideApply + a Replace=false
+  # sync option so ArgoCD updates the fields below without taking ownership of
+  # the whole object away from the operator.
+  #
+  # Every flag under dashboardConfig here is off by default in a stock RHOAI
+  # install — these are exactly the toggles that surface the MaaS UI:
+  #   modelAsService        — "Models as a Service" nav section
+  #   maasAuthPolicies      — subscription / auth-policy management screens
+  #   vLLMDeploymentOnMaaS  — lets a vLLM deploy target the MaaS gateway
+  #   genAiStudio           — Gen AI playground (backs the LlamaStackDistribution
+  #                           in overlay/my-sno-cluster/model-serving)
+  #   observabilityDashboard— per-model metrics tab
+  # ----------------------------------------------------------------------------
+  dashboardConfig:
+    enabled: true
+    name: odh-dashboard-config
+    namespace: redhat-ods-applications
+    spec:
+      dashboardConfig:
+        genAiStudio: true
+        maasAuthPolicies: true
+        modelAsService: true
+        observabilityDashboard: true
+        vLLMDeploymentOnMaaS: true
+      hardwareProfileOrder: []
+      modelServing:
+        deploymentStrategy: recreate
+        isLLMdDefault: true
+      notebookController:
+        enabled: true
+        notebookNamespace: rhods-notebooks
+        pvcSize: 20Gi
+      templateDisablement: []
+      templateOrder: []
 
 # ------------------------------------------------------------------------------
 # OpenShift Virtualization (CNV) — HyperConverged instance
@@ -617,6 +770,31 @@ cnv:
 # ------------------------------------------------------------------------------
 # NVIDIA GPU Operator — ClusterPolicy
 # Manages driver, toolkit, device-plugin, DCGM, GFD daemonsets on GPU nodes.
+#
+# This spec is the operator's OWN DEFAULT for gpu-operator-certified v26.3.x,
+# captured verbatim from a cluster where the ClusterPolicy reached
+# state: ready. The previous hand-written spec here was replaced wholesale on
+# that cluster rather than patched, so treat this block as "the v26.3 default"
+# and re-capture it after a major operator bump rather than hand-editing.
+#
+# Notable deltas from the old hand-written spec (for anyone diffing history):
+#
+#   * driver.useNvidiaDriverCRD: true -> false
+#       When true, the driver is managed by a separate NVIDIADriver CR instead
+#       of this ClusterPolicy's driver stanza. This repo never shipped an
+#       NVIDIADriver CR, and none existed on the cluster — verified with
+#       `oc get nvidiadrivers -A`. false is what actually works here.
+#   * migManager.enabled:            true -> false
+#   * daemonsets.rollingUpdate.maxUnavailable: "0" -> "1"
+#   * validator.plugin.env WITH_WORKLOAD="true" -> [] (empty)
+#   * operator.defaultRuntime: crio  -> dropped (still a valid CRD field; just
+#                                       not part of the default spec)
+#   * many stanzas that were previously absent are now spelled out explicitly
+#     (ccManager, cdi, gdrcopy, gds, kataManager, mig, sandboxDevicePlugin,
+#      vfioManager, tolerations, upgradePolicy, ...)
+#
+# The NVIDIA operator is sensitive to partially-specified ClusterPolicies —
+# prefer capturing the whole default over hand-picking fields.
 # ------------------------------------------------------------------------------
 gpuOperator:
   enabled: true
@@ -625,37 +803,102 @@ gpuOperator:
     enabled: true
     name: gpu-cluster-policy
     spec:
-      operator:
-        defaultRuntime: crio
-      sandboxWorkloads:
-        defaultWorkload: container
-      migManager:
+      ccManager:
         enabled: true
-      nodeStatusExporter:
+      cdi:
+        default: false
         enabled: true
+        nriPluginEnabled: false
       daemonsets:
         rollingUpdate:
-          maxUnavailable: "0"
-      driver:
-        enabled: true
-        useNvidiaDriverCRD: true
+          maxUnavailable: "1"
+        tolerations:
+          - effect: PreferNoSchedule
+            key: nvidia.com/gpu
+            operator: Exists
+        updateStrategy: RollingUpdate
       dcgm:
         enabled: true
       dcgmExporter:
         enabled: true
+        config:
+          name: ""
+        serviceMonitor:
+          enabled: true
       devicePlugin:
         enabled: true
+        mps:
+          root: /run/nvidia/mps
+      driver:
+        enabled: true
+        certConfig:
+          name: ""
+        kernelModuleConfig:
+          name: ""
+        kernelModuleType: auto
+        licensingConfig:
+          nlsEnabled: true
+          secretName: ""
+        repoConfig:
+          configMapName: ""
+        upgradePolicy:
+          autoUpgrade: true
+          drain:
+            deleteEmptyDir: false
+            enable: false
+            force: false
+            timeoutSeconds: 300
+          maxParallelUpgrades: 1
+          maxUnavailable: 25%
+          podDeletion:
+            deleteEmptyDir: false
+            force: false
+            timeoutSeconds: 300
+          waitForCompletion:
+            timeoutSeconds: 0
+        useNvidiaDriverCRD: false
+        virtualTopology:
+          config: ""
+      gdrcopy:
+        enabled: false
+      gds:
+        enabled: false
       gfd:
         enabled: true
+      kataManager:
+        config:
+          artifactsDir: /opt/nvidia-gpu-operator/artifacts/runtimeclasses
+      kataSandboxDevicePlugin:
+        enabled: true
+      mig:
+        strategy: single
+      migManager:
+        enabled: false
+        config:
+          default: all-disabled
+      nodeStatusExporter:
+        enabled: true
+      operator:
+        runtimeClass: nvidia
+        use_ocp_driver_toolkit: true
+      sandboxDevicePlugin:
+        enabled: true
+      sandboxWorkloads:
+        defaultWorkload: container
+        enabled: false
+        mode: kubevirt
       toolkit:
         enabled: true
+        installDir: /usr/local/nvidia
       validator:
         plugin:
-          env:
-            - name: WITH_WORKLOAD
-              value: "true"
+          env: []
+      vfioManager:
+        enabled: true
       vgpuDeviceManager:
-        enabled: false
+        enabled: true
+        config:
+          default: default
       vgpuManager:
         enabled: false
 
@@ -677,3 +920,428 @@ workshopAuth:
   enabled: false
   identityProviderName: workshop-htpasswd
   secretName: workshop-htpasswd
+
+# ==============================================================================
+# Models-as-a-Service (MaaS) platform
+#
+# Sits on top of three things that must already be in place:
+#   1. layer1-install  -> rhcl-operator (Kuadrant) + servicemeshoperator3
+#   2. rhods.dataScientCluster.components.kserve.modelsAsService = Managed
+#      (creates maas-api + maas-controller and the maas.opendatahub.io CRDs)
+#   3. a Gateway the models attach to — `gateway` below
+#
+# Request path:
+#   client -> maas-default-gateway (Gateway API, openshift-default class)
+#          -> AuthPolicy (Authorino: who are you, which subscription?)
+#          -> RateLimitPolicy / TokenRateLimitPolicy (Limitador: how much?)
+#          -> TelemetryPolicy (per-user / per-org usage metrics)
+#          -> HTTPRoute -> InferencePool -> vLLM pod
+#
+# NOT captured here on purpose — all of it is generated by the maas-controller
+# from the Tenant / MaaSSubscription / MaaSAuthPolicy CRs below and will be
+# recreated automatically. Committing it would just fight the controller:
+#   * AuthPolicy      gateway-default-auth, gateway-auth-policy,
+#                     maas-api-auth-policy, maas-auth-<model>
+#   * TokenRateLimitPolicy gateway-default-deny, maas-trlp-<model>
+#   * HTTPRoute       maas-api-route, <model>-kserve-route
+#   * MaaSModelRef    <model>            (owned by each LLMInferenceService)
+#   * InferencePool   <model>-inference-pool
+#   * the per-tier namespaces maas-default-gateway-tier-*
+# ==============================================================================
+maas:
+  enabled: true
+
+  # ----------------------------------------------------------------------------
+  # Kuadrant CR — turns the rhcl-operator's CRDs into a running control plane
+  # (Authorino + Limitador). observability.enable wires Kuadrant's own metrics
+  # into user-workload monitoring, which the MaaS Grafana dashboards query.
+  # ----------------------------------------------------------------------------
+  kuadrant:
+    enabled: true
+    name: kuadrant
+    namespace: kuadrant-system
+    spec:
+      observability:
+        enable: true
+
+  # ----------------------------------------------------------------------------
+  # The MaaS ingress Gateway.
+  #
+  # CHANGE ME: `hostname` is cluster-specific. It must resolve to the cluster's
+  # ingress and be covered by the certificate in tlsSecretName. On the source
+  # cluster this was maas.apps.<cluster-domain>, with the certificate issued by
+  # cert-manager from a sandbox-provided Let's Encrypt ClusterIssuer.
+  #
+  # NOTE this deliberately uses the built-in `openshift-default` GatewayClass,
+  # NOT the `data-science-gateway-class` that RHOAI's GatewayConfig creates.
+  # The data-science gateway is managed by RHOAI (GatewayConfig/default-gateway)
+  # and carries opendatahub.io/managed=true; this one is ours to own, hence
+  # opendatahub.io/managed: "false".
+  # ----------------------------------------------------------------------------
+  gateway:
+    enabled: true
+    name: maas-default-gateway
+    namespace: openshift-ingress
+    gatewayClassName: openshift-default
+    # CHANGE ME
+    hostname: maas.apps.cluster-7xdhm.7xdhm.sandbox5348.opentlc.com
+    # Secret in the gateway namespace holding the TLS cert for `hostname`.
+    tlsSecretName: cert-manager-ingress-cert
+    # Rendered into a ConfigMap referenced by spec.infrastructure.parametersRef.
+    # This is how you size the istio-proxy pods behind a Gateway API Gateway on
+    # OpenShift — there is no field for it on the Gateway itself.
+    options:
+      enabled: true
+      replicas: 2
+      minAvailable: 1
+      resources:
+        requests:
+          memory: 256Mi
+        limits:
+          memory: 3Gi
+
+  # ----------------------------------------------------------------------------
+  # Tenant — the root MaaS object. Everything else hangs off it.
+  # telemetry.metrics.* control which labels the maas-controller puts on the
+  # usage metrics that the "AI MaaS Admin & Analyst" dashboard reads.
+  # ----------------------------------------------------------------------------
+  tenant:
+    enabled: true
+    name: default-tenant
+    namespace: models-as-a-service
+    spec:
+      gatewayRef:
+        name: maas-default-gateway
+        namespace: openshift-ingress
+      telemetry:
+        enabled: true
+        metrics:
+          captureGroup: false
+          captureModelUsage: true
+          captureOrganization: true
+          captureUser: true
+
+  # ----------------------------------------------------------------------------
+  # Subscriptions — a tier per team. `owner.groups` must match real OpenShift
+  # Groups (see `groups:` below); members authenticate with their own token and
+  # inherit the tier's token budget.
+  #
+  # tokenRateLimits are per model, per window, per user.
+  # priority breaks ties when a user is in more than one subscription.
+  # tokenMetadata is echoed into the usage metrics by the TelemetryPolicy, which
+  # is what makes per-cost-centre chargeback dashboards possible.
+  #
+  # CHANGE ME: model names/namespaces must match the LLMInferenceServices in
+  # overlay/my-sno-cluster/model-serving.
+  # ----------------------------------------------------------------------------
+  subscriptions:
+    enabled: true
+    namespace: models-as-a-service
+    defaultModelRefs:
+      - name: llama-32-1b-instruct-maas
+        namespace: vllm-project
+      - name: qwen25-05b-instruct-maas
+        namespace: vllm-project
+    items:
+      - name: team-alpha
+        displayName: "Team Alpha Automated"
+        group: team-alpha
+        priority: 10
+        tokenLimit: 10000
+        tokenWindow: 1m
+        costCenter: CC-00001
+        organizationId: ORG-00001
+
+      - name: team-bravo
+        displayName: "Team Bravo Automated"
+        group: team-bravo
+        priority: 9
+        tokenLimit: 5000
+        tokenWindow: 1m
+        costCenter: CC-00002
+        organizationId: ORG-00002
+
+      # NOTE the capital C / D. These match the OpenShift Group names exactly as
+      # they exist on the cluster — group lookups are case-sensitive, and a
+      # lower-cased name here silently grants nobody access.
+      - name: team-charlie
+        displayName: "Team Charlie Automated"
+        group: team-Charlie
+        priority: 8
+        tokenLimit: 1000
+        tokenWindow: 1m
+        costCenter: CC-00003
+        organizationId: ORG-00003
+
+      - name: team-delta
+        displayName: "Team Delta Automated"
+        group: team-Delta
+        priority: 7
+        tokenLimit: 100
+        tokenWindow: 1m
+        costCenter: CC-00004
+        organizationId: ORG-00004
+
+  # ----------------------------------------------------------------------------
+  # MaaSAuthPolicies — who may call which model. One per subscription; the
+  # maas-controller expands each into the concrete Kuadrant AuthPolicy objects
+  # in the model namespace.
+  # ----------------------------------------------------------------------------
+  authPolicies:
+    enabled: true
+    namespace: models-as-a-service
+    # Generated from `subscriptions.items` (<name>-policy, same group and
+    # modelRefs). Set to false and use `items` below to decouple them.
+    fromSubscriptions: true
+    items: []
+
+  # ----------------------------------------------------------------------------
+  # Gateway-scoped Kuadrant policies.
+  #
+  # These are the ones a human wrote (they carry opendatahub.io/dashboard=true,
+  # i.e. they were created through the RHOAI dashboard) as opposed to the
+  # maas-controller's generated defaults. They enforce a *request* ceiling and a
+  # *token* ceiling per tier, on top of the per-subscription token limits above.
+  #
+  # `auth.identity.tier` is set by the MaaS AuthPolicy; the tier name is
+  # "<subscription>-tier". The /v1/models exclusion keeps model discovery free.
+  # ----------------------------------------------------------------------------
+  gatewayPolicies:
+    enabled: true
+    namespace: openshift-ingress
+    targetGateway: maas-default-gateway
+
+    rateLimitPolicy:
+      enabled: true
+      name: maas-default-gateway-request-rate-limits
+      limits:
+        team-alpha-tier-requests:
+          tier: team-alpha-tier
+          limit: 5
+          window: 1m
+        team-bravo-tier-requests:
+          tier: team-bravo-tier
+          limit: 30
+          window: 1m
+
+    tokenRateLimitPolicy:
+      enabled: true
+      name: maas-default-gateway-token-rate-limits
+      limits:
+        team-alpha-tier-tokens:
+          tier: team-alpha-tier
+          limit: 100
+          window: 1m
+        team-bravo-tier-tokens:
+          tier: team-bravo-tier
+          limit: 300
+          window: 1m
+
+    # TelemetryPolicy — adds the identity/subscription labels to the gateway's
+    # request metrics. Without this, MaaS usage dashboards have no way to break
+    # traffic down by user, org or cost centre. `model` is read out of the
+    # response body, which is why it needs the body-based routing path to work.
+    telemetryPolicy:
+      enabled: true
+      name: maas-telemetry
+      labels:
+        cost_center: auth.identity.subscription_info.costCenter
+        model: responseBodyJSON("/model")
+        organization_id: auth.identity.subscription_info.organizationId
+        subscription: auth.identity.selected_subscription
+        user: auth.identity.userid
+
+  # ----------------------------------------------------------------------------
+  # MaaS metrics database.
+  #
+  # A small PostgreSQL used as the long-term store behind the "MaaS Postgres"
+  # Grafana datasource (grafana.extraDatasources) and the MaaS stakeholder /
+  # chargeback dashboards in bases/grafana. Kuadrant + the RHOAI Thanos only
+  # keep short-window counters; this is where rolled-up usage lands.
+  #
+  # On the source cluster this was stood up ad hoc from the OpenShift
+  # `postgresql-persistent` template (as a DeploymentConfig). It is re-expressed
+  # here as a plain Deployment — DeploymentConfig is deprecated in OCP 4.14+.
+  #
+  # NOTE: nothing in this repo writes to this database. On the source cluster it
+  # was populated out-of-band. Treat it as the store, not the pipeline.
+  #
+  # The password is NOT in git. A placeholder Secret is created on first sync;
+  # replace it, then restart the deployment:
+  #   oc create secret generic maas-postgres -n redhat-ods-applications \
+  #     --from-literal=database-name=maas \
+  #     --from-literal=database-user=maas \
+  #     --from-literal=database-password='<pick-one>' \
+  #     --dry-run=client -o yaml | oc apply -f -
+  #   oc rollout restart deploy/maas-postgres -n redhat-ods-applications
+  # The same password goes into the maas-postgres-grafana-auth Secret in the
+  # grafana namespace (see grafana.extraDatasources).
+  # ----------------------------------------------------------------------------
+  metricsDatabase:
+    enabled: true
+    name: maas-postgres
+    namespace: redhat-ods-applications
+    # Built-in OpenShift postgresql imagestream — no registry auth needed.
+    image: image-registry.openshift-image-registry.svc:5000/openshift/postgresql:15-el9
+    database: maas
+    user: maas
+    secretName: maas-postgres
+    storage:
+      size: 1Gi
+      # CHANGE ME: match your cluster's storage class.
+      storageClassName: gp3-csi-immediate
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+
+  # ----------------------------------------------------------------------------
+  # OpenShift Groups referenced by the subscriptions above.
+  #
+  # Group membership is NOT managed here — `users` is left empty on purpose so
+  # ArgoCD does not wipe real members out from under you. Populate them with
+  # your identity provider, or for a workshop with
+  # bases/get-a-username/label-ns.sh + the workshopAuth htpasswd IDP.
+  #
+  # `helm lint` warns that team-Charlie / team-Delta are not RFC 1123 names.
+  # Ignore it — that rule is for DNS-subdomain names, and user.openshift.io
+  # Groups are not subject to it. Both names are live on the cluster and
+  # `oc apply --dry-run=server` accepts them. Lower-casing them here would
+  # silently detach the subscriptions from their real groups.
+  # ----------------------------------------------------------------------------
+  groups:
+    enabled: true
+    items:
+      - team-alpha
+      - team-bravo
+      - team-Charlie
+      - team-Delta
+      - rhods-admins
+      - rhods-users
+
+# ==============================================================================
+# Kueue — standalone Red Hat Kueue operator instance.
+#
+# The RHOAI DSC kueue component is Removed (see rhods.dataScientCluster) so this
+# CR is the single owner of Kueue on the cluster. Requires cert-manager for its
+# webhook certificates.
+#
+# ResourceFlavors (default-flavor, nvidia-gpu-flavor) and ClusterQueues are NOT
+# created here — RHOAI seeded the flavors, and no ClusterQueue/LocalQueue existed
+# on the source cluster, so nothing was actually being queued yet.
+# ==============================================================================
+kueue:
+  enabled: true
+
+  instance:
+    enabled: true
+    name: cluster
+    spec:
+      managementState: Managed
+      logLevel: Normal
+      operatorLogLevel: Normal
+      config:
+        integrations:
+          frameworks:
+            - Deployment
+            - Pod
+            - PyTorchJob
+            - RayCluster
+            - RayJob
+            - StatefulSet
+            - TrainJob
+
+# ==============================================================================
+# Cluster monitoring
+#
+# Everything here was applied to the source cluster by hand and never made it
+# back into git. It is captured now because each piece is load-bearing and
+# nothing else in this repo recreates it.
+# ==============================================================================
+clusterMonitoring:
+  enabled: true
+
+  # ----------------------------------------------------------------------------
+  # User workload monitoring.
+  #
+  # `enableUserWorkload: true` in the cluster-monitoring-config ConfigMap is what
+  # makes the cluster-monitoring-operator stand up the whole
+  # openshift-user-workload-monitoring stack (prometheus-user-workload x2,
+  # thanos-ruler-user-workload x2, its own prometheus-operator). Without it,
+  # ServiceMonitors and PrometheusRules in namespaces that do NOT carry
+  # `openshift.io/cluster-monitoring: "true"` are simply never scraped.
+  #
+  # NOTE on this cluster specifically: every namespace that currently holds a
+  # ServiceMonitor (kuadrant-system, nvidia-gpu-operator, vllm-project,
+  # redhat-ods-applications, netobserv, ...) carries the cluster-monitoring
+  # label, so the PLATFORM Prometheus scrapes them and UWM had no targets of its
+  # own. It is still enabled here because:
+  #   - it is a prerequisite for any workload namespace you add WITHOUT that
+  #     label, which is the normal case, and
+  #   - turning it off would be a behaviour change relative to the captured
+  #     cluster.
+  # Set enabled: false below if you would rather not pay for the four extra
+  # Prometheus/Thanos pods on a single-node cluster.
+  #
+  # The ConfigMap is a merge target, not solely ours — OCP reads other keys from
+  # it too (retention, storage, alertmanager). ServerSideApply keeps this to the
+  # one key rather than replacing the whole object.
+  userWorkloadMonitoring:
+    enabled: true
+    name: cluster-monitoring-config
+    namespace: openshift-monitoring
+    config:
+      enableUserWorkload: true
+
+  # ----------------------------------------------------------------------------
+  # RHOAI monitoring workarounds — techdebt.md items 3 and 4.
+  #
+  # Both objects are additive: they add to what the rhods-operator generates and
+  # never edit an operator-owned object, so an operator resync cannot clobber
+  # them (unlike the Perses CR in techdebt item 7, which has been reset once).
+  #
+  # Keep these in sync with techdebt.md — if either upstream bug is fixed, both
+  # of these become dead weight and should be removed together with the
+  # techdebt entry.
+  # ----------------------------------------------------------------------------
+  rhoaiMonitoringWorkarounds:
+    enabled: true
+    namespace: redhat-ods-monitoring
+
+    # techdebt #3: the operator-generated
+    # NetworkPolicy/data-science-prometheus-instance-ingress only opens port 9090
+    # from two proxy pods. It never opens 10901, the Thanos gRPC sidecar port, so
+    # thanos-querier-data-science could resolve the sidecar but every gRPC
+    # connection timed out and /api/v1/stores stayed empty — every dashboard
+    # panel showed "No data".
+    #
+    # NetworkPolicies are OR'd, so this supplementary policy opens 10901 without
+    # touching the operator's.
+    thanosSidecarNetworkPolicy:
+      enabled: true
+      name: thanos-querier-data-science-to-prometheus-sidecar
+      port: 10901
+
+    # techdebt #4: the Perses server pod in redhat-ods-monitoring runs as the
+    # namespace `default` ServiceAccount (it has no dedicated SA). To let the
+    # shared PersesDatasource proxy to the GLOBAL Thanos Querier
+    # (thanos-querier.openshift-monitoring.svc:9091) rather than the isolated
+    # data-science one, that SA needs read access to cluster monitoring.
+    #
+    # Same pattern already used by grafana-sa and rhods-dashboard on this
+    # cluster. Caveat: `default` here is also used by the data-science Thanos
+    # Querier pod, so it picks up this read-only grant too.
+    persesClusterMonitoringView:
+      enabled: true
+      name: data-science-perses-cluster-monitoring-view
+      serviceAccountName: default
+
+    # techdebt #4: service-ca-operator injects the CA that signs
+    # thanos-querier.openshift-monitoring.svc's serving certificate into this
+    # ConfigMap. The Perses datasource secret needs it to trust that endpoint.
+    thanosServingCA:
+      enabled: true
+      name: thanos-querier-serving-ca

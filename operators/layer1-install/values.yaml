@@ -41,7 +41,7 @@ operators:
       channel: v5
       source: community-operators
       installPlanApproval: Automatic
-      startingCSV: "grafana-operator.v5.22.2"
+      startingCSV: "grafana-operator.v5.24.0"
 
   # ----------------------------------------------------------------------------
   # NVIDIA GPU Operator (Certified)
@@ -65,7 +65,7 @@ operators:
       channel: v26.3
       source: certified-operators
       installPlanApproval: Automatic
-      startingCSV: "gpu-operator-certified.v26.3.2"
+      startingCSV: "gpu-operator-certified.v26.3.3"
 
   # ----------------------------------------------------------------------------
   # Cluster Observability Operator (Red Hat)
@@ -89,7 +89,7 @@ operators:
       channel: stable
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "cluster-observability-operator.v1.4.0"
+      startingCSV: "cluster-observability-operator.v1.5.1"
 
   # ----------------------------------------------------------------------------
   # Compliance Operator (Red Hat)
@@ -112,7 +112,7 @@ operators:
       channel: stable
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "compliance-operator.v1.8.2"
+      startingCSV: "compliance-operator.v1.9.1"
 
   # ----------------------------------------------------------------------------
   # OpenShift GitOps (Red Hat)
@@ -136,7 +136,7 @@ operators:
       channel: latest
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "openshift-gitops-operator.v1.20.4"
+      startingCSV: "openshift-gitops-operator.v1.21.1"
 
   # ----------------------------------------------------------------------------
   # Kernel Module Management Hub (Red Hat)
@@ -160,7 +160,7 @@ operators:
       channel: stable
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "kernel-module-management-hub.v2.6.0"
+      startingCSV: "kernel-module-management-hub.v2.6.1"
 
   # ----------------------------------------------------------------------------
   # Cluster Logging (Red Hat)
@@ -184,7 +184,7 @@ operators:
       channel: stable-6.4
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "cluster-logging.v6.4.3"
+      startingCSV: "cluster-logging.v6.4.6"
 
   # ----------------------------------------------------------------------------
   # Node Feature Discovery (Red Hat)
@@ -209,7 +209,7 @@ operators:
       channel: stable
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "nfd.4.20.0-202603051149"
+      startingCSV: "nfd.4.20.0-202607171900"
 
   # ----------------------------------------------------------------------------
   # Loki Operator (Red Hat)
@@ -236,7 +236,7 @@ operators:
       channel: stable-6.4
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "loki-operator.v6.4.3"
+      startingCSV: "loki-operator.v6.4.6"
 
   # ----------------------------------------------------------------------------
   # DevWorkspace Operator (Red Hat)
@@ -275,10 +275,10 @@ operators:
     subscription:
       name: rhods-operator
       namespace: redhat-ods-operator
-      channel: stable-3.3
+      channel: stable-3.4
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "rhods-operator.3.3.2"
+      startingCSV: "rhods-operator.3.4.2"
 
   # ----------------------------------------------------------------------------
   # Network Observability (Red Hat)
@@ -303,7 +303,7 @@ operators:
       channel: stable
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: ""
+      startingCSV: "network-observability-operator.v1.12.1"
 
   # ----------------------------------------------------------------------------
   # OpenShift Virtualization / CNV (Red Hat)
@@ -339,7 +339,7 @@ operators:
       channel: stable
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "kubevirt-hyperconverged-operator.v4.20.15"
+      startingCSV: "kubevirt-hyperconverged-operator.v4.20.21"
 
   # ----------------------------------------------------------------------------
   # Red Hat Advanced Cluster Security (RHACS) (Red Hat)
@@ -361,4 +361,289 @@ operators:
       channel: stable
       source: redhat-operators
       installPlanApproval: Automatic
-      startingCSV: "rhacs-operator.v4.10.0"
+      startingCSV: "rhacs-operator.v4.11.2"
+
+  # ----------------------------------------------------------------------------
+  # Red Hat OpenShift Service Mesh 3 / Sail (Red Hat)
+  #
+  # Hard dependency of RHOAI 3.x KServe: the DSCInitialization creates a
+  # GatewayConfig which in turn creates an `Istio` (sailoperator.io) CR named
+  # `openshift-gateway` and the `data-science-gateway-class` GatewayClass.
+  # Without this operator the data-science gateway never programs and every
+  # LLMInferenceService stays unreachable.
+  #
+  # Installs into openshift-operators (built-in NS, global-operators OG).
+  # NOTE: the source cluster had installPlanApproval: Manual. Automatic +
+  # a pinned startingCSV is used here so a fresh bootstrap completes unattended.
+  # ----------------------------------------------------------------------------
+  serviceMesh3:
+    enabled: true
+    namespace:
+      create: false   # openshift-operators is a built-in OCP namespace
+      name: openshift-operators
+    operatorGroup:
+      create: false   # global-operators OG already exists
+    subscription:
+      name: servicemeshoperator3
+      namespace: openshift-operators
+      channel: stable
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "servicemeshoperator3.v3.4.0"
+
+  # ----------------------------------------------------------------------------
+  # Red Hat Connectivity Link / Kuadrant (Red Hat)
+  #
+  # Provides the AuthPolicy / RateLimitPolicy / TokenRateLimitPolicy /
+  # TelemetryPolicy CRDs that Models-as-a-Service builds on. Installing this
+  # one Subscription is enough — OLM dependency resolution pulls in three more
+  # operators into openshift-operators automatically, so they are deliberately
+  # NOT declared here (declaring them would fight OLM's generated Subscriptions,
+  # which are named "<pkg>-<channel>-<source>-openshift-marketplace"):
+  #
+  #   authorino-operator   (authorino-operator.v1.4.2)  — AuthConfig / Authorino
+  #   limitador-operator   (limitador-operator.v1.4.1)  — rate limit counters
+  #   dns-operator         (dns-operator.v1.4.1)        — Kuadrant DNSPolicy
+  #
+  # The Kuadrant CR itself lives in layer2-operands (kuadrant-system namespace).
+  # NOTE: source cluster used installPlanApproval: Manual — see serviceMesh3.
+  # ----------------------------------------------------------------------------
+  connectivityLink:
+    enabled: true
+    namespace:
+      create: false   # openshift-operators is a built-in OCP namespace
+      name: openshift-operators
+    operatorGroup:
+      create: false   # global-operators OG already exists
+    subscription:
+      name: rhcl-operator
+      namespace: openshift-operators
+      channel: stable
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "rhcl-operator.v1.4.2"
+
+  # ----------------------------------------------------------------------------
+  # Kueue (Red Hat)
+  #
+  # Standalone Kueue operator — job queueing / quota for AI workloads.
+  # RHOAI's own `kueue` DSC component is set to Removed (see layer2-operands
+  # rhods.dataScientCluster) because this operator manages the Kueue instance
+  # instead. Requires cert-manager to be present (it issues the webhook and
+  # metrics certs in openshift-kueue-operator).
+  # ----------------------------------------------------------------------------
+  kueueOperator:
+    enabled: true
+    namespace:
+      create: true
+      name: openshift-kueue-operator
+      labels:
+        kubernetes.io/metadata.name: openshift-kueue-operator
+        openshift.io/cluster-monitoring: "true"
+    operatorGroup:
+      create: true
+      name: openshift-kueue-operator
+      targetNamespaces: []   # AllNamespaces
+    subscription:
+      name: kueue-operator
+      namespace: openshift-kueue-operator
+      channel: stable-v1.3
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "kueue-operator.v1.3.1"
+
+  # ----------------------------------------------------------------------------
+  # Leader Worker Set (Red Hat)
+  #
+  # Required for multi-node / disaggregated (prefill + decode) LLM serving —
+  # the llm-d style LLMInferenceService worker topologies. Installed but no
+  # LeaderWorkerSetOperator CR existed on the source cluster, so there is no
+  # matching layer2 operand.
+  # ----------------------------------------------------------------------------
+  leaderWorkerSet:
+    enabled: true
+    namespace:
+      create: true
+      name: openshift-lws-operator
+      labels:
+        kubernetes.io/metadata.name: openshift-lws-operator
+        openshift.io/cluster-monitoring: "true"
+    operatorGroup:
+      create: true
+      name: openshift-lws-operator
+      targetNamespaces:
+        - openshift-lws-operator
+    subscription:
+      name: leader-worker-set
+      namespace: openshift-lws-operator
+      channel: stable-v1.0
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: ""
+
+  # ----------------------------------------------------------------------------
+  # Red Hat build of OpenTelemetry
+  #
+  # Backs the RHOAI monitoring stack: DSCInitialization.spec.monitoring.metrics
+  # /.traces makes the RHOAI operator create an OpenTelemetryCollector
+  # ("data-science-collector") in redhat-ods-monitoring. Without this operator
+  # the DSCI monitoring block never reconciles and no MaaS metrics are scraped.
+  # ----------------------------------------------------------------------------
+  openTelemetry:
+    enabled: true
+    namespace:
+      create: true
+      name: openshift-opentelemetry-operator
+      labels:
+        kubernetes.io/metadata.name: openshift-opentelemetry-operator
+        openshift.io/cluster-monitoring: "true"
+    operatorGroup:
+      create: true
+      name: openshift-opentelemetry-operator
+      targetNamespaces: []   # AllNamespaces
+    subscription:
+      name: opentelemetry-product
+      namespace: openshift-opentelemetry-operator
+      channel: stable
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "opentelemetry-operator.v0.152.0-1"
+
+  # ----------------------------------------------------------------------------
+  # Red Hat build of Tempo
+  #
+  # Distributed tracing backend for RHOAI. DSCInitialization.spec.monitoring
+  # .traces (storage.backend: pv) makes the RHOAI operator create a
+  # TempoMonolithic ("data-science-tempomonolithic") in redhat-ods-monitoring.
+  # ----------------------------------------------------------------------------
+  tempo:
+    enabled: true
+    namespace:
+      create: true
+      name: openshift-tempo-operator
+      labels:
+        kubernetes.io/metadata.name: openshift-tempo-operator
+        openshift.io/cluster-monitoring: "true"
+    operatorGroup:
+      create: true
+      name: openshift-tempo-operator
+      targetNamespaces: []   # AllNamespaces
+    subscription:
+      name: tempo-product
+      namespace: openshift-tempo-operator
+      channel: stable
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "tempo-operator.v0.21.0-3"
+
+  # ----------------------------------------------------------------------------
+  # cert-manager for Red Hat OpenShift
+  #
+  # DISABLED BY DEFAULT: the RHPDS/OPENTLC sandbox this platform was captured
+  # from ships cert-manager pre-installed (Subscription created at cluster
+  # provisioning time, before GitOps bootstrap) along with a
+  # `letsencrypt-production-ec2` ClusterIssuer holding sandbox-specific Route53
+  # credentials. That ClusterIssuer is intentionally NOT in this repo.
+  #
+  # Enable this if your cluster does NOT already ship cert-manager — the Kueue
+  # operator requires it, and the MaaS gateway's TLS listener consumes a
+  # `cert-manager-ingress-cert` Secret in openshift-ingress.
+  # ----------------------------------------------------------------------------
+  certManager:
+    enabled: false
+    namespace:
+      create: true
+      name: cert-manager-operator
+      labels:
+        kubernetes.io/metadata.name: cert-manager-operator
+        openshift.io/cluster-monitoring: "true"
+    operatorGroup:
+      create: true
+      name: cert-manager-operator
+      targetNamespaces:
+        - cert-manager-operator
+    subscription:
+      name: openshift-cert-manager-operator
+      namespace: cert-manager-operator
+      channel: stable-v1
+      source: redhat-operators
+      installPlanApproval: Automatic
+      startingCSV: "cert-manager-operator.v1.20.0"
+
+  # ----------------------------------------------------------------------------
+  # OpenShift Lightspeed
+  #
+  # DISABLED BY DEFAULT: present on the source cluster but never configured —
+  # no OLSConfig CR existed, so the operator sat idle. Flip to true and add an
+  # OLSConfig if you want the in-console assistant.
+  # ----------------------------------------------------------------------------
+  lightspeed:
+    enabled: false
+    namespace:
+      create: true
+      name: openshift-lightspeed
+      labels:
+        kubernetes.io/metadata.name: openshift-lightspeed
+    operatorGroup:
+      create: true
+      name: openshift-lightspeed
+      targetNamespaces:
+        - openshift-lightspeed
+    subscription:
+      name: lightspeed-operator
+      namespace: openshift-lightspeed
+      channel: stable
+      source: redhat-operators
+      installPlanApproval: Manual
+      startingCSV: "lightspeed-operator.v1.1.1"
+
+  # ----------------------------------------------------------------------------
+  # Red Hat Quay
+  #
+  # DISABLED BY DEFAULT: present on the source cluster but never configured —
+  # no QuayRegistry CR existed (the `quayregistry` namespace was created but
+  # left empty). Quay is heavy; flip to true only if you actually want a
+  # registry, and add a QuayRegistry operand.
+  # ----------------------------------------------------------------------------
+  quay:
+    enabled: false
+    namespace:
+      create: false   # openshift-operators is a built-in OCP namespace
+      name: openshift-operators
+    operatorGroup:
+      create: false   # global-operators OG already exists
+    subscription:
+      name: quay-operator
+      namespace: openshift-operators
+      channel: stable-3.17
+      source: redhat-operators
+      installPlanApproval: Manual
+      startingCSV: "quay-operator.v3.17.3"
+
+# ==============================================================================
+# extraNamespaces — namespaces that hold operands but are not the install
+# namespace of any operator above. Created in wave 1 so layer2-operands
+# (wave 2) always has somewhere to put its CRs.
+# ==============================================================================
+extraNamespaces:
+  - name: kuadrant-system
+    labels:
+      kubernetes.io/metadata.name: kuadrant-system
+      openshift.io/cluster-monitoring: "true"
+
+  # Normally created by the RHOAI maas-controller once the DSC's
+  # kserve.modelsAsService component goes Managed. Declared here anyway so the
+  # layer2 Tenant / MaaSSubscription / MaaSAuthPolicy CRs never race a missing
+  # namespace on a cold bootstrap. Only metadata.name is set — the controller
+  # owns the rest of the labels.
+  - name: models-as-a-service
+    labels:
+      kubernetes.io/metadata.name: models-as-a-service
+
+  # Namespace the demo models are served from. Also referenced by
+  # overlay/my-sno-cluster/model-serving.
+  - name: vllm-project
+    labels:
+      kubernetes.io/metadata.name: vllm-project
+      opendatahub.io/dashboard: "true"
+      openshift.io/cluster-monitoring: "true"

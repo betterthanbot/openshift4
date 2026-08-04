@@ -8,9 +8,9 @@ A community GitOps platform for Single Node OpenShift (SNO) managed entirely via
 
 | Layer | Contents |
 |-------|----------|
-| **Operators (layer1)** | 14 operators declared, 12 enabled — GitOps and DevWorkspace are off, see [VERSIONS.md](VERSIONS.md) |
-| **Operands (layer2)** | Grafana, LokiStack (logging + netobserv), FlowCollector, RHACS, OpenShift AI, NFD, GPU, Compliance, Logging, OpenShift Virtualization (see [tutorial](docs/tutorials/openshift-virtualization-on-ec2.md)) |
-| **Workloads** | Gatus, Grafana Dashboards, CTFd *(incomplete — see [techdebt.md](techdebt.md) item 9)*. Kyverno and get-a-username are present in the repo but **excluded** from the workload ApplicationSet — see below |
+| **Operators (layer1)** | 23 operators declared, 18 enabled — GitOps, cert-manager, Lightspeed, Quay and DevWorkspace are off, see [VERSIONS.md](VERSIONS.md) |
+| **Operands (layer2)** | Grafana, LokiStack (logging + netobserv), FlowCollector, RHACS, OpenShift AI (DSC/DSCI/dashboard), NFD, GPU, Compliance, Logging, OpenShift Virtualization (see [tutorial](docs/tutorials/openshift-virtualization-on-ec2.md)), **Kuadrant, the MaaS gateway + tenant + subscriptions, Kueue, user workload monitoring** |
+| **Workloads** | Gatus, Grafana Dashboards, **model-serving** (vLLM models behind MaaS, body-based routing, Gen AI playground), CTFd *(incomplete — see [techdebt.md](techdebt.md) item 9)*. Kyverno and get-a-username are present in the repo but **excluded** from the workload ApplicationSet — see below |
 | **Scripts (not GitOps-managed)** | [MaaS identity & API key provisioning](dumps/identity-management/README.md) — bulk-provisions RHOAI Models-as-a-Service users, subscriptions and keys |
 
 Workloads are discovered by a Git directory generator over `overlay/my-sno-cluster/*`,
@@ -172,6 +172,64 @@ the full flow and the reasoning behind it.
 
 ---
 
+## Models-as-a-Service (MaaS)
+
+The MaaS stack spans all three layers, so it is worth reading end to end before changing
+any one piece.
+
+```
+                      layer1: rhcl-operator + servicemeshoperator3
+                                        |
+  client ──► maas-default-gateway ──► AuthPolicy      (Authorino:  who are you?)
+             (layer2: maas.gateway)  ──► RateLimit /  (Limitador:  how much?)
+                                          TokenRateLimit
+                                      ──► TelemetryPolicy (per-user/org metrics)
+                                        |
+                                    HTTPRoute
+                            ┌───────────┴───────────┐
+              <model>-kserve-route          <model>-bbr
+              (owned by the LLMISVC)   (hand-written, body-based routing)
+                            └───────────┬───────────┘
+                                  InferencePool
+                                        |
+                                    vLLM pod
+```
+
+**Where each piece lives**
+
+| Piece | Where |
+|-------|-------|
+| Kuadrant control plane, gateway, tenant, subscriptions, auth policies, rate limits, telemetry | [operators/layer2-operands/values.yaml](operators/layer2-operands/values.yaml) → `maas:` |
+| `modelsAsService: Managed` (creates `maas-api` / `maas-controller`) | same file → `rhods.dataScientCluster` |
+| MaaS UI feature flags | same file → `rhods.dashboardConfig` |
+| The models themselves, body-based routes, Gen AI playground | [bases/model-serving/](bases/model-serving/) |
+| Usage / chargeback store + Grafana datasource | same file → `maas.metricsDatabase`, `grafana.extraDatasources` |
+| Bulk user + API key provisioning (scripts, not GitOps) | [dumps/identity-management/](dumps/identity-management/README.md) |
+
+**Body-based routing** is the part that is easy to miss. OpenAI-compatible clients put
+the model name in the request *body*, which Gateway API cannot match on. The gateway's
+BBR extension copies it into an `X-Gateway-Model-Name` header, and the routes in
+[bases/model-serving/body-based-routes.yaml](bases/model-serving/body-based-routes.yaml)
+match on that. It is also what lets the TelemetryPolicy label metrics with
+`responseBodyJSON("/model")`.
+
+**What is deliberately not in git.** The `maas-controller` generates a lot from the
+Tenant / MaaSSubscription / MaaSAuthPolicy CRs, and it will recreate all of it: the
+per-model `AuthPolicy` and `TokenRateLimitPolicy`, the `<model>-kserve-route`
+HTTPRoutes, `MaaSModelRef`s, `InferencePool`s, and the `maas-default-gateway-tier-*`
+namespaces. Committing them would just fight the controller.
+
+**Before you deploy this on a new cluster, change:**
+
+| Value | Why |
+|-------|-----|
+| `maas.gateway.hostname` | Cluster-specific — `maas.apps.<your-cluster-domain>` |
+| `maas.gateway.tlsSecretName` | Must name a real TLS Secret in `openshift-ingress` covering that hostname |
+| `maas.subscriptions.items[].group` | Must match real OpenShift Group names — **case-sensitive** |
+| `maas.metricsDatabase.storage.storageClassName` | Match your cluster's storage class |
+
+---
+
 ## Operator Versions
 
 Every subscription uses `installPlanApproval: Automatic`, so the `startingCSV` in
@@ -226,7 +284,44 @@ oc get flowcollector cluster
 
 # Compliance scans running
 oc get compliancescan -n openshift-compliance
+
+# --- MaaS ---
+# Kuadrant control plane (Authorino + Limitador should be Ready)
+oc get kuadrant -n kuadrant-system
+
+# Gateway must be Programmed and have an address
+oc get gateway maas-default-gateway -n openshift-ingress
+
+# Tenant Reconciled, subscriptions Active
+oc get tenant,maassubscription,maasauthpolicy -n models-as-a-service
+
+# The controller-generated policies these produce
+oc get authpolicy,ratelimitpolicy,tokenratelimitpolicy -A
+
+# Models: MaaSModelRef should reach Ready with a URL
+oc get llminferenceservice,maasmodelref -n vllm-project
+
+# Kueue
+oc get kueue.kueue.openshift.io cluster
+
+# RHOAI monitoring (backs the "Prometheus (Data Science)" Grafana datasource)
+oc get opentelemetrycollector,tempomonolithic -n redhat-ods-monitoring
+
+# --- User workload monitoring ---
+# Should print "enableUserWorkload: true"
+oc get cm cluster-monitoring-config -n openshift-monitoring -o jsonpath='{.data.config\.yaml}'
+
+# Takes a few minutes to appear after the flag is set
+oc get pods -n openshift-user-workload-monitoring
 ```
+
+> **Heads up on UWM.** Platform Prometheus only scrapes namespaces labelled
+> `openshift.io/cluster-monitoring: "true"`; everything else needs user workload
+> monitoring. On the captured cluster *every* namespace holding a ServiceMonitor had that
+> label, so UWM was running with no targets of its own — four idle pods. It is enabled here
+> because it is a prerequisite for any workload namespace added without the label. Set
+> `clusterMonitoring.userWorkloadMonitoring.enabled: false` in
+> [layer2 values](operators/layer2-operands/values.yaml) to reclaim the resources on SNO.
 
 ---
 
@@ -238,7 +333,8 @@ argocd/             # AppProject, ApplicationSets, RBAC
 operators/
   layer1-install/   # Helm chart: Namespaces, OperatorGroups, Subscriptions
   layer2-operands/  # Helm chart: Operator CRs / operands
-bases/              # Shared Helm/Kustomize bases (gatus, grafana, kyverno, ctfd, get-a-username)
+bases/              # Shared Helm/Kustomize bases (gatus, grafana, kyverno, ctfd,
+                    #   get-a-username, model-serving)
 overlay/            # Cluster-specific Kustomize overlays — one dir per workload
 docs/               # GitHub Pages documentation
 dumps/              # Live cluster resource dumps (MaaS/Kuadrant/RHOAI) kept for reference

@@ -1,0 +1,105 @@
+# ==============================================================================
+# The "classic" KServe path: ServingRuntime + InferenceService.
+#
+# Kept alongside the LLMInferenceServices as a working comparison — this is the
+# pre-llm-d way to serve a model, and it is what the llama-stack playground's
+# vllm-inference-1 provider points at
+# (llama-32-1b-instruct-predictor.vllm-project.svc).
+#
+# serving.kserve.io/stop: "true" — stopped on the source cluster; the SNO node
+# has one GPU and the -maas LLMInferenceServices had it. Flip to "false" (and
+# stop something else) to run it.
+#
+# security.opendatahub.io/enable-auth: "false" — this one is deliberately NOT
+# behind MaaS auth; it is reached in-cluster only.
+# ==============================================================================
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  annotations:
+    opendatahub.io/apiProtocol: REST
+    opendatahub.io/recommended-accelerators: '["nvidia.com/gpu"]'
+    opendatahub.io/runtime-version: v0.18.0
+    opendatahub.io/serving-runtime-scope: global
+    opendatahub.io/template-display-name: vLLM NVIDIA GPU ServingRuntime for KServe
+    opendatahub.io/template-name: vllm-cuda-runtime-template
+    openshift.io/display-name: vLLM NVIDIA GPU ServingRuntime for KServe
+  labels:
+    opendatahub.io/dashboard: "true"
+  name: llama-32-1b-instruct
+  namespace: vllm-project
+spec:
+  annotations:
+    opendatahub.io/kserve-runtime: vllm
+    prometheus.io/path: /metrics
+    prometheus.io/port: "8080"
+  containers:
+    - args:
+        - --port=8080
+        - --model=/mnt/models
+        - --served-model-name={{.Name}}
+      command:
+        - python
+        - -m
+        - vllm.entrypoints.openai.api_server
+      env:
+        - name: HF_HOME
+          value: /tmp/hf_home
+      image: registry.redhat.io/rhaii/vllm-cuda-rhel9@sha256:5800e12b2a465f15961fcf34b645d79ed4f91ec9161eab22b1205d12682183c8
+      name: kserve-container
+      ports:
+        - containerPort: 8080
+          protocol: TCP
+  multiModel: false
+  supportedModelFormats:
+    - autoSelect: true
+      name: vLLM
+---
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  annotations:
+    modelFormat: vLLM
+    opendatahub.io/connections: llama-32-1b-instruct-maas
+    opendatahub.io/hardware-profile-name: default-profile
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
+    opendatahub.io/model-type: generative
+    openshift.io/description: ""
+    openshift.io/display-name: llama-3.2-1b-instruct
+    security.opendatahub.io/enable-auth: "false"
+    serving.kserve.io/deploymentMode: Standard
+    serving.kserve.io/stop: "true"
+  labels:
+    networking.kserve.io/visibility: exposed
+    opendatahub.io/dashboard: "true"
+    opendatahub.io/genai-asset: "true"
+  name: llama-32-1b-instruct
+  namespace: vllm-project
+spec:
+  predictor:
+    automountServiceAccountToken: false
+    deploymentStrategy:
+      type: Recreate
+    maxReplicas: 1
+    minReplicas: 1
+    model:
+      modelFormat:
+        name: vLLM
+      name: ""
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+          nvidia.com/gpu: "1"
+        requests:
+          cpu: "2"
+          memory: 4Gi
+          nvidia.com/gpu: "1"
+      runtime: llama-32-1b-instruct
+      storageUri: oci://quay.io/redhat-ai-services/modelcar-catalog:llama-3.2-1b-instruct
+    timeout: 30
+    tolerations:
+      - effect: PreferNoSchedule
+        key: nvidia.com/gpu
+        operator: Equal
+        value: "true"

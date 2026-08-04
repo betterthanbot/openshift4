@@ -20,6 +20,9 @@ since resolved and are kept for the root cause; three are still open; three are 
 | 8 | `MaaSAuthPolicy` stuck `Degraded` on AuthConfig sync | 🆕 open, cosmetic so far |
 | 9 | ArgoCD applications `OutOfSync`, `ctfd` `Missing` | 🆕 open |
 | 10 | Installed operators have drifted ahead of `values.yaml` | 🆕 open |
+| 11 | `SecuredCluster` can't cold-bootstrap — needs a Central-issued init bundle | 🆕 open by design — now documented, not fixed |
+| 12 | Cluster config lived only on the cluster, not in git | ✅ **resolved** 2026-08-04 — captured into the repo |
+| 13 | User workload monitoring + the #3/#4 workaround objects were never in git | ✅ **resolved** 2026-08-04 — now in `layer2-operands` |
 
 ## 1. Grafana dashboards missing datasource mapping (RESOLVED)
 
@@ -112,11 +115,16 @@ OR'd together, so this doesn't touch or conflict with the operator-owned one.
 
 **Caveat:** same as #2 — not GitOps-tracked, should be filed upstream.
 
-**Status: workaround still in place and still needed (2026-07-26).**
+**Status: workaround still in place and still needed (re-verified 2026-08-04).**
 `NetworkPolicy/thanos-querier-data-science-to-prometheus-sidecar` is present in
 `redhat-ods-monitoring` alongside the operator-owned
-`data-science-prometheus-instance-ingress`, which still does not open 10901. It exists
-only because someone created it by hand — nothing in this repo would recreate it.
+`data-science-prometheus-instance-ingress`, which still does not open 10901.
+
+**Now GitOps-tracked (2026-08-04).** It is rendered by
+`operators/layer2-operands/templates/cluster-monitoring.yaml` from
+`clusterMonitoring.rhoaiMonitoringWorkarounds.thanosSidecarNetworkPolicy`, and the
+rendered spec was diffed against the live object and is identical. If the upstream
+NetworkPolicy is ever fixed, delete the values block and this item together.
 
 ## 4. Data-science Prometheus (`monitoring.rhobs/v1`) can't see cross-namespace metrics — deliberate isolation, not a bug (worked around manually, 2026-07-24)
 
@@ -193,6 +201,21 @@ today, `PersesDatasource/prometheus-datasource` (`redhat-ods-monitoring`) is
 via `secret: prometheus-datasource-manual-secret` — i.e. the workaround shape described
 above, intact. `ClusterRoleBinding/data-science-perses-cluster-monitoring-view` is also
 still there.
+
+**Partly GitOps-tracked (2026-08-04).** The two Kubernetes objects are now rendered by
+`operators/layer2-operands/templates/cluster-monitoring.yaml` —
+`ClusterRoleBinding/data-science-perses-cluster-monitoring-view` (spec diffed against
+live, identical) and the empty, `inject-cabundle`-annotated
+`ConfigMap/thanos-querier-serving-ca`, with a matching `ignoreDifferences` entry in
+`argocd/appset-operators.yaml` so ArgoCD does not blank out the injected CA.
+
+**Still NOT tracked, and cannot be:** the Perses-native
+`prometheus-datasource-manual-secret` is not a Kubernetes object — it lives only inside
+Perses, created through its HTTP API at
+`/api/v1/projects/redhat-ods-monitoring/secrets`. Nothing in this repo recreates it, and
+neither does the `PersesDatasource` CR edit (dropping `spec.client` and pointing
+`spec.config.plugin.spec.proxy.spec.secret` at that secret). On a fresh cluster both
+steps have to be redone by hand.
 
 **The clock on this one is running.** The bearer token inside that Perses-native secret
 was minted with `--duration=8760h` around 2026-07-24, so it expires ~2027-07-24. Nothing
@@ -503,6 +526,99 @@ LeaderWorkerSet 1.0.0. They arrive with the RHOAI/MaaS stack and the sandbox bas
 Items 5 and 7 both turn on the versions of ones in that list, so record them when
 troubleshooting even though nothing here installs them.
 
+## 11. RHACS `SecuredCluster` cannot come up on a cold bootstrap (2026-08-04)
+
+**Symptom.** The live `SecuredCluster/stackrox-secured-cluster-services` carried no
+`argocd.argoproj.io/tracking-id` annotation, i.e. the ArgoCD-managed object had been
+deleted and re-created by hand at some point.
+
+**Not a spec problem.** The spec rendered by `operators/layer2-operands` is identical to
+what was live — verified by diffing `helm template` output against the cluster.
+
+**Root cause is ordering.** `SecuredCluster` needs a cluster init bundle Secret in the
+`stackrox` namespace before Sensor/Collector can register. That bundle is issued *by
+Central*, so on a cold bootstrap it cannot exist when layer2 first syncs. On this cluster
+the bundle (`cluster-registration-secret`) appeared on 2026-07-24, six days after Central
+— consistent with someone generating it from the console and applying it manually.
+
+**Options, neither of which is automatic:**
+
+1. Ship `rhacs.securedCluster.enabled: false`, bootstrap, generate the bundle from the
+   Central console (Platform Configuration → Clusters → Init bundles → Generate →
+   "Operator" YAML), `oc apply` it into `stackrox`, then flip to `true`.
+2. Leave it enabled and let ArgoCD retry — it fails until the Secret lands, then converges.
+
+The bundle itself is cluster-specific service certs and is deliberately **not** in git.
+The prerequisite and the exact commands are recorded in
+`operators/layer2-operands/values.yaml` above the `securedCluster:` block.
+
+---
+
+## 12. Cluster configuration existed only on the cluster (RESOLVED 2026-08-04)
+
+**Symptom.** A large amount of working configuration had been applied to
+`cluster-7xdhm` by hand and never made it back to git. With the cluster due to be
+destroyed, all of it was one `oc delete` away from being lost.
+
+**What had drifted, and why:**
+
+| Area | Drift |
+|------|-------|
+| Operator versions | Every pinned `startingCSV` was behind; RHOAI had moved a whole minor channel (`stable-3.3` → `stable-3.4`) |
+| NVIDIA GPU | The repo's hand-written `ClusterPolicy` had been replaced wholesale on the cluster with the operator's own v26.3 defaults. Most significant delta: the repo set `driver.useNvidiaDriverCRD: true`, which hands driver management to a separate `NVIDIADriver` CR — and no such CR ever existed (`oc get nvidiadrivers -A` was empty). |
+| NFD | Instance renamed `nfd-instance` → `nfd` and reset to defaults; the hand-tuned PCI device-class whitelist was dropped. |
+| RHACS | `SecuredCluster` recreated by hand — see #11. |
+| RHOAI | DSCI gained a full `monitoring.metrics` / `.traces` block; DSC turned on `modelsAsService`, `nim` and `trustyai` and turned **off** `kueue`; `OdhDashboardConfig` had five MaaS/Gen-AI feature flags enabled that no stock install sets. |
+| New operators | 9 installed by hand: Service Mesh 3, RHCL/Kuadrant, Kueue, Leader Worker Set, OpenTelemetry, Tempo, cert-manager, Lightspeed, Quay (the last four are captured but shipped disabled). Authorino, Limitador and Kuadrant DNS came along via OLM dependency resolution. |
+| MaaS | The entire layer — Kuadrant CR, `maas-default-gateway` + sizing ConfigMap, Tenant, four subscriptions, four auth policies, per-tier rate/token limits, telemetry policy, six Groups. |
+| Model serving | Four `LLMInferenceService`s, two `LLMInferenceServiceConfig`s, a classic `ServingRuntime`/`InferenceService`, two hand-written body-based-routing `HTTPRoute`s, a llama-stack playground and vLLM metrics scraping — all in `vllm-project`. |
+| Metrics | An ad-hoc PostgreSQL (`maas-postgres`, from the `postgresql-persistent` template as a `DeploymentConfig`) plus two Grafana datasources. |
+
+**Fix.** All of the above is now in the repo. Rendered specs were diffed field-by-field
+against the live cluster and are identical; all three trees pass
+`oc apply --dry-run=server`. Two deliberate deviations from what was live:
+
+- `maas-postgres` is re-expressed as a `Deployment` — `DeploymentConfig` is deprecated
+  in OCP 4.14+ and removed in a future release.
+- `rhods-operator`, `servicemeshoperator3` and `rhcl-operator` are declared
+  `installPlanApproval: Automatic` with a pinned `startingCSV`; the source cluster used
+  `Manual`. This trades exact fidelity for an unattended cold bootstrap.
+
+**Caveat.** None of this has been run cold. It is a faithful capture of a working
+cluster, not a tested from-scratch install.
+
+---
+
+## 13. User workload monitoring was enabled by hand and never captured (RESOLVED 2026-08-04)
+
+**Symptom.** `ConfigMap/cluster-monitoring-config` in `openshift-monitoring` carried
+`enableUserWorkload: true`, applied by hand on 2026-07-21 (it had a
+`kubectl.kubernetes.io/last-applied-configuration` annotation and no ArgoCD tracking-id).
+The full UWM stack was running — `prometheus-user-workload` ×2, `thanos-ruler-user-workload`
+×2, plus its own `prometheus-operator` — and nothing in this repo would have recreated any
+of it. The first pass of the 2026-08-04 capture (#12) missed it.
+
+**Worth knowing about this cluster specifically:** UWM had no targets of its own. Every
+namespace holding a `ServiceMonitor` — `kuadrant-system`, `nvidia-gpu-operator`,
+`vllm-project`, `redhat-ods-applications`, `netobserv` — carries
+`openshift.io/cluster-monitoring: "true"`, so the *platform* Prometheus was scraping them
+all. That is also what #4's correction established: the vLLM and GPU metrics the dashboards
+read come from the global Thanos Querier, not from UWM.
+
+So UWM was, in practice, four idle pods. It is captured anyway because it is a prerequisite
+for any workload namespace added *without* the cluster-monitoring label (the normal case),
+and because turning it off would deviate from the captured cluster. Set
+`clusterMonitoring.userWorkloadMonitoring.enabled: false` to reclaim the resources on a
+single-node cluster.
+
+**Fix.** Rendered by `operators/layer2-operands/templates/cluster-monitoring.yaml`, using
+`ServerSideApply=true` — `cluster-monitoring-config` is a shared merge target that OCP also
+reads retention/storage/alertmanager settings from, so a plain apply would clobber keys this
+repo does not manage. There is a matching `ignoreDifferences` entry in
+`argocd/appset-operators.yaml`.
+
+---
+
 ## Open follow-ups
 
 - [x] ~~Sync the Grafana `datasources` fix (#1) out via ArgoCD.~~ Done — verified on cluster.
@@ -519,15 +635,20 @@ troubleshooting even though nothing here installs them.
 - [ ] File upstream bug: `perses-operator`'s `PersesDatasource.spec.client.kubernetesAuth`
       doesn't attach a bearer token to outbound proxy calls (#4, #7) — same operator, same
       gap, two datasources.
-- [ ] GitOps-track the #4 workaround objects (ConfigMap, ClusterRoleBinding, and the
-      Perses secret). This is no longer hypothetical: the equivalent #7 objects have
-      already been wiped by an operator resync, and #4's are the only thing keeping the
-      native Cluster/Models tabs alive.
+- [x] GitOps-track the #4 workaround objects — done 2026-08-04 for the ClusterRoleBinding
+      and the CA ConfigMap. **The Perses-native secret still cannot be**: it is not a
+      Kubernetes object. Re-creating it on a new cluster is a manual step; write it into
+      the runbook rather than assuming the capture covers it.
 - [ ] Re-apply the #7 `kuadrant-prometheus-datasource` fix, or decide the native Usage tab
       is out of scope and say so — the Grafana dashboards don't depend on it.
 - [ ] Diarise the #4 Perses bearer token (~2027-07-24 expiry). Nothing warns before the
       dashboards silently empty out.
-- [ ] Decide on operator pinning (#10), and reconcile the repo's RHOAI channel
-      (`stable-3.3`) with what is actually running (`stable-3.4`).
+- [ ] Decide on operator pinning (#10). The channel drift itself is closed — `values.yaml`
+      now declares `stable-3.4` — but nothing stops it recurring, since every subscription
+      is still `Automatic`.
+- [ ] Bootstrap the #12 capture onto a fresh cluster and record what actually needed a
+      manual assist. Until that happens, "90-95% onboarded" is an estimate, not a result.
+- [ ] Replace the `maas.gateway.hostname` / `tlsSecretName` placeholders, or make them
+      derive from the cluster's ingress domain instead of being hardcoded.
 - [ ] Resolve or remove the `ctfd` application (#9).
 - [ ] Confirm whether the `MaaSAuthPolicy` `Degraded` status (#8) ever self-clears.

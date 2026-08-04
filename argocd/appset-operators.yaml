@@ -136,3 +136,54 @@ spec:
           kind: GrafanaDatasource
           jsonPointers:
             - /spec/datasource/secureJsonData
+        # MaaS metrics DB + Grafana Postgres credentials — placeholders are
+        # committed; real passwords are set manually.
+        - group: ""
+          kind: Secret
+          name: maas-postgres
+          namespace: redhat-ods-applications
+          jsonPointers:
+            - /data
+        - group: ""
+          kind: Secret
+          name: maas-postgres-grafana-auth
+          namespace: grafana
+          jsonPointers:
+            - /data
+        # thanos-querier-serving-ca is committed empty; service-ca-operator
+        # injects service-ca.crt into it (techdebt.md #4). Ignore data so ArgoCD
+        # does not keep blanking it back out.
+        - group: ""
+          kind: ConfigMap
+          name: thanos-querier-serving-ca
+          namespace: redhat-ods-monitoring
+          jsonPointers:
+            - /data
+        # cluster-monitoring-config is shared with OCP (retention, storage,
+        # alertmanager). We ServerSideApply only enableUserWorkload into it, so
+        # ignore any other keys the cluster or an admin adds.
+        - group: ""
+          kind: ConfigMap
+          name: cluster-monitoring-config
+          namespace: openshift-monitoring
+          jsonPointers:
+            - /data
+        # RHOAI owns OdhDashboardConfig; we patch a subset of fields via
+        # ServerSideApply and let the operator manage the rest.
+        - group: opendatahub.io
+          kind: OdhDashboardConfig
+          jsonPointers:
+            - /status
+        # MaaS/KServe/Kuadrant operands are heavily status-driven.
+        - group: maas.opendatahub.io
+          kind: MaaSSubscription
+          jsonPointers:
+            - /status
+        - group: kuadrant.io
+          kind: Kuadrant
+          jsonPointers:
+            - /status
+        - group: gateway.networking.k8s.io
+          kind: Gateway
+          jsonPointers:
+            - /status

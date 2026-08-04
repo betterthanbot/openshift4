@@ -1,0 +1,50 @@
+# ==============================================================================
+# bases/model-serving
+#
+# Everything that was hand-created in the `vllm-project` namespace on the source
+# cluster to serve models through Models-as-a-Service, captured as code.
+#
+# Depends on (all in operators/layer2-operands):
+#   maas.gateway         — the maas-default-gateway these models attach to
+#   maas.tenant          — MaaS control plane
+#   maas.subscriptions   — token budgets naming these exact model names
+#   rhods.dataScientCluster.components.kserve.modelsAsService = Managed
+#
+# NOT included here, because a controller owns each of them and will recreate
+# them from the CRs that ARE here:
+#   AuthPolicy maas-auth-*            TokenRateLimitPolicy maas-trlp-*
+#   HTTPRoute  *-kserve-route         MaaSModelRef *
+#   InferencePool *-inference-pool    Deployment/Service *-kserve*, *-epp-service
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: vllm-project
+
+resources:
+  - connections.yaml
+  - llminferenceserviceconfigs.yaml
+  - llminferenceservices.yaml
+  - classic-serving.yaml
+  - body-based-routes.yaml
+  - metrics.yaml
+  - llamastack-playground.yaml
+
+configMapGenerator:
+  # Inference providers for the Gen AI playground. Kept as a real file so it can
+  # be edited/diffed like YAML rather than as an escaped blob.
+  - name: llama-stack-config
+    files:
+      - config.yaml=llama-stack-config.yaml
+    options:
+      disableNameSuffixHash: true
+
+  # Per-model metrics panel definitions rendered by the RHOAI dashboard's
+  # model "Metrics" tab. `supported: "true"` is what makes the tab appear.
+  - name: llama-32-1b-instruct-metrics-dashboard
+    files:
+      - metrics=metrics-dashboard.json
+    literals:
+      - supported=true
+    options:
+      disableNameSuffixHash: true
