@@ -23,6 +23,7 @@ since resolved and are kept for the root cause; three are still open; three are 
 | 11 | `SecuredCluster` can't cold-bootstrap — needs a Central-issued init bundle | 🆕 open by design — now documented, not fixed |
 | 12 | Cluster config lived only on the cluster, not in git | ✅ **resolved** 2026-08-04 — captured into the repo |
 | 13 | User workload monitoring + the #3/#4 workaround objects were never in git | ✅ **resolved** 2026-08-04 — now in `layer2-operands` |
+| 14 | Whole `operators-layer2` sync rejected up front — no operands deployed at all | ✅ **resolved** 2026-08-06 — `SkipDryRunOnMissingResource=true` |
 
 ## 1. Grafana dashboards missing datasource mapping (RESOLVED)
 
@@ -619,6 +620,74 @@ repo does not manage. There is a matching `ignoreDifferences` entry in
 
 ---
 
+## 14. `operators-layer2` deployed nothing — ArgoCD rejected the entire sync over missing CRDs (RESOLVED 2026-08-06)
+
+**Symptom.** On a freshly bootstrapped cluster (`cluster-dgs2z`), every layer1 operator
+installed and reached `Succeeded`, but **not one layer2 operand existed** — no LokiStack,
+no DataScienceCluster, no Grafana, no Central, no ClusterPolicy. The
+`operators-layer2` Application looked deceptively fine: `OutOfSync` / **`Healthy`**, with
+
+```
+operationState.phase:   Running
+operationState.message: one or more synchronization tasks are not valid. Retrying attempt #3
+```
+
+**Root cause.** ArgoCD (gitops-engine) resolves every rendered resource's GVK against the
+cluster's discovery API *before* it runs any sync task. If even one kind is unknown,
+`getSyncTasks()` returns not-ok and the whole operation is failed with that message —
+**nothing is applied**. The check is atomic, not per-resource. `Healthy` was misleading:
+with zero resources actually applied, there was nothing unhealthy to report.
+
+Exactly four kinds were unresolvable, all added in the 2026-08-04 capture (#12):
+
+| Kind | CRD comes from |
+|------|----------------|
+| `maas.opendatahub.io/v1alpha1` `Tenant`, `MaaSSubscription`, `MaaSAuthPolicy` | the DataScienceCluster, once `kserve.modelsAsService: Managed` reconciles |
+| `opendatahub.io/v1alpha` `OdhDashboardConfig` | the DataScienceCluster's dashboard component |
+
+Which makes it a **hard deadlock**, not a slow start:
+
+```
+DataScienceCluster (wave 0, operators-layer2)
+  └─ registers maas.opendatahub.io + OdhDashboardConfig CRDs
+       └─ Tenant / MaaSSubscription / MaaSAuthPolicy / OdhDashboardConfig (waves 3-4, SAME app)
+            └─ unknown GVK  ->  whole sync invalid  ->  DSC never created  ->  CRDs never registered
+```
+
+The `model-serving` workload Application was stuck the same way on five kinds —
+`serving.kserve.io` (`LLMInferenceService`, `LLMInferenceServiceConfig`,
+`InferenceService`, `ServingRuntime`) and `llamastack.io/LlamaStackDistribution`.
+
+**Why the pre-flight checks missed it.** The 2026-08-04 capture was validated with
+`oc apply --dry-run=server` against the *source* cluster, where every one of those CRDs
+already existed. That verified the manifests were well-formed; it could never have caught
+an ordering problem. PLAN.md said "not yet tested cold" — this is what that was hiding.
+
+**Why sync waves did not save it.** The waves were already ordered correctly (DSC at 0,
+MaaS CRs at 3-5). But ArgoCD only holds a wave open while the previous wave is unhealthy,
+and it has **no health check for `DataScienceCluster`** — the CR is considered Healthy the
+instant it is created, so later waves start immediately. And none of it matters anyway,
+because validation happens before any wave runs.
+
+**Fix.** `SkipDryRunOnMissingResource=true` added to `syncOptions` in **both**
+ApplicationSets. Unknown kinds are then marked `skipDryRun` rather than invalidating the
+sync: everything whose CRD does exist applies immediately, and the resources still waiting
+on a CRD fail only their own apply and are picked up by the next retry.
+
+Retry was also resized — `limit: 5` / `maxDuration: 5m` (~12 min) was too tight for RHOAI,
+which needs 10-15 min to install, reconcile the DSC and register the CRDs. Now `limit: 10`
+/ `maxDuration: 3m` (~24 min). This matters because nothing in this repo sets
+`syncPolicy.automated`: when retries run out the Application just sits `Failed` until
+someone syncs it by hand.
+
+**Generalisation worth remembering.** Every CR in layer2 depends on a CRD installed by a
+layer1 operator, so on any cold bootstrap layer2's first sync attempt races OLM.
+`SkipDryRunOnMissingResource=true` is not a workaround for the four MaaS kinds
+specifically — it is what makes a two-layer operator/operand split viable at all. Do not
+remove it.
+
+---
+
 ## Open follow-ups
 
 - [x] ~~Sync the Grafana `datasources` fix (#1) out via ArgoCD.~~ Done — verified on cluster.
@@ -646,8 +715,13 @@ repo does not manage. There is a matching `ignoreDifferences` entry in
 - [ ] Decide on operator pinning (#10). The channel drift itself is closed — `values.yaml`
       now declares `stable-3.4` — but nothing stops it recurring, since every subscription
       is still `Automatic`.
-- [ ] Bootstrap the #12 capture onto a fresh cluster and record what actually needed a
-      manual assist. Until that happens, "90-95% onboarded" is an estimate, not a result.
+- [x] Bootstrap the #12 capture onto a fresh cluster — done 2026-08-06 on `cluster-dgs2z`,
+      and it found #14 immediately. Re-run it after the #14 fix and record what still needs
+      a manual assist.
+- [ ] Consider whether `DataScienceCluster` deserves a custom ArgoCD health check (a Lua
+      resource action on `.status.phase`/`.status.conditions[Ready]`). Without one, waves
+      after the DSC start before RHOAI has done anything, which is why #14 relies on retry
+      rather than ordering.
 - [ ] Replace the `maas.gateway.hostname` / `tlsSecretName` placeholders, or make them
       derive from the cluster's ingress domain instead of being hardcoded.
 - [ ] Resolve or remove the `ctfd` application (#9).

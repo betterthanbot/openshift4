@@ -69,12 +69,51 @@ spec:
           - ServerSideApply=true          # required for large ArgoCD / operator CRs
           - RespectIgnoreDifferences=true
           - ApplyOutOfSyncOnly=true
+          # ------------------------------------------------------------------
+          # SkipDryRunOnMissingResource=true — DO NOT REMOVE.
+          #
+          # Before running any sync task, ArgoCD resolves every rendered
+          # resource's GVK against the cluster's discovery API. If even ONE kind
+          # is unknown, gitops-engine fails the whole operation with
+          # "one or more synchronization tasks are not valid" and applies
+          # NOTHING. The failure is atomic, not per-resource.
+          #
+          # That is fatal for this repo, because layer2 is nothing but custom
+          # resources whose CRDs are installed by layer1 operators — and, worse,
+          # a few whose CRDs are installed by a layer2 operand:
+          #
+          #   DataScienceCluster (wave 0, this app)
+          #     └─ kserve.modelsAsService: Managed
+          #          └─ installs maas.opendatahub.io CRDs
+          #               └─ Tenant / MaaSSubscription / MaaSAuthPolicy (waves 3-4, this app)
+          #     └─ dashboard component
+          #          └─ installs opendatahub.io/OdhDashboardConfig
+          #               └─ OdhDashboardConfig (wave 4, this app)
+          #
+          # Without this option that is a hard deadlock: the DSC can never be
+          # created, because the sync that would create it is rejected up front
+          # over CRs that only exist once the DSC has run. Observed on
+          # cluster-dgs2z 2026-08-06 — every operator installed, zero operands.
+          #
+          # With it, unknown kinds are marked skipDryRun instead of invalidating
+          # the sync. They still fail at apply time while the CRD is absent, but
+          # everything else applies, and the retry below converges once the CRDs
+          # appear. Sync waves alone do NOT save you here: ArgoCD has no health
+          # check for DataScienceCluster, so it is considered Healthy the moment
+          # it is created and later waves start immediately.
+          # ------------------------------------------------------------------
+          - SkipDryRunOnMissingResource=true
         retry:
-          limit: 5
+          # Sized for a cold bootstrap: RHOAI needs ~10-15 min to install its
+          # operator, reconcile the DSC and register the MaaS/KServe CRDs, and
+          # nothing here is `automated`, so if retries run out the app just sits
+          # Failed until someone syncs it by hand.
+          # 30s + 60s + 120s + 180s x7 ≈ 24 min of retrying.
+          limit: 10
           backoff:
             duration: 30s
             factor: 2
-            maxDuration: 5m
+            maxDuration: 3m
 
       # Ignore fields that operators / OCP manage themselves after creation
       ignoreDifferences:

@@ -325,6 +325,36 @@ oc get pods -n openshift-user-workload-monitoring
 
 ---
 
+## Troubleshooting: "one or more synchronization tasks are not valid"
+
+If an Application is `OutOfSync` + **`Healthy`** but has deployed nothing at all, check:
+
+```bash
+oc get application operators-layer2 -n openshift-gitops \
+  -o jsonpath='{.status.operationState.message}{"\n"}'
+```
+
+`one or more synchronization tasks are not valid` means ArgoCD could not resolve some
+rendered resource's kind against the cluster, and **refused the entire sync** — the check
+is atomic, so nothing gets applied. `Healthy` just means there are no unhealthy resources,
+because there are no resources.
+
+List exactly which ones:
+
+```bash
+oc get application operators-layer2 -n openshift-gitops -o json \
+  | jq -r '.status.operationState.syncResult.resources[]
+           | select(.status != "Synced") | "\(.kind)/\(.name): \(.message)"'
+```
+
+This is expected on a cold bootstrap — layer2 is entirely custom resources whose CRDs
+layer1 has not finished installing yet. Both ApplicationSets set
+`SkipDryRunOnMissingResource=true` precisely so it degrades into a retry instead of a
+deadlock. If you see this error, that option has been removed or the app predates it.
+See [techdebt.md](techdebt.md) item 14.
+
+---
+
 ## Repository Structure
 
 ```

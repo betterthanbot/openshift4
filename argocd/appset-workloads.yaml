@@ -75,6 +75,23 @@ spec:
           - CreateNamespace=true
           - ApplyOutOfSyncOnly=true
           - RespectIgnoreDifferences=true
+          # Same reasoning as argocd/appset-operators.yaml — see the long note
+          # there. ArgoCD rejects an entire sync up front if any rendered kind is
+          # unknown to the cluster, and `model-serving` is made almost entirely
+          # of kinds that only exist after the RHOAI DataScienceCluster has
+          # reconciled: serving.kserve.io (LLMInferenceService,
+          # LLMInferenceServiceConfig, InferenceService, ServingRuntime) and
+          # llamastack.io (LlamaStackDistribution).
+          - SkipDryRunOnMissingResource=true
+        retry:
+          # Workloads land after operators AND operands, so give them room —
+          # a model-serving sync attempted before the DSC has registered the
+          # KServe CRDs should keep retrying rather than give up.
+          limit: 10
+          backoff:
+            duration: 30s
+            factor: 2
+            maxDuration: 3m
 
       ignoreDifferences:
         # Gatus config is generated at runtime by the discovery CronJob
