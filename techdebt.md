@@ -669,10 +669,39 @@ and it has **no health check for `DataScienceCluster`** — the CR is considered
 instant it is created, so later waves start immediately. And none of it matters anyway,
 because validation happens before any wave runs.
 
-**Fix.** `SkipDryRunOnMissingResource=true` added to `syncOptions` in **both**
-ApplicationSets. Unknown kinds are then marked `skipDryRun` rather than invalidating the
-sync: everything whose CRD does exist applies immediately, and the resources still waiting
-on a CRD fail only their own apply and are picked up by the next retry.
+**Fix.** `SkipDryRunOnMissingResource=true`. Unknown kinds are then marked `skipDryRun`
+rather than invalidating the sync: everything whose CRD does exist applies immediately, and
+the resources still waiting on a CRD fail only their own apply and are picked up by the
+next retry.
+
+**It must be set PER-RESOURCE.** The first attempt set it only at the application level,
+in the ApplicationSets' `syncPolicy.syncOptions`. That does not work — verified on the live
+cluster (OpenShift GitOps 1.21.1): after applying it and re-syncing, `operators-layer2`
+failed with the identical message and **0 resources synced**. ArgoCD honours the option as
+an annotation on the object itself:
+
+```yaml
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+```
+
+It is set in three places, and those are the ones that matter:
+
+| File | Resources |
+|------|-----------|
+| `operators/layer2-operands/templates/maas-tenant.yaml` | `Tenant`, `MaaSSubscription`, `MaaSAuthPolicy` |
+| `operators/layer2-operands/templates/rhods-dashboard-config.yaml` | `OdhDashboardConfig` (appended to the existing `ServerSideApply=true`) |
+| `bases/model-serving/kustomization.yaml` | every resource, via `commonAnnotations` |
+
+The app-level entries are kept as belt-and-braces for ArgoCD versions that do respect them,
+but nothing should depend on them.
+
+**Confirmed working:** after the per-resource annotations were pushed and
+`operators-layer2` re-synced, the operation message changed from
+`one or more synchronization tasks are not valid` (0 resources) to
+`waiting for healthy state of /ServiceAccount/grafana-sa and 31 more resources` — i.e. the
+sync now proceeds and applies everything whose CRDs exist.
 
 Retry was also resized — `limit: 5` / `maxDuration: 5m` (~12 min) was too tight for RHOAI,
 which needs 10-15 min to install, reconcile the DSC and register the CRDs. Now `limit: 10`
