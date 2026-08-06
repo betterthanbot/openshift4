@@ -26,7 +26,10 @@ metadata:
     {{- include "layer2-operands.labels" . | nindent 4 }}
   annotations:
     argocd.argoproj.io/sync-wave: "4"
-    argocd.argoproj.io/sync-options: ServerSideApply=true
+    # OdhDashboardConfig's CRD is registered by the DataScienceCluster's dashboard
+    # component, in this same Application — SkipDryRunOnMissingResource stops a cold
+    # bootstrap rejecting the whole sync over it. See techdebt.md #14.
+    argocd.argoproj.io/sync-options: ServerSideApply=true,SkipDryRunOnMissingResource=true
 spec:
   {{- toYaml $d.spec | nindent 2 }}
 {{- end }}

@@ -21,6 +21,19 @@ kind: Kustomization
 
 namespace: vllm-project
 
+# Nearly every kind here — serving.kserve.io (LLMInferenceService,
+# LLMInferenceServiceConfig, InferenceService, ServingRuntime) and
+# llamastack.io/LlamaStackDistribution — has its CRD registered by the RHOAI
+# DataScienceCluster, which lives in operators/layer2-operands. Until that has
+# reconciled, ArgoCD cannot resolve these kinds, and it rejects the WHOLE
+# Application sync up front rather than the individual resources.
+#
+# Applied to every resource in the base (harmless on the Secrets / Service /
+# ServiceMonitor / HTTPRoute, whose kinds always exist) so the app degrades into
+# a retry instead of a hard failure. See techdebt.md #14.
+commonAnnotations:
+  argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+
 resources:
   - connections.yaml
   - llminferenceserviceconfigs.yaml

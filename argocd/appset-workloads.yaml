@@ -82,6 +82,10 @@ spec:
           # reconciled: serving.kserve.io (LLMInferenceService,
           # LLMInferenceServiceConfig, InferenceService, ServingRuntime) and
           # llamastack.io (LlamaStackDistribution).
+          #
+          # NOT sufficient on its own — see the note in appset-operators.yaml.
+          # The per-resource annotation that actually works is set via
+          # commonAnnotations in bases/model-serving/kustomization.yaml.
           - SkipDryRunOnMissingResource=true
         retry:
           # Workloads land after operators AND operands, so give them room —

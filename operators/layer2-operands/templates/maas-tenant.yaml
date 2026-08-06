@@ -15,6 +15,12 @@ metadata:
     {{- include "layer2-operands.labels" . | nindent 4 }}
   annotations:
     argocd.argoproj.io/sync-wave: "3"
+    # The maas.opendatahub.io CRDs are registered by the DataScienceCluster
+    # (kserve.modelsAsService) in this SAME Application, so on a cold bootstrap
+    # this kind does not exist when ArgoCD validates the sync. Without this
+    # annotation ArgoCD rejects the ENTIRE sync up front and applies nothing —
+    # including the DSC that would create the CRD. See techdebt.md #14.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   {{- toYaml $m.tenant.spec | nindent 2 }}
 {{- end }}
@@ -31,6 +37,8 @@ metadata:
     {{- include "layer2-operands.labels" $ | nindent 4 }}
   annotations:
     argocd.argoproj.io/sync-wave: "4"
+    # CRD comes from the DataScienceCluster in this same app — see Tenant above.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
     openshift.io/display-name: {{ $sub.displayName | quote }}
 spec:
   owner:
@@ -74,6 +82,8 @@ metadata:
     {{- include "layer2-operands.labels" $ | nindent 4 }}
   annotations:
     argocd.argoproj.io/sync-wave: "4"
+    # CRD comes from the DataScienceCluster in this same app — see Tenant above.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
     openshift.io/display-name: {{ $p.name | quote }}
     {{- if $p.subscription }}
     openshift.io/description: {{ printf "Auth policy created for subscription %q" $p.subscription | quote }}

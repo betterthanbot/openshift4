@@ -101,6 +101,19 @@ spec:
           # appear. Sync waves alone do NOT save you here: ArgoCD has no health
           # check for DataScienceCluster, so it is considered Healthy the moment
           # it is created and later waves start immediately.
+          #
+          # IMPORTANT — this app-level entry is NOT sufficient on its own.
+          # Tested on OpenShift GitOps 1.21.1 (cluster-dgs2z, 2026-08-06): with
+          # only this option set, the sync still failed with 0 resources synced.
+          # The option is honoured per-resource, via
+          #   argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+          # on the object itself. Those annotations are the actual fix and live
+          # in:
+          #   operators/layer2-operands/templates/maas-tenant.yaml
+          #   operators/layer2-operands/templates/rhods-dashboard-config.yaml
+          #   bases/model-serving/kustomization.yaml  (commonAnnotations)
+          # This entry is kept as belt-and-braces for ArgoCD versions that do
+          # respect it, but do not rely on it alone.
           # ------------------------------------------------------------------
           - SkipDryRunOnMissingResource=true
         retry:
