@@ -809,13 +809,13 @@ gpuOperator:
         default: false
         enabled: true
         nriPluginEnabled: false
+      # No `tolerations` here on purpose. The operator injects its own
+      # nvidia.com/gpu:NoSchedule toleration into every daemonset it owns; the
+      # PreferNoSchedule entry this used to carry did not even match the real
+      # node taint (nvidia.com/gpu=true:NoSchedule) and was doing nothing.
       daemonsets:
         rollingUpdate:
           maxUnavailable: "1"
-        tolerations:
-          - effect: PreferNoSchedule
-            key: nvidia.com/gpu
-            operator: Exists
         updateStrategy: RollingUpdate
       dcgm:
         enabled: true
@@ -827,6 +827,9 @@ gpuOperator:
           enabled: true
       devicePlugin:
         enabled: true
+        config:
+          default: ""
+          name: ""
         mps:
           root: /run/nvidia/mps
       driver:
@@ -865,17 +868,16 @@ gpuOperator:
         enabled: false
       gfd:
         enabled: true
-      kataManager:
-        config:
-          artifactsDir: /opt/nvidia-gpu-operator/artifacts/runtimeclasses
+      # kataManager intentionally omitted — the operator supplies its own
+      # artifactsDir default, and pinning it here served no purpose.
       kataSandboxDevicePlugin:
         enabled: true
       mig:
         strategy: single
+      # No `config.default` — falls through to the operator's own
+      # default-mig-parted-config ConfigMap rather than pinning a profile here.
       migManager:
-        enabled: false
-        config:
-          default: all-disabled
+        enabled: true
       nodeStatusExporter:
         enabled: true
       operator:
@@ -897,8 +899,6 @@ gpuOperator:
         enabled: true
       vgpuDeviceManager:
         enabled: true
-        config:
-          default: default
       vgpuManager:
         enabled: false
 
@@ -948,6 +948,30 @@ workshopAuth:
 #   * InferencePool   <model>-inference-pool
 #   * the per-tier namespaces maas-default-gateway-tier-*
 # ==============================================================================
+# ==============================================================================
+# Cluster StorageClasses.
+#
+# The platform assumes a gp3 class with Immediate binding exists, because
+# several PVCs are applied in an earlier sync wave than the workload that mounts
+# them. The stock gp3-csi (WaitForFirstConsumer) deadlocks in that arrangement —
+# see templates/storageclass-immediate.yaml for the full explanation.
+#
+# CHANGE ME on non-AWS clusters: provisioner/parameters are ebs.csi.aws.com
+# specific. Set enabled: false and point maas.metricsDatabase.storage
+# .storageClassName at an equivalent Immediate-binding class of your own.
+# ==============================================================================
+storageClasses:
+  enabled: true
+  gp3Immediate:
+    enabled: true
+    name: gp3-csi-immediate
+    provisioner: ebs.csi.aws.com
+    parameters:
+      type: gp3
+      encrypted: "true"
+    reclaimPolicy: Delete
+    allowVolumeExpansion: true
+
 maas:
   enabled: true
 
@@ -982,7 +1006,7 @@ maas:
     enabled: true
     name: maas-default-gateway
     namespace: openshift-ingress
-    gatewayClassName: openshift-default
+    gatewayClassName: data-science-gateway-class
     # CHANGE ME
     hostname: maas.apps.cluster-dgs2z.dgs2z.sandbox3354.opentlc.com
     # Secret in the gateway namespace holding the TLS cert for `hostname`.
@@ -1197,6 +1221,66 @@ maas:
       limits:
         cpu: "1"
         memory: 1Gi
+
+  # ----------------------------------------------------------------------------
+  # DB_CONNECTION_URL for the MaaS API (Secret maas-db-config).
+  #
+  # One of the two prerequisites the DataScienceCluster gates modelsAsService
+  # on. Points at the metricsDatabase above; the password is filled in manually
+  # (see the one-liner in templates/maas-db-config.yaml).
+  # ----------------------------------------------------------------------------
+  dbConfig:
+    enabled: true
+    secretName: maas-db-config
+    namespace: redhat-ods-applications
+    # `disable` matches the plaintext postgresql:15-el9 imagestream image above.
+    sslMode: disable
+
+  # ----------------------------------------------------------------------------
+  # Authorino listener TLS — the other modelsAsService prerequisite.
+  #
+  # `spec` below is dumps/authorino.yaml verbatim, i.e. the state the source
+  # cluster ran with. Everything except listener.tls is what the kuadrant
+  # operator sets by default; it is repeated here so a ServerSideApply adoption
+  # is a no-op on those fields rather than a fight.
+  #
+  # CHANGE ME if `oc get svc -n kuadrant-system` shows a different authorization
+  # service name — serviceName only feeds the certificate SANs, and a mismatch
+  # there fails at TLS handshake, not at sync.
+  # ----------------------------------------------------------------------------
+  authorino:
+    enabled: true
+    name: authorino
+    namespace: kuadrant-system
+    serviceName: authorino-authorino-authorization
+
+    certificate:
+      # Set false if you already issue authorino-server-cert some other way
+      # (e.g. an OpenShift service-serving-cert annotation on the Service).
+      enabled: true
+      secretName: authorino-server-cert
+      issuerName: authorino-selfsigned
+      duration: 8760h    # 1y
+      renewBefore: 720h  # 30d
+
+    spec:
+      clusterWide: true
+      healthz: {}
+      listener:
+        ports: {}
+        tls:
+          enabled: true
+          certSecretRef:
+            name: authorino-server-cert
+      logLevel: info
+      metrics: {}
+      oidcServer:
+        tls:
+          enabled: false
+      supersedingHostSubsets: true
+      tracing:
+        endpoint: ""
+      volumes: {}
 
   # ----------------------------------------------------------------------------
   # OpenShift Groups referenced by the subscriptions above.
