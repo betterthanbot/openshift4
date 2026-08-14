@@ -1006,7 +1006,7 @@ maas:
     enabled: true
     name: maas-default-gateway
     namespace: openshift-ingress
-    gatewayClassName: data-science-gateway-class
+    gatewayClassName: openshift-default
     # CHANGE ME
     hostname: maas.apps.cluster-dgs2z.dgs2z.sandbox3354.opentlc.com
     # Secret in the gateway namespace holding the TLS cert for `hostname`.
