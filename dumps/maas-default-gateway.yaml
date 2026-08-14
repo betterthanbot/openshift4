@@ -19,14 +19,14 @@ spec:
     - allowedRoutes:
         namespaces:
           from: All
-      hostname: maas.apps.cluster-7xdhm.7xdhm.sandbox5348.opentlc.com
+      hostname: maas.apps.cluster-dgs2z.dgs2z.sandbox3354.opentlc.com
       name: http
       port: 80
       protocol: HTTP
     - allowedRoutes:
         namespaces:
           from: All
-      hostname: maas.apps.cluster-7xdhm.7xdhm.sandbox5348.opentlc.com
+      hostname: maas.apps.cluster-dgs2z.dgs2z.sandbox3354.opentlc.com
       name: https
       port: 443
       protocol: HTTPS

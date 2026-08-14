@@ -984,7 +984,7 @@ maas:
     namespace: openshift-ingress
     gatewayClassName: openshift-default
     # CHANGE ME
-    hostname: maas.apps.cluster-7xdhm.7xdhm.sandbox5348.opentlc.com
+    hostname: maas.apps.cluster-dgs2z.dgs2z.sandbox3354.opentlc.com
     # Secret in the gateway namespace holding the TLS cert for `hostname`.
     tlsSecretName: cert-manager-ingress-cert
     # Rendered into a ConfigMap referenced by spec.infrastructure.parametersRef.

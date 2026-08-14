@@ -226,6 +226,26 @@ spec:
           kind: OdhDashboardConfig
           jsonPointers:
             - /status
+        # ------------------------------------------------------------------
+        # TEMPORARY — NVIDIA ClusterPolicy is being tuned by hand on-cluster.
+        #
+        # Ignoring /spec (not just /status) parks the ClusterPolicy: combined
+        # with RespectIgnoreDifferences=true and ApplyOutOfSyncOnly=true above,
+        # ArgoCD reports it Synced no matter what the live spec looks like, and
+        # skips it entirely during a sync — so a manual sync of operators-layer2
+        # will not clobber in-flight `oc edit` changes.
+        #
+        # TO RE-ENABLE GITOPS MANAGEMENT: fold the tested spec back into
+        # operators/layer2-operands/values.yaml (gpuOperator.clusterPolicy.spec)
+        # and DELETE this block. The next sync then overwrites the live object,
+        # so port your changes to values.yaml first or you will lose them.
+        # ------------------------------------------------------------------
+        - group: nvidia.com
+          kind: ClusterPolicy
+          name: gpu-cluster-policy
+          jsonPointers:
+            - /spec
+            - /status
         # MaaS/KServe/Kuadrant operands are heavily status-driven.
         - group: maas.opendatahub.io
           kind: MaaSSubscription
