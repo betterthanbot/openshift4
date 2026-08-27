@@ -121,5 +121,101 @@ metadata:
     service.beta.openshift.io/inject-cabundle: "true"
 {{- end }}
 
+{{- if $w.persesPrometheusDatasource.enabled }}
+{{- $ds := $w.persesPrometheusDatasource }}
+---
+# techdebt.md #2 + #4 — the default Prometheus datasource that the RHOAI console's
+# own "Observe & monitor -> Dashboard" (Perses, not Grafana) depends on.
+#
+# WHY THIS IS HAND-WRITTEN. The rhods-operator is supposed to generate this and
+# does not. Both operator-generated dashboards — dashboard-0-cluster-admin and
+# dashboard-1-model — reference their datasource by KIND ONLY:
+#
+#   datasource:
+#     kind: PrometheusDatasource      # note: no `name`
+#
+# With no named target they resolve against whichever PersesDatasource in their
+# namespace carries `default: true`. When none exists, every panel renders
+#   "No datasource found for kind 'PrometheusDatasource' and name 'undefined'"
+# which is the literal string 'undefined' from the dashboard JS, not a config
+# typo. One object with default: true fixes every panel on both tabs at once.
+#
+# WHY THE GLOBAL THANOS AND NOT THE DATA-SCIENCE ONE. Pointing this at
+# thanos-querier-data-science-thanos-querier:10902 clears the error but leaves
+# every panel on "No data": that Prometheus is monitoring.rhobs/v1 and its
+# service discovery is hardcoded to its own namespace, so it never sees
+# kube-state-metrics, node-exporter, DCGM or the vLLM pods. Re-verified on
+# cluster-dgs2z 2026-08-14 — /api/v1/stores returned {} and `up` returned zero
+# series. The metrics these dashboards want only exist on the global Thanos.
+#
+# Reaching the global Thanos needs both of the objects above:
+#   thanosServingCA          -> trusts its serving cert
+#   persesClusterMonitoringView -> grants the Perses SA (`default`) read access
+#
+# KNOWN RISK — kubernetesAuth. techdebt #4 recorded that
+# client.kubernetesAuth.enable did NOT attach a bearer token on the COO version
+# current in 2026-07, giving 401s from Thanos's kube-rbac-proxy, and that the
+# workaround was a Perses-NATIVE secret created through the Perses HTTP API —
+# an object Kubernetes cannot see and git cannot track. Those notes explicitly
+# say to retest after an operator upgrade, which is what this block does. If
+# panels return 401/"No data" rather than the datasource error, kubernetesAuth
+# is still broken: fall back to the Perses-native secret described in
+# techdebt.md #4 and set persesPrometheusDatasource.enabled: false here.
+apiVersion: perses.dev/v1alpha2
+kind: PersesDatasource
+metadata:
+  name: {{ $ds.name }}
+  namespace: {{ $w.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+  annotations:
+    # Wave 6 — after the CA ConfigMap (wave 5) it trusts and the ClusterRoleBinding.
+    argocd.argoproj.io/sync-wave: "6"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+{{- if $ds.useKubernetesAuth }}
+  # Only rendered in kubernetesAuth mode. In manual-secret mode `client` is
+  # omitted ENTIRELY and deliberately: the perses-operator resyncs every
+  # PersesDatasource cluster-wide every 30-60s and unconditionally regenerates
+  # <datasource>-secret from spec.client.*, so anything we add by hand there is
+  # wiped. Leaving client unset keeps the operator away from our secret.
+  client:
+    tls:
+      enable: true
+      caCert:
+        type: configmap
+        name: {{ $w.thanosServingCA.name }}
+        namespace: {{ $w.namespace }}
+        certPath: service-ca.crt
+    kubernetesAuth:
+      enable: true
+{{- end }}
+  config:
+    # The whole point — see the header. Exactly one datasource in this namespace
+    # may carry this.
+    default: true
+    display:
+      name: {{ $ds.displayName | quote }}
+    plugin:
+      kind: PrometheusDatasource
+      spec:
+        proxy:
+          kind: HTTPProxy
+          spec:
+            # REQUIRED, and easy to miss. `client.tls` above only makes the
+            # perses-operator MATERIALISE a Perses-native secret named
+            # <datasource>-secret holding the CA; it does not wire it into the
+            # proxy. Without this reference the proxy dials Thanos with an empty
+            # trust store and every panel fails with
+            #   tls: failed to verify certificate: x509: certificate signed by
+            #   unknown authority
+            # even though the CA is correct and present. Confirmed on
+            # cluster-dgs2z 2026-08-14. The name is derived by the operator, not
+            # chosen by us.
+            secret: {{ if $ds.useKubernetesAuth }}{{ $ds.name }}-secret{{ else }}{{ $ds.manualSecretName }}{{ end }}
+            url: {{ $ds.url | quote }}
+        scrapeInterval: {{ $ds.scrapeInterval }}
+{{- end }}
+
 {{- end }}
 {{- end }}

@@ -1254,14 +1254,10 @@ maas:
     namespace: kuadrant-system
     serviceName: authorino-authorino-authorization
 
-    certificate:
-      # Set false if you already issue authorino-server-cert some other way
-      # (e.g. an OpenShift service-serving-cert annotation on the Service).
-      enabled: true
-      secretName: authorino-server-cert
-      issuerName: authorino-selfsigned
-      duration: 8760h    # 1y
-      renewBefore: 720h  # 30d
+    # Issued by the OpenShift service-CA, NOT cert-manager — RHOAI's
+    # maas-default-gateway-authn-ssl EnvoyFilter pins the gateway's trust anchor
+    # to service-ca.crt, so nothing else validates. See the template header.
+    certSecretName: authorino-server-cert
 
     spec:
       clusterWide: true
@@ -1422,6 +1418,47 @@ clusterMonitoring:
       enabled: true
       name: data-science-perses-cluster-monitoring-view
       serviceAccountName: default
+
+    # techdebt #2: the rhods-operator never creates the default Prometheus
+    # PersesDatasource, so every panel on the RHOAI Observability dashboard
+    # renders "No datasource found for kind 'PrometheusDatasource' and name
+    # 'undefined'". This supplies it. See the template header for why it targets
+    # the global Thanos Querier and not the isolated data-science one.
+    persesPrometheusDatasource:
+      enabled: true
+      name: prometheus-datasource
+      displayName: Prometheus (Cluster - global Thanos)
+      # Port 9091 = cluster-wide tenancy (needs cluster-monitoring-view, granted
+      # by persesClusterMonitoringView above). Port 9092 is the per-namespace
+      # port and would scope the dashboards to a single namespace.
+      url: https://thanos-querier.openshift-monitoring.svc:9091
+      scrapeInterval: 30s
+
+      # RETESTED 2026-08-14 on cluster-dgs2z: client.kubernetesAuth.enable STILL
+      # does not attach a bearer token. With it on, TLS succeeds and Thanos's
+      # kube-rbac-proxy answers a plain-text 401. techdebt #4's finding stands,
+      # so this stays false and we use the manual-secret path below.
+      # Retest by flipping to true after any COO/perses-operator upgrade; if the
+      # panels populate, delete manualSecretName and the bootstrap step.
+      useKubernetesAuth: false
+
+      # A PERSES-NATIVE secret — NOT a Kubernetes Secret, so `oc get secret`
+      # will never show it and git cannot manage it. It lives in Perses' own
+      # store and is created through the Perses HTTP API. Bootstrap on a new
+      # cluster (token is capped at 1 year and needs manual renewal):
+      #
+      #   CA=$(oc get cm thanos-querier-serving-ca -n redhat-ods-monitoring \
+      #          -o jsonpath='{.data.service-ca\.crt}')
+      #   TOK=$(oc create token default -n redhat-ods-monitoring --duration=8760h)
+      #   # POST {"kind":"Secret","metadata":{"project":"redhat-ods-monitoring",
+      #   #   "name":"prometheus-datasource-manual-secret"},"spec":{
+      #   #   "tlsConfig":{"ca":"$CA"},
+      #   #   "authorization":{"type":"Bearer","credentials":"$TOK"}}}
+      #   # to http://localhost:8080/api/v1/projects/redhat-ods-monitoring/secrets
+      #   # from inside pod data-science-perses-0.
+      #
+      # Created on cluster-dgs2z 2026-08-14; token expires 2027-08-14.
+      manualSecretName: prometheus-datasource-manual-secret
 
     # techdebt #4: service-ca-operator injects the CA that signs
     # thanos-querier.openshift-monitoring.svc's serving certificate into this
