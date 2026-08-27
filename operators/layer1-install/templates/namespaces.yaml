@@ -19,22 +19,3 @@ metadata:
     meta.helm.sh/release-namespace: {{ $.Release.Namespace }}
 {{- end }}
 {{- end }}
-{{- /*
-  Extra namespaces that hold layer2 operands but are not any operator's own
-  install namespace (kuadrant-system, models-as-a-service, vllm-project).
-*/ -}}
-{{- range $ns := .Values.extraNamespaces }}
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ $ns.name }}
-  labels:
-    {{- range $k, $v := $ns.labels }}
-    {{ $k }}: {{ $v | quote }}
-    {{- end }}
-    {{- include "layer1-install.labels" $ | nindent 4 }}
-  annotations:
-    meta.helm.sh/release-name: {{ $.Release.Name }}
-    meta.helm.sh/release-namespace: {{ $.Release.Namespace }}
-{{- end }}

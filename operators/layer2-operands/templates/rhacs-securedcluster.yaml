@@ -14,7 +14,4 @@ metadata:
     {{- include "layer2-operands.labels" . | nindent 4 }}
 spec:
   clusterName: {{ $sc.clusterName | quote }}
-  {{- with $sc.centralEndpoint }}
-  centralEndpoint: {{ . | quote }}
-  {{- end }}
 {{- end }}

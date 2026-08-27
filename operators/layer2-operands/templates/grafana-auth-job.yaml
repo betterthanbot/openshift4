@@ -52,13 +52,7 @@ spec:
               # This triggers the Grafana Operator to reconcile and push the token
               # to Grafana via its API. ArgoCD ignoreDifferences prevents syncs
               # from resetting this field back to empty.
-              #
-              # Datasources labelled grafana.openshift4/auth=none are skipped —
-              # they authenticate some other way (e.g. the MaaS postgres
-              # datasource uses a username/password from a Secret) and stamping
-              # an Authorization header onto them corrupts their config.
-              for CR in $(oc get grafanadatasource -n {{ $sa.namespace }} \
-                            -l 'grafana.openshift4/auth!=none' -o name); do
+              for CR in $(oc get grafanadatasource -n {{ $sa.namespace }} -o name); do
                 oc patch "${CR}" -n {{ $sa.namespace }} \
                   --type merge \
                   -p "{\"spec\":{\"datasource\":{\"secureJsonData\":{\"httpHeaderValue1\":\"Bearer ${TOKEN}\"}}}}"

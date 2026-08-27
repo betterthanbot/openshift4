@@ -29,15 +29,13 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/betterthanbot/openshift4.git
-        revision: argocd/demo
+        revision: main
         directories:
           # Each subdirectory here becomes one ArgoCD Application.
           # Add new workloads by creating overlay/my-sno-cluster/<name>/kustomization.yaml
           - path: overlay/my-sno-cluster/*
           # To disable a workload without deleting the folder, add it here with exclude: true
           - path: overlay/my-sno-cluster/kyverno
-            exclude: true
-          - path: overlay/my-sno-cluster/get-a-username
             exclude: true
         # template:
         #   metadata:
@@ -55,7 +53,7 @@ spec:
 
       source:
         repoURL: https://github.com/betterthanbot/openshift4.git
-        targetRevision: argocd/demo
+        targetRevision: main
         path: "{{ .path.path }}"
         # ArgoCD auto-detects kustomize (kustomization.yaml present)
         # or Helm (Chart.yaml present) — no explicit config needed
@@ -67,49 +65,41 @@ spec:
         namespace: default
 
       syncPolicy:
-        # automated:
-        #   prune: true
-        #   selfHeal: true
+        automated:
+          prune: true
+          selfHeal: true
         allowEmpty: true
         syncOptions:
           - CreateNamespace=true
           - ApplyOutOfSyncOnly=true
           - RespectIgnoreDifferences=true
-          # Same reasoning as argocd/appset-operators.yaml — see the long note
-          # there. ArgoCD rejects an entire sync up front if any rendered kind is
-          # unknown to the cluster, and `model-serving` is made almost entirely
-          # of kinds that only exist after the RHOAI DataScienceCluster has
-          # reconciled: serving.kserve.io (LLMInferenceService,
-          # LLMInferenceServiceConfig, InferenceService, ServingRuntime) and
-          # llamastack.io (LlamaStackDistribution).
-          #
-          # NOT sufficient on its own — see the note in appset-operators.yaml.
-          # The per-resource annotation that actually works is set via
-          # commonAnnotations in bases/model-serving/kustomization.yaml.
-          - SkipDryRunOnMissingResource=true
-        retry:
-          # Workloads land after operators AND operands, so give them room —
-          # a model-serving sync attempted before the DSC has registered the
-          # KServe CRDs should keep retrying rather than give up.
-          limit: 10
-          backoff:
-            duration: 30s
-            factor: 2
-            maxDuration: 3m
 
       ignoreDifferences:
-        # Gatus config is generated at runtime by the discovery CronJob
         - group: ""
           kind: ConfigMap
           name: gatus-config
           namespace: gatus
           jsonPointers:
             - /data
-        # get-a-username secret — placeholder is committed; real password is set
-        # manually via `oc edit`, never committed to git.
+
+        # --- get-a-username ----------------------------------------------
+        # Workshop user/admin passwords + access token. Placeholders in git;
+        # real values set with `oc edit secret get-a-username-secret -n guides`.
         - group: ""
           kind: Secret
           name: get-a-username-secret
           namespace: guides
+          jsonPointers:
+            - /data
+        - group: ""
+          kind: Secret
+          name: redis
+          namespace: guides
+          jsonPointers:
+            - /data
+        - group: ""
+          kind: Secret
+          name: ctfd-secrets
+          namespace: ctfd
           jsonPointers:
             - /data

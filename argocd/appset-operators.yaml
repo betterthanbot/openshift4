@@ -49,7 +49,7 @@ spec:
 
       source:
         repoURL: https://github.com/betterthanbot/openshift4.git
-        targetRevision: argocd/demo
+        targetRevision: main
         path: "{{path}}"
         helm:
           valueFiles:
@@ -60,73 +60,21 @@ spec:
         namespace: "{{destNamespace}}"
 
       syncPolicy:
-        # automated:
-        #   prune: false       # never auto-delete operator namespaces or CRDs
-        #   selfHeal: true
+        automated:
+          prune: false       # never auto-delete operator namespaces or CRDs
+          selfHeal: true
         allowEmpty: true
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true          # required for large ArgoCD / operator CRs
           - RespectIgnoreDifferences=true
           - ApplyOutOfSyncOnly=true
-          # ------------------------------------------------------------------
-          # SkipDryRunOnMissingResource=true — DO NOT REMOVE.
-          #
-          # Before running any sync task, ArgoCD resolves every rendered
-          # resource's GVK against the cluster's discovery API. If even ONE kind
-          # is unknown, gitops-engine fails the whole operation with
-          # "one or more synchronization tasks are not valid" and applies
-          # NOTHING. The failure is atomic, not per-resource.
-          #
-          # That is fatal for this repo, because layer2 is nothing but custom
-          # resources whose CRDs are installed by layer1 operators — and, worse,
-          # a few whose CRDs are installed by a layer2 operand:
-          #
-          #   DataScienceCluster (wave 0, this app)
-          #     └─ kserve.modelsAsService: Managed
-          #          └─ installs maas.opendatahub.io CRDs
-          #               └─ Tenant / MaaSSubscription / MaaSAuthPolicy (waves 3-4, this app)
-          #     └─ dashboard component
-          #          └─ installs opendatahub.io/OdhDashboardConfig
-          #               └─ OdhDashboardConfig (wave 4, this app)
-          #
-          # Without this option that is a hard deadlock: the DSC can never be
-          # created, because the sync that would create it is rejected up front
-          # over CRs that only exist once the DSC has run. Observed on
-          # cluster-dgs2z 2026-08-06 — every operator installed, zero operands.
-          #
-          # With it, unknown kinds are marked skipDryRun instead of invalidating
-          # the sync. They still fail at apply time while the CRD is absent, but
-          # everything else applies, and the retry below converges once the CRDs
-          # appear. Sync waves alone do NOT save you here: ArgoCD has no health
-          # check for DataScienceCluster, so it is considered Healthy the moment
-          # it is created and later waves start immediately.
-          #
-          # IMPORTANT — this app-level entry is NOT sufficient on its own.
-          # Tested on OpenShift GitOps 1.21.1 (cluster-dgs2z, 2026-08-06): with
-          # only this option set, the sync still failed with 0 resources synced.
-          # The option is honoured per-resource, via
-          #   argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
-          # on the object itself. Those annotations are the actual fix and live
-          # in:
-          #   operators/layer2-operands/templates/maas-tenant.yaml
-          #   operators/layer2-operands/templates/rhods-dashboard-config.yaml
-          #   bases/model-serving/kustomization.yaml  (commonAnnotations)
-          # This entry is kept as belt-and-braces for ArgoCD versions that do
-          # respect it, but do not rely on it alone.
-          # ------------------------------------------------------------------
-          - SkipDryRunOnMissingResource=true
         retry:
-          # Sized for a cold bootstrap: RHOAI needs ~10-15 min to install its
-          # operator, reconcile the DSC and register the MaaS/KServe CRDs, and
-          # nothing here is `automated`, so if retries run out the app just sits
-          # Failed until someone syncs it by hand.
-          # 30s + 60s + 120s + 180s x7 ≈ 24 min of retrying.
-          limit: 10
+          limit: 5
           backoff:
             duration: 30s
             factor: 2
-            maxDuration: 3m
+            maxDuration: 5m
 
       # Ignore fields that operators / OCP manage themselves after creation
       ignoreDifferences:
@@ -188,70 +136,3 @@ spec:
           kind: GrafanaDatasource
           jsonPointers:
             - /spec/datasource/secureJsonData
-        # MaaS metrics DB + Grafana Postgres credentials — placeholders are
-        # committed; real passwords are set manually.
-        - group: ""
-          kind: Secret
-          name: maas-postgres
-          namespace: redhat-ods-applications
-          jsonPointers:
-            - /data
-        - group: ""
-          kind: Secret
-          name: maas-postgres-grafana-auth
-          namespace: grafana
-          jsonPointers:
-            - /data
-        # maas-db-config holds DB_CONNECTION_URL with the same password embedded
-        # in it — placeholder committed, real value set manually.
-        - group: ""
-          kind: Secret
-          name: maas-db-config
-          namespace: redhat-ods-applications
-          jsonPointers:
-            - /data
-        # thanos-querier-serving-ca is committed empty; service-ca-operator
-        # injects service-ca.crt into it (techdebt.md #4). Ignore data so ArgoCD
-        # does not keep blanking it back out.
-        - group: ""
-          kind: ConfigMap
-          name: thanos-querier-serving-ca
-          namespace: redhat-ods-monitoring
-          jsonPointers:
-            - /data
-        # cluster-monitoring-config is shared with OCP (retention, storage,
-        # alertmanager). We ServerSideApply only enableUserWorkload into it, so
-        # ignore any other keys the cluster or an admin adds.
-        - group: ""
-          kind: ConfigMap
-          name: cluster-monitoring-config
-          namespace: openshift-monitoring
-          jsonPointers:
-            - /data
-        # RHOAI owns OdhDashboardConfig; we patch a subset of fields via
-        # ServerSideApply and let the operator manage the rest.
-        - group: opendatahub.io
-          kind: OdhDashboardConfig
-          jsonPointers:
-            - /status
-        # NVIDIA ClusterPolicy was parked here (ignoring /spec) while the policy
-        # was tuned by hand on-cluster. The tested spec now lives in
-        # operators/layer2-operands/values.yaml, so git is authoritative again
-        # and only /status is ignored.
-        - group: nvidia.com
-          kind: ClusterPolicy
-          jsonPointers:
-            - /status
-        # MaaS/KServe/Kuadrant operands are heavily status-driven.
-        - group: maas.opendatahub.io
-          kind: MaaSSubscription
-          jsonPointers:
-            - /status
-        - group: kuadrant.io
-          kind: Kuadrant
-          jsonPointers:
-            - /status
-        - group: gateway.networking.k8s.io
-          kind: Gateway
-          jsonPointers:
-            - /status

@@ -1,5 +1,0 @@
-# Generated artifacts contain live MaaS API keys and htpasswd passwords.
-# Never commit them.
-out/
-*.csv
-.passwords.json

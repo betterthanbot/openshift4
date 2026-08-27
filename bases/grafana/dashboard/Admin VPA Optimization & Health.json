@@ -12,7 +12,6 @@
       }
     ]
   },
-  "description": "REQUIRES the Vertical Pod Autoscaler CRDs and kube-state-metrics' VPA custom-resource-state feature to be installed and scraped. Verified against a live cluster metrics catalog (2026-07-24): no kube_customresource_verticalpodautoscaler_* series exist anywhere - not a query bug, VPA simply isn't installed/exposed on this cluster right now. Every panel here will show \"No data\" until that changes; the queries themselves are correct for when it does.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
