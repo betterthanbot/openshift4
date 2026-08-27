@@ -22,9 +22,9 @@ spec:
     namespace: openshift-gitops
   project: default
   source:
-    repoURL: https://github.com/dariuslwh95/masterclass-sandbox.git
+    repoURL: https://github.com/betterthanbot/openshift4.git
     path: argocd/
-    targetRevision: feat/dl-init
+    targetRevision: feature/dl
   syncPolicy:
     automated:
       prune: false      # never auto-delete argocd/ resources
