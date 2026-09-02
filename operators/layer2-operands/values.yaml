@@ -142,26 +142,32 @@ rhacs:
 
   # SecuredCluster registers this cluster's Sensor/Collector with Central.
   #
-  # HARD PREREQUISITE — this is what broke on the source cluster: SecuredCluster
-  # cannot start until a cluster init bundle Secret exists in the `stackrox`
-  # namespace. The bundle is issued by Central, so it cannot exist on a cold
-  # bootstrap, and ArgoCD applying SecuredCluster in the same wave as Central
-  # leaves it stuck. The CR had to be deleted and re-applied by hand once the
-  # bundle was in place (the live CR carried no ArgoCD tracking-id as a result).
+  # HARD PREREQUISITE — SecuredCluster cannot register until a cluster
+  # registration secret (CRS) exists in the `stackrox` namespace. The CRS is
+  # issued by Central, so it cannot exist on a cold bootstrap, and ArgoCD
+  # applying SecuredCluster in the same wave as Central leaves it stuck.
   #
   # Two ways to unblock it:
   #   1. Leave enabled: false on first bootstrap. Once Central is Available,
-  #      generate the bundle and apply it, then flip to true:
+  #      generate the CRS and apply it, then flip to true:
   #        oc -n stackrox get secret central-htpasswd \
   #          -o go-template='{{index .data "password" | base64decode}}'
   #        # log in to the Central route -> Platform Configuration -> Clusters
-  #        # -> Init bundles -> Generate -> download the "Operator" YAML
-  #        oc apply -f <cluster-init-bundle>.yaml -n stackrox
+  #        # -> Cluster registration secrets -> Create -> download the YAML
+  #        oc apply -f <cluster-registration-secret>.yaml -n stackrox
   #   2. Leave it enabled and let ArgoCD retry — it will keep failing until the
-  #      bundle Secret lands, then converge on its own.
+  #      CRS lands, then converge on its own.
   #
-  # The bundle Secret (`cluster-registration-secret` / the older
-  # `*-tls` trio) is NOT in git — it holds cluster-specific service certs.
+  # On first registration Sensor mints tls-cert-sensor / tls-cert-collector /
+  # tls-cert-admission-control from the CRS; collector and admission-control
+  # mount those and stay in ContainerCreating until they exist. Sensor prefers
+  # the older `*-tls` init-bundle secrets over the CRS when both are present, so
+  # after rotating to a CRS delete sensor-tls / collector-tls /
+  # admission-control-tls — otherwise Sensor keeps presenting the stale (likely
+  # revoked) init-bundle certs and never registers.
+  #
+  # Neither the CRS nor the `*-tls` trio is in git — they hold cluster-specific
+  # service certs.
   securedCluster:
     enabled: true
     name: stackrox-secured-cluster-services
@@ -171,6 +177,18 @@ rhacs:
     # Defaults to central.stackrox.svc:443 when empty — correct for a
     # Central running in the same cluster, which is the case here.
     centralEndpoint: ""
+    # Sensor's default request is 2 CPU, which does not fit on a worker pool
+    # already ~90% requested (RHACS Central + scanners alone account for most of
+    # it). The pod stays Pending, and because Sensor is what issues the
+    # tls-cert-* secrets, collector and admission-control hang behind it.
+    sensor:
+      resources:
+        requests:
+          cpu: "1"
+          memory: 4Gi
+        limits:
+          cpu: "2"
+          memory: 8Gi
 
 # ------------------------------------------------------------------------------
 # OpenShift GitOps / ArgoCD
