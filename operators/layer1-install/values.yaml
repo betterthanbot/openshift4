@@ -166,7 +166,7 @@ operators:
   # Cluster Logging (Red Hat)
   # ----------------------------------------------------------------------------
   clusterLogging:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: openshift-logging
@@ -217,7 +217,7 @@ operators:
   # that require their own OperatorGroup (not the global one).
   # ----------------------------------------------------------------------------
   lokiOperator:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: openshift-operators-redhat

@@ -296,7 +296,7 @@ gitops:
 # Cluster Logging / LokiStack
 # ------------------------------------------------------------------------------
 logging:
-  enabled: true
+  enabled: false
 
   clusterLogForwarder:
     enabled: true
@@ -470,7 +470,7 @@ grafana:
 # CHANGE ME: storage.secret.name, storageClassName, and schemas.effectiveDate.
 # ------------------------------------------------------------------------------
 lokiStack:
-  enabled: true
+  enabled: false
   name: logging-loki
   namespace: openshift-logging
   spec:
