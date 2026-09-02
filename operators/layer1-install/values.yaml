@@ -142,7 +142,7 @@ operators:
   # Kernel Module Management Hub (Red Hat)
   # ----------------------------------------------------------------------------
   kmmHub:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: openshift-kmm-hub
