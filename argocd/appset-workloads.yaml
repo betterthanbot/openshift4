@@ -65,10 +65,12 @@ spec:
         namespace: default
 
       syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
-        allowEmpty: true
+        # Auto-sync DISABLED — generated Applications must be synced manually.
+        # Re-enable by uncommenting the block below.
+        # automated:
+        #   prune: true
+        #   selfHeal: true
+        #   allowEmpty: true
         syncOptions:
           - CreateNamespace=true
           - ApplyOutOfSyncOnly=true

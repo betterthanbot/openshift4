@@ -26,9 +26,11 @@ spec:
     path: argocd/
     targetRevision: feature/dl
   syncPolicy:
-    automated:
-      prune: false      # never auto-delete argocd/ resources
-      selfHeal: true
+    # Auto-sync DISABLED — sync this Application manually (UI / `argocd app sync`).
+    # Re-enable by uncommenting the block below.
+    # automated:
+    #   prune: false      # never auto-delete argocd/ resources
+    #   selfHeal: true
     syncOptions:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
