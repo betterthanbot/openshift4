@@ -13,10 +13,10 @@
 #   oc edit secret netobserv-loki-s3 -n netobserv
 # ------------------------------------------------------------------------------
 netobserv:
-  enabled: true
+  enabled: false
 
   lokiStack:
-    enabled: true
+    enabled: false
     name: netobserv-loki
     namespace: netobserv
     spec:
@@ -128,7 +128,7 @@ netobserv:
 # Red Hat Advanced Cluster Security (RHACS)
 # ------------------------------------------------------------------------------
 rhacs:
-  enabled: true
+  enabled: false
 
   central:
     enabled: true
@@ -296,7 +296,7 @@ gitops:
 # Cluster Logging / LokiStack
 # ------------------------------------------------------------------------------
 logging:
-  enabled: true
+  enabled: false
 
   clusterLogForwarder:
     enabled: true
@@ -317,7 +317,7 @@ logging:
 # operator; only the custom ones are managed here.
 # ------------------------------------------------------------------------------
 compliance:
-  enabled: true
+  enabled: false
 
   scanSettings:
     - name: cis-1.7-full
@@ -470,7 +470,7 @@ grafana:
 # CHANGE ME: storage.secret.name, storageClassName, and schemas.effectiveDate.
 # ------------------------------------------------------------------------------
 lokiStack:
-  enabled: true
+  enabled: false
   name: logging-loki
   namespace: openshift-logging
   spec:
@@ -496,7 +496,7 @@ lokiStack:
 # Detects hardware features (GPU, CPU flags, PCI devices) and labels nodes.
 # ------------------------------------------------------------------------------
 nfd:
-  enabled: true
+  enabled: false
 
   instance:
     enabled: true
@@ -528,7 +528,7 @@ nfd:
 # Toggle individual components via managementState: Managed | Removed.
 # ------------------------------------------------------------------------------
 rhods:
-  enabled: true
+  enabled: false
 
   dscInitialization:
     enabled: true
@@ -618,7 +618,7 @@ cnv:
 # Manages driver, toolkit, device-plugin, DCGM, GFD daemonsets on GPU nodes.
 # ------------------------------------------------------------------------------
 gpuOperator:
-  enabled: true
+  enabled: false
 
   clusterPolicy:
     enabled: true
@@ -673,6 +673,6 @@ gpuOperator:
 # regeneration one-liner.
 # ------------------------------------------------------------------------------
 workshopAuth:
-  enabled: false
+  enabled: true
   identityProviderName: workshop-htpasswd
   secretName: workshop-htpasswd

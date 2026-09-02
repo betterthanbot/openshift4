@@ -24,7 +24,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 type: Opaque
 data:
-  SECRET_KEY: UnpkclRYRlBlRlJNZGpSclVWTmpTa3RTYkd0WGFEUkxRVGg0YUUwMVdqUktSR2xDZWxKS01HdE0=
+  SECRET_KEY: TWpNeWRUSk5TakpMWVZwQmRYZEZURXRVVkRCU1pVd3hVekZVUjBGMFp6Wm9aR0pJUm1keVEwYzA=
 ---
 # Source: ctfd/templates/persistantvolumeclaim.yaml
 apiVersion: v1
@@ -79,7 +79,7 @@ metadata:
     app.kubernetes.io/version: "3.8.2"
     app.kubernetes.io/managed-by: Helm
 spec:
-  replicas: 1
+  replicas: 5
   selector:
     matchLabels:
       app.kubernetes.io/name: ctfd

@@ -49,7 +49,7 @@ spec:
 
       source:
         repoURL: https://github.com/betterthanbot/openshift4.git
-        targetRevision: main
+        targetRevision: feature/dl
         path: "{{path}}"
         helm:
           valueFiles:
@@ -60,10 +60,12 @@ spec:
         namespace: "{{destNamespace}}"
 
       syncPolicy:
-        automated:
-          prune: false       # never auto-delete operator namespaces or CRDs
-          selfHeal: true
-        allowEmpty: true
+        # Auto-sync DISABLED — generated Applications must be synced manually.
+        # Re-enable by uncommenting the block below.
+        # automated:
+        #   prune: false       # never auto-delete operator namespaces or CRDs
+        #   selfHeal: true
+        #   allowEmpty: true
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true          # required for large ArgoCD / operator CRs

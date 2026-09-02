@@ -18,7 +18,7 @@ controller:
   # -- Type of the workload object.
   kind: Deployment
   # -- The number of replicas.
-  replicas: 1
+  replicas: 5
   # -- The controller update strategy. Currently only applies to controllers of kind `Deployment`.
   updateStrategy: {}
   # -- Additional annotations for the controller object.
