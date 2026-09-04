@@ -1,0 +1,55 @@
+# ==============================================================================
+# LLMInferenceServiceConfig — per-model overlay on top of the cluster-wide
+# RHOAI templates in redhat-ods-applications (v3-4-2-kserve-config-llm-*).
+#
+# These two exist only to pin the vLLM CUDA runtime image for the two -maas
+# models, which reference them via spec.baseRefs.
+#
+# CHANGE ME after an RHOAI upgrade: the image digest and the
+# opendatahub.io/template-name annotation are both version-stamped (v3-4-2).
+# Re-copy them from the current
+# `oc get llminferenceserviceconfig -n redhat-ods-applications` template.
+# ==============================================================================
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceServiceConfig
+metadata:
+  annotations:
+    opendatahub.io/recommended-accelerators: '["nvidia.com/gpu"]'
+    opendatahub.io/template-name: v3-4-2-kserve-config-llm-template-nvidia-cuda
+    openshift.io/description: vLLM NVIDIA CUDA GPU LLMInferenceServiceConfig for LLMInferenceService.
+    openshift.io/display-name: vLLM NVIDIA CUDA GPU LLMInferenceServiceConfig
+    platform.opendatahub.io/type: OpenShift AI Self-Managed
+    platform.opendatahub.io/version: 3.4.2
+    serving.kserve.io/well-known-config: "true"
+  name: llama-32-1b-instruct-maas
+  namespace: vllm-project
+spec:
+  model:
+    uri: ""
+  template:
+    containers:
+      - image: registry.redhat.io/rhaii/vllm-cuda-rhel9@sha256:5800e12b2a465f15961fcf34b645d79ed4f91ec9161eab22b1205d12682183c8
+        name: main
+        resources: {}
+---
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceServiceConfig
+metadata:
+  annotations:
+    opendatahub.io/recommended-accelerators: '["nvidia.com/gpu"]'
+    opendatahub.io/template-name: v3-4-2-kserve-config-llm-template-nvidia-cuda
+    openshift.io/description: vLLM NVIDIA CUDA GPU LLMInferenceServiceConfig for LLMInferenceService.
+    openshift.io/display-name: vLLM NVIDIA CUDA GPU LLMInferenceServiceConfig
+    platform.opendatahub.io/type: OpenShift AI Self-Managed
+    platform.opendatahub.io/version: 3.4.2
+    serving.kserve.io/well-known-config: "true"
+  name: qwen25-05b-instruct-maas
+  namespace: vllm-project
+spec:
+  model:
+    uri: ""
+  template:
+    containers:
+      - image: registry.redhat.io/rhaii/vllm-cuda-rhel9@sha256:5800e12b2a465f15961fcf34b645d79ed4f91ec9161eab22b1205d12682183c8
+        name: main
+        resources: {}

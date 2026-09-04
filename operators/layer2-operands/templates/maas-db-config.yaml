@@ -1,0 +1,51 @@
+{{- if and .Values.maas .Values.maas.enabled .Values.maas.dbConfig .Values.maas.dbConfig.enabled }}
+{{- $c := .Values.maas.dbConfig }}
+{{- $db := .Values.maas.metricsDatabase }}
+---
+# ------------------------------------------------------------------------------
+# maas-db-config — the CLIENT-side connection string for the MaaS API.
+#
+# Distinct from the maas-postgres Secret in maas-metrics-db.yaml: that one holds
+# the SERVER's own credentials (database-name/user/password consumed by the
+# postgresql container's env). This one holds a single DB_CONNECTION_URL key,
+# which is what the RHOAI maas-controller looks for. Without it the DSC reports:
+#
+#   ModelsAsServiceReady=False  reason=PrerequisitesNotMet
+#   "database Secret 'maas-db-config' not found in namespace
+#    'redhat-ods-applications'. Create the Secret with key 'DB_CONNECTION_URL'"
+#
+# The password is NOT in git, same as maas-postgres. A placeholder is created on
+# first sync; substitute the real one (it must MATCH database-password in the
+# maas-postgres Secret) with:
+#
+#   PW=$(oc get secret {{ $db.secretName }} -n {{ $db.namespace }} \
+#          -o jsonpath='{.data.database-password}' | base64 -d)
+#   oc create secret generic {{ $c.secretName }} -n {{ $c.namespace }} \
+#     --from-literal=DB_CONNECTION_URL="postgresql://{{ $db.user }}:${PW}@{{ $db.name }}.{{ $db.namespace }}.svc.cluster.local:5432/{{ $db.database }}?sslmode={{ $c.sslMode }}" \
+#     --dry-run=client -o yaml | oc apply -f -
+#
+# sslmode=disable is deliberate: the postgresql:15-el9 imagestream image serves
+# plaintext on 5432 with no server certificate, and the connection never leaves
+# the cluster SDN. Set dbConfig.sslMode if you front it with TLS.
+#
+# Prune=false + IgnoreExtraneous + the /data ignoreDifferences entry in
+# argocd/appset-operators.yaml keep ArgoCD from blanking the real URL back to
+# the placeholder on every sync.
+# ------------------------------------------------------------------------------
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $c.secretName }}
+  namespace: {{ $c.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+  annotations:
+    # Wave 1 — alongside the maas-postgres Secret and ahead of the
+    # DataScienceCluster (wave 2), whose modelsAsService component gates on it.
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: Prune=false
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+type: Opaque
+stringData:
+  DB_CONNECTION_URL: "postgresql://{{ $db.user }}:CHANGE_ME@{{ $db.name }}.{{ $db.namespace }}.svc.cluster.local:5432/{{ $db.database }}?sslmode={{ $c.sslMode }}"
+{{- end }}

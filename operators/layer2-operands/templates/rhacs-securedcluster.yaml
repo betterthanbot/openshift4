@@ -2,9 +2,9 @@
 {{- $sc := .Values.rhacs.securedCluster }}
 ---
 # RHACS SecuredCluster — registers this cluster's Sensor/Collector with Central.
-# Prerequisite: Central must be up and the init bundle secret must exist.
-# Generate the bundle from the RHACS console and apply it to the cluster before
-# this resource is created.
+# Prerequisite: a cluster registration secret (CRS) must exist in the `stackrox`
+# namespace. The CRS is issued by Central, so generate it from the RHACS console
+# and apply it to the cluster before this resource is created.
 apiVersion: platform.stackrox.io/v1alpha1
 kind: SecuredCluster
 metadata:
@@ -14,4 +14,11 @@ metadata:
     {{- include "layer2-operands.labels" . | nindent 4 }}
 spec:
   clusterName: {{ $sc.clusterName | quote }}
+  {{- with $sc.centralEndpoint }}
+  centralEndpoint: {{ . | quote }}
+  {{- end }}
+  {{- with $sc.sensor }}
+  sensor:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 {{- end }}

@@ -1,0 +1,13 @@
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSModelRef
+metadata:
+  annotations:
+    openshift.io/display-name: llama-3.2-1b-instruct-maas
+  finalizers:
+    - maas.opendatahub.io/model-cleanup
+  name: llama-32-1b-instruct-maas
+  namespace: vllm-project
+spec:
+  modelRef:
+    kind: LLMInferenceService
+    name: llama-32-1b-instruct-maas

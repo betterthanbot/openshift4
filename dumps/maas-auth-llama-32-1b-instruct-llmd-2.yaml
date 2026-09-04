@@ -1,0 +1,209 @@
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  annotations:
+    maas.opendatahub.io/auth-policies: team-alpha-policy,team-bravo-policy
+  labels:
+    app.kubernetes.io/component: auth-policy
+    app.kubernetes.io/managed-by: maas-controller
+    app.kubernetes.io/part-of: maas-auth-policy
+    maas.opendatahub.io/model: llama-32-1b-instruct-llmd-2
+  name: maas-auth-llama-32-1b-instruct-llmd-2
+  namespace: vllm-project
+spec:
+  rules:
+    authentication:
+      api-keys:
+        metrics: false
+        plain:
+          selector: request.headers.authorization
+        priority: 0
+        when:
+          - operator: matches
+            selector: request.headers.authorization
+            value: ^Bearer sk-oai-.*
+      kubernetes-tokens:
+        kubernetesTokenReview:
+          audiences:
+            - https://kubernetes.default.svc
+        metrics: false
+        priority: 1
+        when:
+          - operator: matches
+            selector: request.url_path
+            value: .*/v1/models$
+          - operator: neq
+            selector: request.headers.authorization
+            value: ""
+    authorization:
+      auth-valid:
+        cache:
+          key:
+            selector: '(has(auth.metadata.apiKeyValidation) ? "api-key|" + request.headers.authorization.replace("Bearer ", "") : (has(auth.identity.sub) ? "oidc|" + auth.identity.sub : "k8s-token|" + auth.identity.user.username)) + "|vllm-project/llama-32-1b-instruct-llmd-2"'
+          ttl: 60
+        metrics: false
+        opa:
+          allValues: false
+          rego: |-
+            # API key authentication: validate the key
+            allow {
+              object.get(input.auth.metadata, "apiKeyValidation", {})
+              input.auth.metadata.apiKeyValidation.valid == true
+            }
+
+            # Kubernetes token authentication: check identity exists
+            allow {
+              object.get(input.auth.identity, "user", {}).username != ""
+            }
+
+            # OIDC token authentication: check JWT subject exists
+            allow {
+              object.get(input.auth.identity, "sub", "") != ""
+            }
+        priority: 0
+      require-group-membership:
+        cache:
+          key:
+            selector: '((has(auth.metadata) && has(auth.metadata.apiKeyValidation)) ? auth.metadata.apiKeyValidation.userId : (has(auth.identity.preferred_username) ? auth.identity.preferred_username : (has(auth.identity.sub) ? auth.identity.sub : auth.identity.user.username))) + "|" + ((has(auth.metadata) && has(auth.metadata.apiKeyValidation)) ? auth.metadata.apiKeyValidation.groups : (has(auth.identity.groups) ? auth.identity.groups : auth.identity.user.groups)).join(",") + "|vllm-project/llama-32-1b-instruct-llmd-2"'
+          ttl: 60
+        metrics: false
+        opa:
+          allValues: false
+          rego: |2
+
+            # Allowed groups and users from all MaaSAuthPolicies
+            allowed_groups := ["team-alpha","team-bravo"]
+            allowed_users := []
+
+            # Extract username from API key, OIDC, or K8s token
+            username := input.auth.metadata.apiKeyValidation.username
+                { object.get(input.auth, "metadata", {}).apiKeyValidation.username != "" }
+            else := input.auth.identity.preferred_username
+                { object.get(input.auth, "identity", {}).preferred_username != "" }
+            else := input.auth.identity.sub
+                { object.get(input.auth, "identity", {}).sub != "" }
+            else := input.auth.identity.user.username
+                { object.get(input.auth, "identity", {}).user.username != "" }
+            else := ""
+
+            # Extract groups from API key, OIDC, or K8s token
+            groups := input.auth.metadata.apiKeyValidation.groups
+                { object.get(input.auth, "metadata", {}).apiKeyValidation.groups != [] }
+            else := input.auth.identity.groups
+                { object.get(input.auth, "identity", {}).groups != [] }
+            else := input.auth.identity.user.groups
+                { object.get(input.auth, "identity", {}).user.groups != [] }
+            else := []
+
+            # Allow if user is in allowed users
+            allow {
+                username == allowed_users[_]
+            }
+
+            # Allow if any user group is in allowed groups
+            allow {
+                groups[_] == allowed_groups[_]
+            }
+        priority: 0
+      subscription-valid:
+        cache:
+          key:
+            selector: '((has(auth.metadata) && has(auth.metadata.apiKeyValidation)) ? auth.metadata.apiKeyValidation.userId : (has(auth.identity.preferred_username) ? auth.identity.preferred_username : (has(auth.identity.sub) ? auth.identity.sub : auth.identity.user.username))) + "|" + ((has(auth.metadata) && has(auth.metadata.apiKeyValidation)) ? auth.metadata.apiKeyValidation.groups : (has(auth.identity.groups) ? auth.identity.groups : auth.identity.user.groups)).join(",") + "|" + ((has(auth.metadata) && has(auth.metadata.apiKeyValidation)) ? auth.metadata.apiKeyValidation.subscription : ("x-maas-subscription" in request.headers ? request.headers["x-maas-subscription"] : "")) + "|vllm-project/llama-32-1b-instruct-llmd-2"'
+          ttl: 60
+        metrics: false
+        opa:
+          allValues: false
+          rego: "allow {\n\t# Subscription name must be present (selector succeeded)\n\tobject.get(input.auth.metadata[\"subscription-info\"], \"name\", \"\") != \"\"\n\t# Error field must be empty (no validation errors from selector)\n\tobject.get(input.auth.metadata[\"subscription-info\"], \"error\", \"\") == \"\"\n\t# Allowlist: phase must be exactly \"Active\" or \"Degraded\" (reject empty/unreconciled)\n\tphase := object.get(input.auth.metadata[\"subscription-info\"], \"phase\", \"\")\n\tany([phase == \"Active\", phase == \"Degraded\"])\n\t# Subscription must not be deleting\n\tobject.get(input.auth.metadata[\"subscription-info\"], \"deletionTimestamp\", \"\") == \"\"\n}"
+        priority: 0
+    metadata:
+      apiKeyValidation:
+        cache:
+          key:
+            selector: request.headers.authorization.replace("Bearer ", "")
+          ttl: 60
+        http:
+          body:
+            expression: '{"key": request.headers.authorization.replace("Bearer ", "")}'
+          contentType: application/json
+          method: POST
+          url: https://maas-api.redhat-ods-applications.svc.cluster.local:8443/internal/v1/api-keys/validate
+        metrics: false
+        priority: 0
+        when:
+          - operator: matches
+            selector: request.headers.authorization
+            value: ^Bearer sk-oai-.*
+      subscription-info:
+        cache:
+          key:
+            selector: '((has(auth.metadata) && has(auth.metadata.apiKeyValidation)) ? auth.metadata.apiKeyValidation.userId : (has(auth.identity.preferred_username) ? auth.identity.preferred_username : (has(auth.identity.sub) ? auth.identity.sub : auth.identity.user.username))) + "|" + ((has(auth.metadata) && has(auth.metadata.apiKeyValidation)) ? auth.metadata.apiKeyValidation.groups : (has(auth.identity.groups) ? auth.identity.groups : auth.identity.user.groups)).join(",") + "|" + ((has(auth.metadata) && has(auth.metadata.apiKeyValidation)) ? auth.metadata.apiKeyValidation.subscription : ("x-maas-subscription" in request.headers ? request.headers["x-maas-subscription"] : "")) + "|vllm-project/llama-32-1b-instruct-llmd-2"'
+          ttl: 60
+        http:
+          body:
+            expression: |-
+              {
+                "groups": (has(auth.metadata) && has(auth.metadata.apiKeyValidation)) ? auth.metadata.apiKeyValidation.groups : (has(auth.identity.groups) ? auth.identity.groups : auth.identity.user.groups),
+                "username": (has(auth.metadata) && has(auth.metadata.apiKeyValidation)) ? auth.metadata.apiKeyValidation.username : (has(auth.identity.preferred_username) ? auth.identity.preferred_username : (has(auth.identity.sub) ? auth.identity.sub : auth.identity.user.username)),
+                "requestedSubscription": (has(auth.metadata) && has(auth.metadata.apiKeyValidation)) ? auth.metadata.apiKeyValidation.subscription : ("x-maas-subscription" in request.headers ? request.headers["x-maas-subscription"] : ""),
+                "requestedModel": "vllm-project/llama-32-1b-instruct-llmd-2"
+              }
+          contentType: application/json
+          method: POST
+          url: https://maas-api.redhat-ods-applications.svc.cluster.local:8443/internal/v1/subscriptions/select
+        metrics: false
+        priority: 1
+    response:
+      success:
+        filters:
+          identity:
+            json:
+              properties:
+                groups:
+                  expression: auth.metadata.apiKeyValidation.groups
+                groups_str:
+                  expression: auth.metadata.apiKeyValidation.groups.join(",")
+                keyId:
+                  selector: auth.metadata.apiKeyValidation.keyId
+                selected_subscription:
+                  expression: 'has(auth.metadata["subscription-info"].name) ? auth.metadata["subscription-info"].name : ""'
+                selected_subscription_key:
+                  expression: 'has(auth.metadata["subscription-info"].namespace) && has(auth.metadata["subscription-info"].name) ? auth.metadata["subscription-info"].namespace + "/" + auth.metadata["subscription-info"].name + "@vllm-project/llama-32-1b-instruct-llmd-2" : ""'
+                subscription_error:
+                  expression: 'has(auth.metadata["subscription-info"].error) ? auth.metadata["subscription-info"].error : ""'
+                subscription_error_message:
+                  expression: 'has(auth.metadata["subscription-info"].message) ? auth.metadata["subscription-info"].message : ""'
+                subscription_info:
+                  expression: 'has(auth.metadata["subscription-info"].name) ? auth.metadata["subscription-info"] : {}'
+                userid:
+                  selector: auth.metadata.apiKeyValidation.username
+            metrics: true
+            priority: 0
+        headers:
+          Authorization:
+            key: authorization
+            metrics: false
+            plain:
+              value: ""
+            priority: 0
+          X-MaaS-Subscription:
+            metrics: false
+            plain:
+              expression: '(has(auth.metadata) && has(auth.metadata.apiKeyValidation)) ? auth.metadata.apiKeyValidation.subscription : ""'
+            priority: 0
+      unauthenticated:
+        code: 401
+        message:
+          value: Authentication required
+      unauthorized:
+        body:
+          expression: 'has(auth.metadata["subscription-info"].message) ? auth.metadata["subscription-info"].message : "Access denied"'
+        code: 403
+        headers:
+          content-type:
+            value: text/plain
+          x-ext-auth-reason:
+            expression: 'has(auth.metadata["subscription-info"].error) ? auth.metadata["subscription-info"].error : "unauthorized"'
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: llama-32-1b-instruct-llmd-2-kserve-route
