@@ -1,0 +1,19 @@
+# OpenShift's restricted-v2 SCC assigns an arbitrary non-root UID/GID per namespace;
+# the chart's hardcoded UIDs get rejected by admission, so leave these unset and let
+# the SCC pick. OpenShift applies the SCC-assigned fsGroup to the volume at mount time,
+# so mongodb's volume-permissions chown init container is unneeded too.
+securityContext:
+  runAsUser: null
+  fsGroup: null
+
+containerSecurityContext:
+  runAsUser: null
+
+mongodb:
+  podSecurityContext:
+    fsGroup: null
+  containerSecurityContext:
+    runAsUser: null
+    runAsGroup: null
+  volumePermissions:
+    enabled: false
