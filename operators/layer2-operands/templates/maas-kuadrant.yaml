@@ -1,0 +1,22 @@
+{{- if and .Values.maas .Values.maas.enabled .Values.maas.kuadrant .Values.maas.kuadrant.enabled }}
+{{- $k := .Values.maas.kuadrant }}
+---
+# Kuadrant control plane. The rhcl-operator (layer1-install: connectivityLink)
+# watches this CR and creates the Authorino and Limitador instances that every
+# AuthPolicy / RateLimitPolicy / TokenRateLimitPolicy below depends on.
+#
+# Applied early (wave 1) because the MaaS gateway policies are useless — and
+# Kuadrant's admission webhooks reject them — until Authorino and Limitador are
+# actually running.
+apiVersion: kuadrant.io/v1beta1
+kind: Kuadrant
+metadata:
+  name: {{ $k.name }}
+  namespace: {{ $k.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  {{- toYaml $k.spec | nindent 2 }}
+{{- end }}

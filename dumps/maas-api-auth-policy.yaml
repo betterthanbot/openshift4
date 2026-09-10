@@ -1,0 +1,118 @@
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  annotations:
+    opendatahub.io/managed: "false"
+  labels:
+    app.kubernetes.io/component: api
+    app.kubernetes.io/name: maas-api
+    app.kubernetes.io/part-of: models-as-a-service
+    app.opendatahub.io/modelsasservice: "true"
+    maas.opendatahub.io/tenant-name: default-tenant
+    maas.opendatahub.io/tenant-namespace: models-as-a-service
+    platform.opendatahub.io/part-of: modelsasservice
+  name: maas-api-auth-policy
+  namespace: redhat-ods-applications
+spec:
+  rules:
+    authentication:
+      api-keys:
+        metrics: false
+        plain:
+          selector: request.headers.authorization
+        priority: 0
+        when:
+          - operator: matches
+            selector: request.headers.authorization
+            value: ^Bearer sk-oai-.*
+      openshift-identities:
+        kubernetesTokenReview:
+          audiences:
+            - https://kubernetes.default.svc
+            - maas-default-gateway-sa
+        metrics: false
+        priority: 1
+        when:
+          - predicate: '!request.headers.authorization.startsWith("Bearer sk-oai-")'
+    authorization:
+      api-key-valid:
+        metrics: false
+        patternMatching:
+          patterns:
+            - operator: eq
+              selector: auth.metadata.apiKeyValidation.valid
+              value: "true"
+        priority: 0
+        when:
+          - operator: matches
+            selector: request.headers.authorization
+            value: ^Bearer sk-oai-.*
+    metadata:
+      apiKeyValidation:
+        http:
+          body:
+            expression: '{"key": request.headers.authorization.replace("Bearer ", "")}'
+          contentType: application/json
+          method: POST
+          url: https://maas-api.redhat-ods-applications.svc.cluster.local:8443/internal/v1/api-keys/validate
+        metrics: false
+        priority: 0
+        when:
+          - operator: matches
+            selector: request.headers.authorization
+            value: ^Bearer sk-oai-.*
+    response:
+      success:
+        headers:
+          X-MaaS-Group:
+            metrics: false
+            plain:
+              selector: auth.metadata.apiKeyValidation.groups.@tostr
+            priority: 0
+            when:
+              - operator: matches
+                selector: request.headers.authorization
+                value: ^Bearer sk-oai-.*
+          X-MaaS-Group-OC:
+            key: X-MaaS-Group
+            metrics: false
+            plain:
+              selector: auth.identity.user.groups.@tostr
+            priority: 1
+            when:
+              - predicate: '!request.headers.authorization.startsWith("Bearer sk-oai-")'
+          X-MaaS-Subscription:
+            metrics: false
+            plain:
+              selector: auth.metadata.apiKeyValidation.subscription
+            priority: 0
+            when:
+              - operator: matches
+                selector: request.headers.authorization
+                value: ^Bearer sk-oai-.*
+              - operator: neq
+                selector: auth.metadata.apiKeyValidation.subscription
+                value: ""
+          X-MaaS-Username:
+            metrics: false
+            plain:
+              selector: auth.metadata.apiKeyValidation.username
+            priority: 0
+            when:
+              - operator: matches
+                selector: request.headers.authorization
+                value: ^Bearer sk-oai-.*
+          X-MaaS-Username-OC:
+            key: X-MaaS-Username
+            metrics: false
+            plain:
+              selector: auth.identity.user.username
+            priority: 1
+            when:
+              - predicate: '!request.headers.authorization.startsWith("Bearer sk-oai-")'
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: maas-api-route
+  when:
+    - predicate: request.path != "/maas-api/health" || request.method != "GET"

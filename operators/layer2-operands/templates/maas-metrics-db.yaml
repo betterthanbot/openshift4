@@ -1,0 +1,127 @@
+{{- if and .Values.maas .Values.maas.enabled .Values.maas.metricsDatabase .Values.maas.metricsDatabase.enabled }}
+{{- $db := .Values.maas.metricsDatabase }}
+---
+# Placeholder credentials. Prune=false + IgnoreExtraneous keep ArgoCD from
+# reverting the real password once you set it — see values.yaml for the
+# one-liner.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $db.secretName }}
+  namespace: {{ $db.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: Prune=false
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+type: Opaque
+stringData:
+  database-name: {{ $db.database | quote }}
+  database-user: {{ $db.user | quote }}
+  database-password: "CHANGE_ME"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $db.name }}
+  namespace: {{ $db.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ $db.storage.size }}
+  storageClassName: {{ $db.storage.storageClassName }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $db.name }}
+  namespace: {{ $db.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+    app: {{ $db.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ $db.name }}
+  ports:
+    - name: postgresql
+      port: 5432
+      protocol: TCP
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $db.name }}
+  namespace: {{ $db.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+    app: {{ $db.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $db.name }}
+  strategy:
+    # Recreate, not RollingUpdate: the PVC is ReadWriteOnce, so two pods can
+    # never be up at once anyway.
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ $db.name }}
+    spec:
+      containers:
+        - name: postgresql
+          image: {{ $db.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $db.secretName }}
+                  key: database-name
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $db.secretName }}
+                  key: database-user
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $db.secretName }}
+                  key: database-password
+          resources:
+            {{- toYaml $db.resources | nindent 12 }}
+          readinessProbe:
+            exec:
+              command: ["/usr/libexec/check-container"]
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["/usr/libexec/check-container", "--live"]
+            initialDelaySeconds: 120
+            timeoutSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/pgsql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ $db.name }}
+{{- end }}

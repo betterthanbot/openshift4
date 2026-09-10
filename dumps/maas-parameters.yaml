@@ -1,0 +1,26 @@
+apiVersion: v1
+data:
+  api-key-max-expiration-days: "90"
+  app-namespace: redhat-ods-applications
+  authz-cache-ttl: "60"
+  cluster-audience: https://kubernetes.default.svc
+  gateway-name: maas-default-gateway
+  gateway-namespace: openshift-ingress
+  maas-api-image: registry.redhat.io/rhoai/odh-maas-api-rhel9@sha256:43fac73059ec1664537877e1e37f5cb337aee7d94e6f04cd32f2bf5ad6a0ec2c
+  maas-api-key-cleanup-image: registry.redhat.io/ubi9/ubi-minimal@sha256:907b68736aa798b2d38255b7aa070b2a70acb90803864a40f05d0ec47556ddd0
+  maas-controller-image: registry.redhat.io/rhoai/odh-maas-controller-rhel9@sha256:745da3f2220415b37e099e0067fe73d6080c6bd16cc340d432666b606a232686
+  metadata-cache-ttl: "60"
+  payload-processing-image: registry.redhat.io/rhoai/odh-ai-gateway-payload-processing-rhel9@sha256:f50970346465edcb371d06365f9d794bd4069c7a2a40e033f69bea0a37c2bbf2
+  payload-processing-replicas: "1"
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/component: api
+    app.kubernetes.io/name: maas-api
+    app.kubernetes.io/part-of: modelsasservice
+    app.opendatahub.io/modelsasservice: "true"
+    maas.opendatahub.io/tenant-name: default-tenant
+    maas.opendatahub.io/tenant-namespace: models-as-a-service
+    platform.opendatahub.io/part-of: datasciencecluster
+  name: maas-parameters
+  namespace: redhat-ods-applications

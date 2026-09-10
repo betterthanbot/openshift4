@@ -88,14 +88,39 @@ bootstrap/
    bootstrap.yaml            ← Manual entry point
 
 argocd/
-   rbac/                     ← Argo CD permissions
-   projects/                 ← GitOps project boundaries
-   applications/             ← Individual workload deployments
-   applicationsets/          ← Application factories / scaling patterns
+   appProject.yaml           ← GitOps project boundary (openshift4-community)
+   rbac-operands.yaml        ← Permissions the operand sync needs
+   appset-operators.yaml     ← ApplicationSet → operators/layer1-install + layer2-operands
+   appset-workloads.yaml     ← ApplicationSet → one Application per overlay/my-sno-cluster/*
+
+operators/
+   layer1-install/           ← Namespaces, OperatorGroups, Subscriptions (wave 1)
+   layer2-operands/          ← Operator CRs / operands (wave 2)
 
 overlay/
-   my-sno-cluster/           ← Workload configuration
+   my-sno-cluster/           ← Workload configuration (wave 3)
 ```
+
+---
+
+## Which Branch Bootstrap Tracks
+
+`bootstrap.yaml` currently sets:
+
+```yaml
+repoURL: https://github.com/betterthanbot/openshift4.git
+path: argocd/
+targetRevision: argocd/demo
+```
+
+Both ApplicationSets under `argocd/` pin the same revision independently, so **changing
+`bootstrap.yaml` alone is not enough** when you fork — update `targetRevision` in
+`argocd/appset-operators.yaml` and `argocd/appset-workloads.yaml` too, along with their
+`repoURL`s.
+
+Neither ApplicationSet enables `syncPolicy.automated`. Nothing self-heals, nothing
+prunes, and repository changes stay `OutOfSync` until someone syncs deliberately — which
+is the intent on this branch, but means `OutOfSync` is not a useful alarm signal here.
 
 ---
 

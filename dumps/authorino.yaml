@@ -1,0 +1,25 @@
+apiVersion: operator.authorino.kuadrant.io/v1beta1
+kind: Authorino
+metadata:
+  finalizers:
+    - authorino.kuadrant.io/finalizer
+  name: authorino
+  namespace: kuadrant-system
+spec:
+  clusterWide: true
+  healthz: {}
+  listener:
+    ports: {}
+    tls:
+      certSecretRef:
+        name: authorino-server-cert
+      enabled: true
+  logLevel: info
+  metrics: {}
+  oidcServer:
+    tls:
+      enabled: false
+  supersedingHostSubsets: true
+  tracing:
+    endpoint: ""
+  volumes: {}

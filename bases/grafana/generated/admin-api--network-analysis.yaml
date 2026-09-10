@@ -7,6 +7,9 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana-a
+  datasources:
+    - inputName: "DS_PROMETHEUS"
+      datasourceName: "Prometheus"
   json: |
     {
       "annotations": {
@@ -165,7 +168,7 @@ spec:
             {
               "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
               "editorMode": "builder",
-              "expr": "sum by (code) (rate(http_requests_total[1m])) or sum by (status) (rate(nginx_ingress_controller_requests[1m]))",
+              "expr": "sum by (code) (rate(http_requests_total[1m]))",
               "legendFormat": "HTTP {{code}}{{status}}",
               "range": true,
               "refId": "A"

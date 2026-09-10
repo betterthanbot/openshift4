@@ -1,0 +1,13 @@
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSModelRef
+metadata:
+  annotations:
+    openshift.io/display-name: qwen2.5-0.5b-instruct-llmd
+  finalizers:
+    - maas.opendatahub.io/model-cleanup
+  name: qwen25-05b-instruct-llmd
+  namespace: vllm-project
+spec:
+  modelRef:
+    kind: LLMInferenceService
+    name: qwen25-05b-instruct-llmd

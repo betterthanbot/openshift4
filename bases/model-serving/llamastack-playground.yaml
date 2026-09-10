@@ -1,0 +1,62 @@
+# ==============================================================================
+# LlamaStackDistribution — backs the Gen AI playground in the RHOAI dashboard
+# (enabled by dashboardConfig.genAiStudio in operators/layer2-operands).
+#
+# Its inference providers are configured in the llama-stack-config ConfigMap
+# (llama-stack-config.yaml), which points at the in-cluster vLLM services.
+#
+# The VLLM_API_TOKEN_* env vars are literally "fake" — these providers talk to
+# the model Services directly inside the namespace, bypassing the MaaS gateway,
+# so no real token is needed. They are placeholders the vLLM client requires,
+# not credentials.
+# ==============================================================================
+apiVersion: llamastack.io/v1alpha1
+kind: LlamaStackDistribution
+metadata:
+  annotations:
+    openshift.io/display-name: lsd-genai-playground
+  labels:
+    opendatahub.io/dashboard: "true"
+  name: lsd-genai-playground
+  namespace: vllm-project
+spec:
+  network:
+    allowedFrom:
+      namespaces:
+        - vllm-project
+    exposeRoute: false
+  replicas: 1
+  server:
+    containerSpec:
+      command:
+        - /bin/sh
+        - -c
+        - llama stack run /etc/llama-stack/config.yaml
+      env:
+        - name: VLLM_TLS_VERIFY
+          value: "false"
+        - name: MILVUS_DB_PATH
+          value: ~/.llama/milvus.db
+        - name: FMS_ORCHESTRATOR_URL
+          value: http://localhost
+        - name: VLLM_MAX_TOKENS
+          value: "4096"
+        - name: VLLM_API_TOKEN_1
+          value: fake
+        - name: VLLM_API_TOKEN_2
+          value: fake
+        - name: LLAMA_STACK_CONFIG_DIR
+          value: /opt/app-root/src/.llama/distributions/rh/
+      name: llama-stack
+      port: 8321
+      resources:
+        limits:
+          cpu: "2"
+          memory: 12Gi
+        requests:
+          cpu: 250m
+          memory: 500Mi
+    distribution:
+      name: rh-dev
+    userConfig:
+      configMapName: llama-stack-config

@@ -1,0 +1,69 @@
+{{- if and .Values.maas .Values.maas.enabled .Values.maas.authorino .Values.maas.authorino.enabled }}
+{{- $a := .Values.maas.authorino }}
+---
+# ------------------------------------------------------------------------------
+# Authorino TLS — required by RHOAI's modelsAsService component.
+#
+# RHOAI's maas-controller refuses to start ModelsAsService unless some Authorino
+# instance serves its authorization listener over TLS:
+#
+#   "Authorino TLS is not configured: no Authorino instance has
+#    listener.tls.enabled=true with a certSecretRef."
+#
+# The rhcl/kuadrant operator creates the Authorino CR from the Kuadrant CR
+# (maas-kuadrant.yaml, wave 1) with TLS OFF and exposes no field on Kuadrant to
+# turn it on, so the listener config has to be set on the Authorino object.
+#
+# THE CERTIFICATE MUST COME FROM THE OPENSHIFT SERVICE-CA. This is not a free
+# choice. maas-controller creates an EnvoyFilter (maas-default-gateway-authn-ssl,
+# owned by the Gateway) that points the gateway's ext_authz cluster at Authorino
+# over TLS and pins the trust anchor to:
+#
+#   /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+#
+# Anything not signed by the cluster's service-serving-signer therefore fails
+# the handshake. The gateway's wasm shim then logs
+#   "kuadrant_wasm_shim: gRPC status code is not OK"
+# and every request through maas.<domain> returns a plain-text 500 — with
+# nothing in Authorino's own log, because the request never reaches it. The RHOAI
+# dashboard surfaces this as "Error loading components" on the API keys tab.
+#
+# Diagnosed on cluster-dgs2z 2026-08-14 after a cert-manager self-signed
+# Certificate was used here instead. Do not reintroduce one.
+#
+# The Service below is a DELIBERATE PARTIAL OBJECT. The authorino-operator owns
+# this Service; ServerSideApply lets us own only the serving-cert annotation and
+# leave ports/selector/type to the operator. Cold-bootstrap caveat: if this
+# applies before the operator has created the Service, it creates a portless
+# Service that the operator then fills in.
+# ------------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $a.serviceName }}
+  namespace: {{ $a.namespace }}
+  annotations:
+    # Wave 1 — the Secret this generates must exist before the Authorino CR
+    # (wave 2) flips its listener to TLS, or authorino cannot mount it.
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: ServerSideApply=true,SkipDryRunOnMissingResource=true
+    # service-ca watches for this and drops a service-serving cert (tls.crt +
+    # tls.key, signed by openshift-service-serving-signer) into the named Secret.
+    service.beta.openshift.io/serving-cert-secret-name: {{ $a.certSecretName }}
+---
+apiVersion: operator.authorino.kuadrant.io/v1beta1
+kind: Authorino
+metadata:
+  name: {{ $a.name }}
+  namespace: {{ $a.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    # The kuadrant operator normally creates this object; we are adopting it.
+    # ServerSideApply lets us own only the fields below and leave the operator's
+    # own fields (and its finalizer) intact instead of Replace-ing the object.
+    argocd.argoproj.io/sync-options: ServerSideApply=true,SkipDryRunOnMissingResource=true
+spec:
+  {{- toYaml $a.spec | nindent 2 }}
+{{- end }}
