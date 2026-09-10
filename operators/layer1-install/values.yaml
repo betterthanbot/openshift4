@@ -47,7 +47,7 @@ operators:
   # NVIDIA GPU Operator (Certified)
   # ----------------------------------------------------------------------------
   gpuOperator:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: nvidia-gpu-operator
@@ -95,7 +95,7 @@ operators:
   # Compliance Operator (Red Hat)
   # ----------------------------------------------------------------------------
   complianceOperator:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: openshift-compliance
@@ -142,7 +142,7 @@ operators:
   # Kernel Module Management Hub (Red Hat)
   # ----------------------------------------------------------------------------
   kmmHub:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: openshift-kmm-hub
@@ -166,7 +166,7 @@ operators:
   # Cluster Logging (Red Hat)
   # ----------------------------------------------------------------------------
   clusterLogging:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: openshift-logging
@@ -190,7 +190,7 @@ operators:
   # Node Feature Discovery (Red Hat)
   # ----------------------------------------------------------------------------
   nfd:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: openshift-nfd
@@ -217,7 +217,7 @@ operators:
   # that require their own OperatorGroup (not the global one).
   # ----------------------------------------------------------------------------
   lokiOperator:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: openshift-operators-redhat
@@ -262,7 +262,7 @@ operators:
   # Red Hat OpenShift AI / RHODS (Red Hat)
   # ----------------------------------------------------------------------------
   rhodsOperator:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: redhat-ods-operator
@@ -285,7 +285,7 @@ operators:
   # FlowCollector is cluster-scoped — operator needs AllNamespaces OG.
   # ----------------------------------------------------------------------------
   netobserv:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: netobserv
@@ -345,7 +345,7 @@ operators:
   # Red Hat Advanced Cluster Security (RHACS) (Red Hat)
   # ----------------------------------------------------------------------------
   rhacsOperator:
-    enabled: true
+    enabled: false
     namespace:
       create: true
       name: stackrox

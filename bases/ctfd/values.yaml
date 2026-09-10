@@ -18,7 +18,7 @@ controller:
   # -- Type of the workload object.
   kind: Deployment
   # -- The number of replicas.
-  replicas: 1
+  replicas: 5
   # -- The controller update strategy. Currently only applies to controllers of kind `Deployment`.
   updateStrategy: {}
   # -- Additional annotations for the controller object.
@@ -117,7 +117,7 @@ persistentVolumeClaim:
   # -- Volume mode of the persistent volume claim object.
   volumeMode: Filesystem
   # -- Storage request size for the persistent volume claim object.
-  size: 1Gi
+  size: 100Gi
   # -- Storage class name for the persistent volume claim object.
   storageClassName: ''
   # -- Use an existing persistent volume claim object.
@@ -153,13 +153,13 @@ podSecurityContext:
   runAsUser: null
 
 # -- Compute resources used by the container. More info [here](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/).
-resources: {}
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
+resources:
+  limits:
+    cpu: 4
+    memory: 16Gi
+  requests:
+    cpu: 1
+    memory: 2Gi
 
 # -- Pod-level affinity. More info [here](https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#scheduling).
 affinity: {}

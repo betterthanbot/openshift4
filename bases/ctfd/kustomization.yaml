@@ -4,6 +4,8 @@ kind: Kustomization
 
 resources:
 - ./ctfd.yaml
+- ./hpa.yaml
+- ./pdb.yaml
 
 namespace: ctfd
 
