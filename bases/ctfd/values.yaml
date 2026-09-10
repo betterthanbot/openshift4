@@ -117,7 +117,7 @@ persistentVolumeClaim:
   # -- Volume mode of the persistent volume claim object.
   volumeMode: Filesystem
   # -- Storage request size for the persistent volume claim object.
-  size: 250Gi
+  size: 100Gi
   # -- Storage class name for the persistent volume claim object.
   storageClassName: ''
   # -- Use an existing persistent volume claim object.
