@@ -1443,7 +1443,19 @@ clusterMonitoring:
     # 'undefined'". This supplies it. See the template header for why it targets
     # the global Thanos Querier and not the isolated data-science one.
     persesPrometheusDatasource:
-      enabled: true
+      # RHOAI 3.5.0's rhods-operator now generates its own default
+      # PrometheusDatasource (cluster-prometheus-datasource, owned by the
+      # Monitoring CR default-monitoring) pointing at the same global Thanos
+      # Querier. Perses only allows one `default: true` datasource per plugin
+      # kind, and this hand-written one (created 2026-09-07, before that
+      # operator behavior existed) was winning the race and leaving
+      # cluster-prometheus-datasource permanently Degraded with "cannot be a
+      # default PrometheusDatasource because there is already one defined
+      # named prometheus-datasource" — which is exactly the
+      # "No datasource found for kind 'PrometheusDatasource'" error on every
+      # RHOAI dashboard panel. Disabled now that the operator handles this
+      # itself. Re-enable only if a future operator regresses this again.
+      enabled: false
       name: prometheus-datasource
       displayName: Prometheus (Cluster - global Thanos)
       # Port 9091 = cluster-wide tenancy (needs cluster-monitoring-view, granted
