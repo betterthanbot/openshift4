@@ -1,0 +1,16 @@
+---
+# Not part of the pascaliske/ctfd chart, hand-maintained. Re-running `make template`
+# in this directory will not touch this file.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ctfd
+  labels:
+    app.kubernetes.io/name: ctfd
+    app.kubernetes.io/instance: ctfd
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ctfd
+      app.kubernetes.io/instance: ctfd

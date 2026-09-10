@@ -24,7 +24,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 type: Opaque
 data:
-  SECRET_KEY: TWpNeWRUSk5TakpMWVZwQmRYZEZURXRVVkRCU1pVd3hVekZVUjBGMFp6Wm9aR0pJUm1keVEwYzA=
+  SECRET_KEY: TWtSWFRFWlFWM2wyYkdGR01UQnBjbE56VjI1SVNXWkhOa3BZY1ZaT2MyaFZTRGwyVTNscFZ6Skc=
 ---
 # Source: ctfd/templates/persistantvolumeclaim.yaml
 apiVersion: v1
@@ -42,7 +42,7 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi
+      storage: 250Gi
   volumeMode: Filesystem
 ---
 # Source: ctfd/templates/service.yaml
@@ -131,7 +131,13 @@ spec:
             httpGet:
               path: /healthcheck
               port: http
-          resources: {}
+          resources: 
+            limits:
+              cpu: 4
+              memory: 16Gi
+            requests:
+              cpu: 1
+              memory: 2Gi
           securityContext:
       volumes:
         - name: ctfd-storage
