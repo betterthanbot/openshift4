@@ -1,0 +1,211 @@
+---
+# DEMO 11 — healthy baseline: startup + readiness + liveness all passing
+# Expect: READY 1/1, RESTARTS 0, and an endpoint in the Service below.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: h01-probes-healthy
+  namespace: sched-demo
+  labels: {demo: probes, app: web}
+spec:
+  containers:
+    - name: httpd
+      image: registry.access.redhat.com/ubi9/httpd-24:latest
+      ports:
+        - containerPort: 8080
+      startupProbe:                 # runs FIRST; readiness+liveness are paused until it passes
+        httpGet: {path: /.noindex.html, port: 8080}   # docroot is empty -> "/" is a real 403, not a stand-in for "not up yet"
+        periodSeconds: 5
+        failureThreshold: 30        # 150s budget to boot
+      readinessProbe:               # controls Service endpoints
+        httpGet: {path: /.noindex.html, port: 8080}
+        periodSeconds: 5
+        failureThreshold: 3
+      livenessProbe:                # controls restarts
+        httpGet: {path: /.noindex.html, port: 8080}
+        periodSeconds: 10
+        failureThreshold: 3
+      resources:
+        requests: {cpu: 20m, memory: 64Mi}
+        limits: {cpu: 200m, memory: 256Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# DEMO 12 — readiness FAILS: pod stays Running 0/1 forever, NO restarts, NO traffic
+# TEACHING POINT: readiness quarantines, it never kills.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: h02-readiness-fail
+  namespace: sched-demo
+  labels: {demo: probes, app: web}
+spec:
+  containers:
+    - name: httpd
+      image: registry.access.redhat.com/ubi9/httpd-24:latest
+      ports:
+        - containerPort: 8080
+      readinessProbe:
+        httpGet: {path: /does-not-exist, port: 8080}   # 404 -> probe failure
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        failureThreshold: 2
+      resources:
+        requests: {cpu: 20m, memory: 64Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# Service exists only to show endpoint behaviour. No Route needed.
+# oc get endpointslices -l kubernetes.io/service-name=svc-web -o yaml | grep -A3 addresses
+# h01 appears, h02 never does.
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-web
+  namespace: sched-demo
+spec:
+  selector: {app: web}
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+# DEMO 13 — liveness FAILS: restart counter climbs, then CrashLoopBackOff
+# Watch: oc get pod h03-liveness-fail -w
+# Events: "Liveness probe failed: HTTP probe failed with statuscode: 404" -> "Killing container"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: h03-liveness-fail
+  namespace: sched-demo
+  labels: {demo: probes}
+spec:
+  containers:
+    - name: httpd
+      image: registry.access.redhat.com/ubi9/httpd-24:latest
+      livenessProbe:
+        httpGet: {path: /does-not-exist, port: 8080}
+        initialDelaySeconds: 10
+        periodSeconds: 5
+        failureThreshold: 2        # dies ~20s in
+      resources:
+        requests: {cpu: 20m, memory: 64Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# DEMO 14 — exec liveness, self-inflicted: healthy for 45s, then the marker file vanishes
+# Nice visual: 1/1 Running -> RESTARTS 1 -> healthy again -> RESTARTS 2 ...
+apiVersion: v1
+kind: Pod
+metadata:
+  name: h04-liveness-exec-flapping
+  namespace: sched-demo
+  labels: {demo: probes}
+spec:
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command:
+        - /bin/sh
+        - -c
+        - "touch /tmp/healthy; sleep 45; rm -f /tmp/healthy; sleep 600"
+      livenessProbe:
+        exec:
+          command: ["cat", "/tmp/healthy"]
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        failureThreshold: 2
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# DEMO 15a — slow starter WITHOUT a startupProbe: liveness kills it before boot finishes
+# App needs 90s. Liveness allows 15s. Result: infinite CrashLoopBackOff.
+# TEACHING POINT: this is the #1 real-world probe bug.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: h05-slowstart-no-startupprobe
+  namespace: sched-demo
+  labels: {demo: probes}
+spec:
+  containers:
+    - name: httpd
+      image: registry.access.redhat.com/ubi9/httpd-24:latest
+      command: ["/bin/bash", "-c", "sleep 90; exec /usr/bin/run-httpd"]
+      livenessProbe:
+        httpGet: {path: /, port: 8080}
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        failureThreshold: 2
+      resources:
+        requests: {cpu: 20m, memory: 64Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# DEMO 15b — same app, startupProbe gives it 150s. Boots at ~90s, then goes 1/1.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: h06-slowstart-with-startupprobe
+  namespace: sched-demo
+  labels: {demo: probes}
+spec:
+  containers:
+    - name: httpd
+      image: registry.access.redhat.com/ubi9/httpd-24:latest
+      command: ["/bin/bash", "-c", "sleep 90; exec /usr/bin/run-httpd"]
+      startupProbe:
+        httpGet: {path: /.noindex.html, port: 8080}   # docroot is empty -> "/" is a real 403, not a stand-in for "not up yet"
+        periodSeconds: 5
+        failureThreshold: 30       # 5 x 30 = 150s grace
+      livenessProbe:
+        httpGet: {path: /.noindex.html, port: 8080}
+        periodSeconds: 5
+        failureThreshold: 2        # identical to 15a, but only armed after startup succeeds
+      resources:
+        requests: {cpu: 20m, memory: 64Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# DEMO 16 — TCP probe against a port nothing listens on
+# Event: "Readiness probe failed: dial tcp 10.x.x.x:9999: connect: connection refused"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: h07-tcp-probe-fail
+  namespace: sched-demo
+  labels: {demo: probes}
+spec:
+  containers:
+    - name: httpd
+      image: registry.access.redhat.com/ubi9/httpd-24:latest
+      readinessProbe:
+        tcpSocket: {port: 9999}
+        initialDelaySeconds: 5
+        periodSeconds: 5
+      resources:
+        requests: {cpu: 20m, memory: 64Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}

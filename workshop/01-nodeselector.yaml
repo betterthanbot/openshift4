@@ -1,0 +1,97 @@
+---
+# DEMO 1 — nodeSelector
+# p01 Running anywhere | p02 Pending (label doesn't exist)
+# p03 Pending (label matches, taint blocks) | p04 Running (selector + toleration)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p01-baseline
+  namespace: sched-demo
+  labels: {demo: nodeselector}
+spec:
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+        limits: {cpu: 100m, memory: 128Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# FAILS: no node carries hardware=fpga
+# Event: 0/6 nodes are available: 6 node(s) didn't match Pod's node affinity/selector
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p02-nodeselector-missing-label
+  namespace: sched-demo
+  labels: {demo: nodeselector}
+spec:
+  nodeSelector:
+    hardware: fpga
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# FAILS: label matches the gpu node, but it is tainted dedicated=gpu:NoSchedule
+# Event: 1 node(s) had untolerated taint {dedicated: gpu}, 5 node(s) didn't match ...
+# TEACHING POINT: selector gets you to the node, toleration gets you past the door.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p03-nodeselector-no-toleration
+  namespace: sched-demo
+  labels: {demo: nodeselector}
+spec:
+  nodeSelector:
+    hardware: gpu
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# WORKS: selector + matching toleration -> lands on the gpu node
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p04-nodeselector-with-toleration
+  namespace: sched-demo
+  labels: {demo: nodeselector}
+spec:
+  nodeSelector:
+    hardware: gpu
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: gpu
+      effect: NoSchedule
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}

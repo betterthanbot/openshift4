@@ -1,0 +1,87 @@
+{{- if and .Values.maas .Values.maas.enabled .Values.maas.gateway .Values.maas.gateway.enabled }}
+{{- $g := .Values.maas.gateway }}
+{{- if $g.options.enabled }}
+---
+# Sizing for the istio-proxy pods that back the Gateway below. Gateway API has
+# no field for this on OpenShift, so it is passed by reference through
+# spec.infrastructure.parametersRef. Both keys are YAML-in-a-string that the
+# gateway controller strategic-merges into the generated Deployment / PDB.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $g.name }}-options
+  namespace: {{ $g.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+data:
+  deployment: |
+    spec:
+      replicas: {{ $g.options.replicas }}
+      template:
+        spec:
+          containers:
+          - name: istio-proxy
+            resources:
+              {{- toYaml $g.options.resources | nindent 14 }}
+  podDisruptionBudget: |
+    spec:
+      minAvailable: {{ $g.options.minAvailable }}
+{{- end }}
+---
+# The MaaS ingress Gateway — every model request enters here.
+#
+# opendatahub.io/managed: "false" tells RHOAI to keep its hands off; RHOAI owns
+# the separate data-science-gateway (created by GatewayConfig/default-gateway).
+#
+# security.opendatahub.io/authorino-tls-bootstrap: "true" makes the platform
+# provision the TLS material Authorino needs to be called as an external
+# authorizer from this gateway — without it every AuthPolicy attached here
+# fails closed.
+#
+# PREREQUISITE: the Secret named in tlsSecretName must exist in this namespace
+# and cover `hostname`. On the source cluster it was issued by cert-manager
+# from a sandbox-provided Let's Encrypt ClusterIssuer, which is not in this repo.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ $g.name }}
+  namespace: {{ $g.namespace }}
+  labels:
+    {{- include "layer2-operands.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    opendatahub.io/managed: "false"
+    security.opendatahub.io/authorino-tls-bootstrap: "true"
+spec:
+  gatewayClassName: {{ $g.gatewayClassName }}
+  {{- if $g.options.enabled }}
+  infrastructure:
+    parametersRef:
+      group: ""
+      kind: ConfigMap
+      name: {{ $g.name }}-options
+  {{- end }}
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      hostname: {{ $g.hostname | quote }}
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: {{ $g.hostname | quote }}
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: {{ $g.tlsSecretName }}
+{{- end }}

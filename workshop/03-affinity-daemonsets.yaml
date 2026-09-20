@@ -1,0 +1,239 @@
+---
+# DEMO 5 — node affinity: required vs preferred
+# FAILS: requires hardware=gpu OR hardware=fpga, but has no toleration for the gpu taint.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p11-affinity-required-fail
+  namespace: sched-demo
+  labels: {demo: affinity}
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: hardware
+                operator: In
+                values: ["gpu", "fpga"]
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# WORKS: same intent, but preferred. Scheduler tries gpu, settles for any worker.
+# TEACHING POINT: required = hard filter (Pending). preferred = scoring hint (never blocks).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p12-affinity-preferred-ok
+  namespace: sched-demo
+  labels: {demo: affinity}
+spec:
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: hardware
+                operator: In
+                values: ["gpu"]
+        - weight: 10
+          preference:
+            matchExpressions:
+              - key: node-tier
+                operator: In
+                values: ["standard"]
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# DEMO 6 — pod anti-affinity: 4 replicas, 1 per host, only 2 untainted workers match
+# Expect: 2 Running, 2 Pending ("didn't satisfy existing pods anti-affinity rules")
+# Scale to 2 to make it green:  oc scale deploy/d13-antiaffinity --replicas=2
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: d13-antiaffinity
+  namespace: sched-demo
+spec:
+  replicas: 4
+  selector:
+    matchLabels: {app: spread-me}
+  template:
+    metadata:
+      labels: {app: spread-me, demo: affinity}
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels: {app: spread-me}
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: app
+          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+          command: ["sleep", "infinity"]
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+---
+# DEMO 7 — pod affinity: co-locate a sidecar workload with spread-me
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: d14-podaffinity
+  namespace: sched-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: follower}
+  template:
+    metadata:
+      labels: {app: follower, demo: affinity}
+    spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels: {app: spread-me}
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: app
+          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+          command: ["sleep", "infinity"]
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+---
+# DEMO 8 — topology spread across AZs (soft vs hard)
+# ScheduleAnyway = best effort. Flip to DoNotSchedule + cordon a node to force Pending.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: d15-topologyspread
+  namespace: sched-demo
+spec:
+  replicas: 4
+  selector:
+    matchLabels: {app: zoned}
+  template:
+    metadata:
+      labels: {app: zoned, demo: affinity}
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {app: zoned}
+      containers:
+        - name: app
+          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+          command: ["sleep", "infinity"]
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+---
+# DEMO 9 — Pending for a non-taint reason: no node has 64 cores free
+# Event: 0/6 nodes are available: 6 Insufficient cpu
+# TEACHING POINT: always read the event, not just the STATUS column.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p16-insufficient-cpu
+  namespace: sched-demo
+  labels: {demo: resources}
+spec:
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: "64", memory: 2Gi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# DEMO 10a — DaemonSet WITHOUT tolerations
+# Expect DESIRED=2 : skips 3 masters (taint) AND the gpu node (dedicated=gpu taint)
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ds17-no-tolerations
+  namespace: sched-demo
+spec:
+  selector:
+    matchLabels: {app: ds-plain}
+  template:
+    metadata:
+      labels: {app: ds-plain, demo: daemonset}
+    spec:
+      containers:
+        - name: agent
+          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+          command: ["sleep", "infinity"]
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+---
+# DEMO 10b — DaemonSet WITH tolerations -> DESIRED=6 (every node, like a real log/metrics agent)
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ds18-tolerate-all
+  namespace: sched-demo
+spec:
+  selector:
+    matchLabels: {app: ds-everywhere}
+  template:
+    metadata:
+      labels: {app: ds-everywhere, demo: daemonset}
+    spec:
+      tolerations:
+        - operator: Exists          # tolerates every taint, every effect
+      containers:
+        - name: agent
+          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+          command: ["sleep", "infinity"]
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}

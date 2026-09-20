@@ -1,0 +1,18 @@
+apiVersion: v1
+data:
+  dashboard-url: https://rh-ai.apps.cluster-dgs2z.dgs2z.sandbox3354.opentlc.com/
+  gateway-domain: rh-ai.apps.cluster-dgs2z.dgs2z.sandbox3354.opentlc.com
+  gateway-name: data-science-gateway
+  images-jobs-async-upload: registry.redhat.io/rhoai/odh-model-registry-job-async-upload-rhel9@sha256:92f91e4af5d9c39de65a792d1e3a628b0284e0526dc891ed56167118b4d1372d
+  kube-rbac-proxy: registry.redhat.io/rhoai/odh-kube-auth-proxy-rhel9@sha256:a059f453011028f7f18b3c7ec6406a958aa7a5b9bf6c67d084ea9d5d36d6c970
+  odh-dashboard-image: registry.redhat.io/rhoai/odh-dashboard-rhel9@sha256:ef27b31dd24931f3606ef0d4f923f91cd2ced02dd7f20a75962b4fd07b4b0c80
+  section-title: OpenShift Self Managed Services
+kind: ConfigMap
+metadata:
+  labels:
+    app: rhods-dashboard
+    app.kubernetes.io/part-of: rhods-dashboard
+    app.opendatahub.io/rhods-dashboard: "true"
+    platform.opendatahub.io/part-of: dashboard
+  name: rhoai-dashboard-params
+  namespace: redhat-ods-applications

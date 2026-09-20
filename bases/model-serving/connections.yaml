@@ -1,0 +1,103 @@
+# ==============================================================================
+# Model "connections" — the RHOAI dashboard's term for a Secret that holds a
+# model's storage location.
+#
+# Referenced by the opendatahub.io/connections annotation on each
+# LLMInferenceService / InferenceService. Contents are just a public OCI
+# modelcar image reference — no credentials — so they are safe in git.
+#
+# These are Opaque Secrets rather than ConfigMaps because that is the shape the
+# dashboard expects; a connection can also carry S3 keys, hence Secret.
+# ==============================================================================
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: llama-32-1b-instruct-maas
+  namespace: vllm-project
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/connection-type-protocol: uri
+    opendatahub.io/connection-type-ref: uri-v1
+    openshift.io/display-name: llama-3.2-1b-instruct-maas
+type: Opaque
+stringData:
+  URI: oci://quay.io/redhat-ai-services/modelcar-catalog:llama-3.2-1b-instruct
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: qwen25-05b-instruct-maas
+  namespace: vllm-project
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/connection-type-protocol: uri
+    opendatahub.io/connection-type-ref: uri-v1
+    openshift.io/display-name: qwen2.5-0.5b-instruct-maas
+type: Opaque
+stringData:
+  URI: oci://quay.io/redhat-ai-services/modelcar-catalog:qwen2.5-0.5b-instruct
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: llama-32-1b-instruct-llmd
+  namespace: vllm-project
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/connection-type-protocol: uri
+    opendatahub.io/connection-type-ref: uri-v1
+    openshift.io/display-name: llama-3.2-1b-instruct-llmd
+type: Opaque
+stringData:
+  URI: oci://quay.io/redhat-ai-services/modelcar-catalog:llama-3.2-1b-instruct
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: qwen25-05b-instruct
+  namespace: vllm-project
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/connection-type-protocol: uri
+    opendatahub.io/connection-type-ref: uri-v1
+    openshift.io/display-name: qwen2.5-0.5b-instruct
+type: Opaque
+stringData:
+  URI: oci://quay.io/redhat-ai-services/modelcar-catalog:qwen2.5-0.5b-instruct
+---
+# Extra catalogue entries that existed on the source cluster but were never
+# deployed — kept so they show up in the dashboard's connection picker.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: granite-40-h-micro
+  namespace: vllm-project
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/connection-type-protocol: uri
+    opendatahub.io/connection-type-ref: uri-v1
+    openshift.io/display-name: granite-4.0-h-micro
+type: Opaque
+stringData:
+  URI: oci://quay.io/redhat-ai-services/modelcar-catalog:granite-4.0-h-micro
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: granite-embedding-english-r2
+  namespace: vllm-project
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/connection-type-protocol: uri
+    opendatahub.io/connection-type-ref: uri-v1
+    openshift.io/display-name: granite-embedding-english-r2
+type: Opaque
+stringData:
+  URI: oci://quay.io/redhat-ai-services/modelcar-catalog:granite-embedding-english-r2

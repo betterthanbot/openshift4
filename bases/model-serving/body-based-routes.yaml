@@ -1,0 +1,84 @@
+# ==============================================================================
+# Body-based routing (BBR).
+#
+# The problem: an OpenAI-compatible client sends the model name in the JSON
+# request BODY ({"model": "..."}), but Gateway API can only match on method,
+# path and headers. So a single /v1/chat/completions endpoint cannot be routed
+# to the right model on its own.
+#
+# The fix: the gateway's body-based-routing extension reads the body, and
+# projects the model name into the X-Gateway-Model-Name header. These routes
+# then match on THAT header and send traffic to the matching InferencePool.
+#
+# That is why one shared hostname can serve every model, and why the MaaS
+# TelemetryPolicy can label metrics with responseBodyJSON("/model").
+#
+# These are hand-written and are NOT recreated by any controller — unlike the
+# <model>-kserve-route HTTPRoutes, which each LLMInferenceService owns.
+#
+# NOTE the backendRefs group: inference.networking.x-k8s.io (the x-k8s alpha
+# group), while the InferencePool objects the LLMInferenceServices create are
+# in inference.networking.k8s.io. Both CRDs are installed; this is what was
+# live and working on the source cluster.
+#
+# timeouts 0s = no timeout, so long generations are not cut off.
+# ==============================================================================
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: llama-32-1b-bbr
+  namespace: vllm-project
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: maas-default-gateway
+      namespace: openshift-ingress
+  rules:
+    - backendRefs:
+        - group: inference.networking.x-k8s.io
+          kind: InferencePool
+          name: llama-32-1b-instruct-maas-inference-pool
+          port: 8000
+          weight: 1
+      matches:
+        - headers:
+            - name: X-Gateway-Model-Name
+              type: Exact
+              value: llama-32-1b-instruct-maas
+          path:
+            type: PathPrefix
+            value: /v1
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: qwen25-05b-bbr
+  namespace: vllm-project
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: maas-default-gateway
+      namespace: openshift-ingress
+  rules:
+    - backendRefs:
+        - group: inference.networking.x-k8s.io
+          kind: InferencePool
+          name: qwen25-05b-instruct-maas-inference-pool
+          port: 8000
+          weight: 1
+      matches:
+        - headers:
+            - name: X-Gateway-Model-Name
+              type: Exact
+              value: qwen25-05b-instruct-maas
+          path:
+            type: PathPrefix
+            value: /v1
+      timeouts:
+        backendRequest: 0s
+        request: 0s

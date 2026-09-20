@@ -1,0 +1,204 @@
+# ==============================================================================
+# LLMInferenceService — the RHOAI 3.x / llm-d way to serve an LLM.
+#
+# Each of these creates, behind the scenes: a vLLM Deployment, an InferencePool,
+# a scheduler/EPP Deployment, an HTTPRoute onto the MaaS gateway, and a
+# MaaSModelRef. None of those are in git — they are all owned by this CR.
+#
+# router.gateway.refs points at maas-default-gateway (layer2-operands: maas.gateway),
+# which is what puts these models behind MaaS auth + rate limiting. The model
+# names here MUST match maas.subscriptions.defaultModelRefs in
+# operators/layer2-operands/values.yaml.
+#
+# serving.kserve.io/stop: "true" is the dashboard's "stopped" state — the CR
+# exists but no pods run. The two -maas services are the live ones; the two
+# llm-d variants were left stopped on the source cluster and are kept here as
+# working examples. Flip to "false" to start one (each wants a full GPU).
+#
+# baseRefs points at the matching LLMInferenceServiceConfig in this same
+# namespace (see llminferenceserviceconfigs.yaml) — that is where the vLLM
+# image comes from.
+# ==============================================================================
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  annotations:
+    opendatahub.io/connections: llama-32-1b-instruct-maas
+    opendatahub.io/hardware-profile-name: default-profile
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
+    opendatahub.io/model-type: generative
+    openshift.io/display-name: llama-3.2-1b-instruct-llmd-2
+    serving.kserve.io/stop: "true"
+  labels:
+    opendatahub.io/dashboard: "true"
+    opendatahub.io/genai-asset: "true"
+  name: llama-32-1b-instruct-llmd-2
+  namespace: vllm-project
+spec:
+  model:
+    name: llama-32-1b-instruct-llmd-2
+    uri: oci://quay.io/redhat-ai-services/modelcar-catalog:llama-3.2-1b-instruct
+  replicas: 1
+  router:
+    gateway:
+      refs:
+        - name: maas-default-gateway
+          namespace: openshift-ingress
+    route: {}
+    scheduler: {}
+  template:
+    containers:
+      - name: main
+        resources:
+          limits:
+            cpu: "2"
+            memory: 4Gi
+            nvidia.com/gpu: "1"
+          requests:
+            cpu: "2"
+            memory: 4Gi
+            nvidia.com/gpu: "1"
+    tolerations:
+      - effect: PreferNoSchedule
+        key: nvidia.com/gpu
+        operator: Equal
+        value: "true"
+---
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  annotations:
+    opendatahub.io/connections: llama-32-1b-instruct-maas
+    opendatahub.io/hardware-profile-name: default-profile
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
+    opendatahub.io/model-type: generative
+    openshift.io/display-name: llama-3.2-1b-instruct-maas
+    serving.kserve.io/stop: "false"
+  labels:
+    opendatahub.io/dashboard: "true"
+    opendatahub.io/genai-asset: "true"
+  name: llama-32-1b-instruct-maas
+  namespace: vllm-project
+spec:
+  baseRefs:
+    - name: llama-32-1b-instruct-maas
+  model:
+    name: llama-32-1b-instruct-maas
+    uri: oci://quay.io/redhat-ai-services/modelcar-catalog:llama-3.2-1b-instruct
+  replicas: 1
+  router:
+    gateway:
+      refs:
+        - name: maas-default-gateway
+          namespace: openshift-ingress
+    route: {}
+    scheduler: {}
+  template:
+    containers:
+      - name: main
+        resources:
+          limits:
+            cpu: "4"
+            memory: 10Gi
+            nvidia.com/gpu: "1"
+          requests:
+            cpu: "2"
+            memory: 6Gi
+            nvidia.com/gpu: "1"
+    tolerations:
+      - effect: PreferNoSchedule
+        key: nvidia.com/gpu
+        operator: Equal
+        value: "true"
+---
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  annotations:
+    opendatahub.io/connections: qwen25-05b-instruct-maas
+    opendatahub.io/hardware-profile-name: default-profile
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
+    opendatahub.io/model-type: generative
+    openshift.io/display-name: qwen2.5-0.5b-instruct-llmd
+    serving.kserve.io/stop: "true"
+  labels:
+    opendatahub.io/dashboard: "true"
+    opendatahub.io/genai-asset: "true"
+  name: qwen25-05b-instruct-llmd
+  namespace: vllm-project
+spec:
+  model:
+    name: qwen25-05b-instruct-llmd
+    uri: oci://quay.io/redhat-ai-services/modelcar-catalog:qwen2.5-0.5b-instruct
+  replicas: 1
+  router:
+    gateway:
+      refs:
+        - name: maas-default-gateway
+          namespace: openshift-ingress
+    route: {}
+    scheduler: {}
+  template:
+    containers:
+      - name: main
+        resources:
+          limits:
+            cpu: "2"
+            memory: 4Gi
+            nvidia.com/gpu: "1"
+          requests:
+            cpu: "2"
+            memory: 4Gi
+            nvidia.com/gpu: "1"
+    tolerations:
+      - effect: PreferNoSchedule
+        key: nvidia.com/gpu
+        operator: Equal
+        value: "true"
+---
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  annotations:
+    opendatahub.io/connections: qwen25-05b-instruct-maas
+    opendatahub.io/hardware-profile-name: default-profile
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
+    opendatahub.io/model-type: generative
+    openshift.io/display-name: qwen2.5-0.5b-instruct-maas
+    serving.kserve.io/stop: "false"
+  labels:
+    opendatahub.io/dashboard: "true"
+    opendatahub.io/genai-asset: "true"
+  name: qwen25-05b-instruct-maas
+  namespace: vllm-project
+spec:
+  baseRefs:
+    - name: qwen25-05b-instruct-maas
+  model:
+    name: qwen25-05b-instruct-maas
+    uri: oci://quay.io/redhat-ai-services/modelcar-catalog:qwen2.5-0.5b-instruct
+  replicas: 1
+  router:
+    gateway:
+      refs:
+        - name: maas-default-gateway
+          namespace: openshift-ingress
+    route: {}
+    scheduler: {}
+  template:
+    containers:
+      - name: main
+        resources:
+          limits:
+            cpu: "4"
+            memory: 10Gi
+            nvidia.com/gpu: "1"
+          requests:
+            cpu: "2"
+            memory: 6Gi
+            nvidia.com/gpu: "1"
+    tolerations:
+      - effect: PreferNoSchedule
+        key: nvidia.com/gpu
+        operator: Equal
+        value: "true"

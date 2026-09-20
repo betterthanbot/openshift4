@@ -21,6 +21,7 @@
         }
       ]
     },
+    "description": "REQUIRES Red Hat ACM with the right-sizing feature and ACM Observability (Thanos) collecting acm_rs:* recording rules from managed clusters - these are computed on the ACM hub, not this cluster's own Prometheus. Verified against a live cluster metrics catalog (2026-07-24): zero acm_rs:* series exist here, consistent with this being a standalone SNO cluster without an ACM hub relationship. Not a query bug - leave this dashboard as reference for when/if this cluster is enrolled under ACM.",
     "editable": true,
     "fiscalYearStartMonth": 0,
     "graphTooltip": 0,

@@ -1,0 +1,18 @@
+apiVersion: services.platform.opendatahub.io/v1alpha1
+kind: Monitoring
+metadata:
+  name: default-monitoring
+spec:
+  alerting: {}
+  collectorReplicas: 2
+  metrics:
+    replicas: 1
+    storage:
+      retention: 90d
+      size: 50Gi
+  namespace: redhat-ods-monitoring
+  traces:
+    sampleRatio: "0.1"
+    storage:
+      backend: pv
+      retention: 2160h0m0s
