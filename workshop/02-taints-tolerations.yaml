@@ -1,0 +1,168 @@
+---
+# DEMO 2 — tolerations
+# p05 toleration alone does NOT attract -> lands on a plain worker
+# TEACHING POINT: tolerations are permission, not preference. Pair with nodeSelector/affinity.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p05-toleration-only
+  namespace: sched-demo
+  labels: {demo: taints}
+spec:
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: gpu
+      effect: NoSchedule
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# FAILS: value mismatch (ml != gpu). Equal compares key AND value AND effect.
+# Event: 1 node(s) had untolerated taint {dedicated: gpu}, 5 node(s) didn't match selector
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p06-toleration-wrong-value
+  namespace: sched-demo
+  labels: {demo: taints}
+spec:
+  nodeSelector:
+    hardware: gpu
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: ml          # <-- wrong on purpose
+      effect: NoSchedule
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# WORKS: operator Exists ignores value. Omitting effect tolerates ALL effects of that key.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p07-toleration-exists
+  namespace: sched-demo
+  labels: {demo: taints}
+spec:
+  nodeSelector:
+    hardware: gpu
+  tolerations:
+    - key: dedicated
+      operator: Exists
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# DEMO 3 — NoExecute eviction
+# Both pods land on the node labelled demo-role=evictme (set by 00-setup.sh).
+# Taint it NoExecute mid-demo:
+#   source .demo-nodes
+#   oc adm taint node "$WORKER_C" maintenance=true:NoExecute
+# p08 (no toleration) -> evicted instantly
+# p09 (tolerationSeconds: 60) -> survives 60s, then evicted. Watch both with -w.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p08-noexecute-victim
+  namespace: sched-demo
+  labels: {demo: noexecute}
+spec:
+  terminationGracePeriodSeconds: 5    # snappy teardown so the demo reads clearly
+  nodeSelector:
+    demo-role: evictme
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p09-noexecute-grace60
+  namespace: sched-demo
+  labels: {demo: noexecute}
+spec:
+  terminationGracePeriodSeconds: 5
+  nodeSelector:
+    demo-role: evictme
+  tolerations:
+    - key: maintenance
+      operator: Equal
+      value: "true"
+      effect: NoExecute
+      tolerationSeconds: 60
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
+---
+# DEMO 4 — the control-plane taint (read-only lesson; delete right after)
+# Masters carry node-role.kubernetes.io/master:NoSchedule (and/or control-plane).
+# This is why your app never lands there. Tolerate it + select it and it will.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: p10-runs-on-master
+  namespace: sched-demo
+  labels: {demo: taints}
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/master: ""
+  tolerations:
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: app
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities: {drop: ["ALL"]}
+        seccompProfile: {type: RuntimeDefault}
