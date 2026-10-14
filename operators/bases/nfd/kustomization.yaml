@@ -1,0 +1,21 @@
+# ==============================================================================
+# operators/bases/nfd — Node Feature Discovery
+#
+# Installs NFD and its NodeFeatureDiscovery instance, which labels nodes with the
+# hardware they carry (GPUs, CPU flags, PCI devices).
+#
+# ArgoCD app:  operators-nfd   (argocd/appset-operators.yaml)
+# Installs:    nfd (channel stable, redhat-operators) into openshift-nfd
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml
+  # Operands
+  - nodefeaturediscovery.yaml

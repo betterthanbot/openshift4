@@ -8,9 +8,27 @@ A community GitOps platform for Single Node OpenShift (SNO) managed entirely via
 
 | Layer | Contents |
 |-------|----------|
-| **Operators (layer1)** | 12 operators installed via OLM |
-| **Operands (layer2)** | Grafana, LokiStack (logging + netobserv), FlowCollector, RHACS, OpenShift AI, NFD, GPU, Compliance, Logging, OpenShift Virtualization (disabled by default — see [tutorial](docs/tutorials/openshift-virtualization-on-ec2.md)) |
-| **Workloads** | Gatus, Grafana Dashboards, Kyverno, get-a-username (workshop user provisioning) |
+| **Operators** | 23 operators declared, 17 enabled — GitOps, KMM Hub, cert-manager, Lightspeed, Quay and DevWorkspace are off, see [VERSIONS.md](VERSIONS.md). Each is its own Kustomize base + overlay and its own ArgoCD app (`operators-<name>`) that bundles the OLM install with the operator's operands — see [operators/README.md](operators/README.md) |
+| **Operands** | Grafana, LokiStack (logging + netobserv), FlowCollector, RHACS, OpenShift AI (DSC/DSCI/dashboard), NFD, GPU, Compliance, Logging, OpenShift Virtualization (see [tutorial](docs/tutorials/openshift-virtualization-on-ec2.md)), **Kuadrant, the MaaS gateway + tenant + subscriptions, Kueue, user workload monitoring** |
+| **Workloads** | Gatus, Grafana Dashboards, **model-serving** (vLLM models behind MaaS, body-based routing, Gen AI playground), CTFd *(incomplete — see [techdebt.md](techdebt.md) item 9)*. Kyverno and get-a-username are present in the repo but **excluded** from the workload ApplicationSet — see below |
+| **Scripts (not GitOps-managed)** | [MaaS identity & API key provisioning](dumps/identity-management/README.md) — bulk-provisions RHOAI Models-as-a-Service users, subscriptions and keys |
+
+Workloads are discovered by a Git directory generator over `overlay/my-sno-cluster/*`,
+so a new subdirectory with a `kustomization.yaml` becomes an ArgoCD Application with no
+change to [argocd/appset-workloads.yaml](argocd/appset-workloads.yaml). Two are
+explicitly excluded there (`kyverno`, `get-a-username`) — remove the `exclude: true`
+entry to bring either back.
+
+Operators work the same way, one tree over: a Git directory generator over
+`operators/overlay/my-sno-cluster/*` ([argocd/appset-operators.yaml](argocd/appset-operators.yaml))
+turns each `operators/bases/<name>` + overlay into an Application called `operators-<name>`.
+Seven are excluded there (the disabled operators and `workshop-auth`).
+
+> **This branch (`argocd/demo`) points at itself.** `bootstrap/bootstrap.yaml` and both
+> ApplicationSets set `targetRevision: argocd/demo`, and none of them enable
+> `syncPolicy.automated` — nothing self-heals and nothing prunes, so applications sitting
+> `OutOfSync` is the expected steady state here rather than a fault. Change both when you
+> fork.
 
 ---
 
@@ -48,13 +66,18 @@ Apply the bootstrap Application once — ArgoCD takes it from here:
 oc apply -f bootstrap/bootstrap.yaml
 ```
 
-ArgoCD will sync in waves:
+Syncing `argocd/` creates one Application per operator (`operators-*`) and one per
+workload. Nothing is automated, so sync them yourself — in the UI, or all the operator
+apps at once:
 
-| Wave | What happens |
-|------|-------------|
-| 1 | Namespaces, OperatorGroups, Subscriptions created — operators install |
-| 2 | Operator CRs applied (Grafana, LokiStack, RHACS, OpenShift AI, etc.) |
-| 3 | Workloads deployed (Gatus, Grafana dashboards, Kyverno) |
+```bash
+argocd app sync -l app.kubernetes.io/part-of=openshift4-operators
+```
+
+Inside each operator app, sync waves install the operator first (Namespace → OperatorGroup
+→ Subscription) and apply its operands once the CRDs exist. Between apps there is no
+ordering; an app that needs another's CRDs retries until they appear — the order that
+avoids that is in [operators/README.md](operators/README.md#how-a-sync-behaves).
 
 Allow 10–15 minutes for all operators to reach `Succeeded` and operands to become `Ready`.
 
@@ -108,11 +131,15 @@ After the RHACS operator installs and `Central` is `Ready`, you must generate an
    oc apply -f <init-bundle>.yaml -n stackrox
    ```
 
-5. Trigger an ArgoCD sync on `operators-layer2` — SecuredCluster will connect to Central using the bundle.
+5. Trigger an ArgoCD sync on `operators-rhacs` — SecuredCluster will connect to Central using the bundle.
 
 > The init bundle contains cluster-specific secrets. Do not commit it to git.
 
 ### 5. Provision workshop users (get-a-username)
+
+> **Excluded from the workload ApplicationSet by default.** Remove the
+> `overlay/my-sno-cluster/get-a-username` `exclude: true` entry in
+> [argocd/appset-workloads.yaml](argocd/appset-workloads.yaml) before any of this applies.
 
 `overlay/my-sno-cluster/get-a-username/` deploys the [username-distribution](https://quay.io/openshiftlabs/username-distribution) tool, which hands each attendee a `userN` login and their assigned modules/console links. ArgoCD only ever creates **placeholder** Secrets for this (no real password is committed to git) — after first sync, run the setup script locally:
 
@@ -132,26 +159,115 @@ To tear a workshop run down afterward (deletes the namespaces, users, identity p
 
 See [overlay/my-sno-cluster/get-a-username/README.md](overlay/my-sno-cluster/get-a-username/README.md) for the full workflow.
 
+### 6. Provision MaaS users and API keys (optional)
+
+If the cluster runs RHOAI Models-as-a-Service, one script stands up the whole roster —
+htpasswd identities, OpenShift Groups, `MaaSSubscription`s, `MaaSAuthPolicy`s and a
+verified API key per user — from a single `config.json`:
+
+```bash
+cd dumps/identity-management
+./provision-maas-keys.sh --dry-run   # show the plan, change nothing
+./provision-maas-keys.sh             # reconcile + mint
+```
+
+It is safe to re-run: existing users keep their passwords, existing keys are not
+re-issued. Output lands in `dumps/identity-management/out/` (gitignored — it contains
+live credentials). [`testing.sh.tmp`](testing.sh.tmp) then drives real inference traffic
+through every issued key and tallies it by user, subscription, model and cost centre.
+
+This is deliberately **not** GitOps-managed: it mints credentials, which do not belong in
+git. See [dumps/identity-management/README.md](dumps/identity-management/README.md) for
+the full flow and the reasoning behind it.
+
+---
+
+## Models-as-a-Service (MaaS)
+
+The MaaS stack spans several apps (`connectivity-link`, `service-mesh`, `rhoai`, `maas`), so it
+is worth reading end to end before changing any one piece.
+
+```
+                      connectivity-link + service-mesh apps
+                                        |
+  client ──► maas-default-gateway ──► AuthPolicy      (Authorino:  who are you?)
+             (maas app: gateway.yaml) ──► RateLimit / (Limitador:  how much?)
+                                          TokenRateLimit
+                                      ──► TelemetryPolicy (per-user/org metrics)
+                                        |
+                                    HTTPRoute
+                            ┌───────────┴───────────┐
+              <model>-kserve-route          <model>-bbr
+              (owned by the LLMISVC)   (hand-written, body-based routing)
+                            └───────────┬───────────┘
+                                  InferencePool
+                                        |
+                                    vLLM pod
+```
+
+**Where each piece lives**
+
+| Piece | Where |
+|-------|-------|
+| Kuadrant control plane (`Kuadrant` CR) | [operators/bases/connectivity-link/](operators/bases/connectivity-link/) |
+| Gateway, tenant, subscriptions, auth policies, rate limits, telemetry | [operators/bases/maas/](operators/bases/maas/) |
+| `modelsAsService: Managed` (creates `maas-api` / `maas-controller`) | [operators/bases/rhoai/datasciencecluster.yaml](operators/bases/rhoai/datasciencecluster.yaml) |
+| MaaS UI feature flags | [operators/bases/rhoai/odhdashboardconfig.yaml](operators/bases/rhoai/odhdashboardconfig.yaml) |
+| The models themselves, body-based routes, Gen AI playground | [bases/model-serving/](bases/model-serving/) |
+| Usage / chargeback store + Grafana datasource | [operators/bases/maas/metrics-db.yaml](operators/bases/maas/metrics-db.yaml), [operators/bases/grafana-operator/datasources-extra.yaml](operators/bases/grafana-operator/datasources-extra.yaml) |
+| Bulk user + API key provisioning (scripts, not GitOps) | [dumps/identity-management/](dumps/identity-management/README.md) |
+
+**Body-based routing** is the part that is easy to miss. OpenAI-compatible clients put
+the model name in the request *body*, which Gateway API cannot match on. The gateway's
+BBR extension copies it into an `X-Gateway-Model-Name` header, and the routes in
+[bases/model-serving/body-based-routes.yaml](bases/model-serving/body-based-routes.yaml)
+match on that. It is also what lets the TelemetryPolicy label metrics with
+`responseBodyJSON("/model")`.
+
+**What is deliberately not in git.** The `maas-controller` generates a lot from the
+Tenant / MaaSSubscription / MaaSAuthPolicy CRs, and it will recreate all of it: the
+per-model `AuthPolicy` and `TokenRateLimitPolicy`, the `<model>-kserve-route`
+HTTPRoutes, `MaaSModelRef`s, `InferencePool`s, and the `maas-default-gateway-tier-*`
+namespaces. Committing them would just fight the controller.
+
+**Before you deploy this on a new cluster, change:**
+
+| Value | Where | Why |
+|-------|-------|-----|
+| Gateway `hostname` | [operators/overlay/my-sno-cluster/maas/](operators/overlay/my-sno-cluster/maas/kustomization.yaml) | Cluster-specific — `maas.apps.<your-cluster-domain>` |
+| `https` listener TLS Secret | [operators/bases/maas/gateway.yaml](operators/bases/maas/gateway.yaml) | Must name a real TLS Secret in `openshift-ingress` covering that hostname |
+| subscription `group`s | [operators/bases/maas/subscriptions.yaml](operators/bases/maas/subscriptions.yaml) | Must match real OpenShift Group names — **case-sensitive** |
+| metrics DB `storageClassName` | [operators/bases/maas/metrics-db.yaml](operators/bases/maas/metrics-db.yaml) | Match your cluster's storage class |
+
 ---
 
 ## Operator Versions
 
-| Operator | Version | Channel | Source |
-|----------|---------|---------|--------|
-| Grafana Community | `v5.22.2` | `v5` | community-operators |
-| NVIDIA GPU Operator | `v26.3.2` | `v26.3` | certified-operators |
-| Cluster Observability | `v1.4.0` | `stable` | redhat-operators |
-| Compliance Operator | `v1.8.2` | `stable` | redhat-operators |
-| Kernel Module Management Hub | `v2.6.0` | `stable` | redhat-operators |
-| Cluster Logging | `v6.4.3` | `stable-6.4` | redhat-operators |
-| Node Feature Discovery | `4.20.0` | `stable` | redhat-operators |
-| Loki Operator | `v6.4.3` | `stable-6.4` | redhat-operators |
-| DevWorkspace Operator | `v0.41.0` | `fast` | redhat-operators |
-| Red Hat OpenShift AI | `3.4.1` | `stable-3.4` | redhat-operators |
-| RHACS | `v4.11.0` | `stable` | redhat-operators |
-| Network Observability | latest | `stable` | redhat-operators |
+Every subscription uses `installPlanApproval: Automatic`, so the `startingCSV` in
+the `subscription.yaml` in each [operators/bases/*](operators/bases/) is a
+**floor, not a pin** — OLM upgrades to the head of the channel from there. Both columns
+below are therefore real and usually differ.
 
-See [VERSIONS.md](VERSIONS.md) for full version details and upgrade instructions.
+| Operator | Channel | `startingCSV` (repo) | Running (2026-07-26) |
+|----------|---------|----------------------|----------------------|
+| Grafana Community | `v5` | `v5.22.2` | `5.24.0` |
+| NVIDIA GPU Operator | `v26.3` | `v26.3.2` | `26.3.3` |
+| Cluster Observability | `stable` | `v1.4.0` | `1.5.1` |
+| Compliance Operator | `stable` | `v1.8.2` | `1.9.1` |
+| Kernel Module Management Hub | `stable` | `v2.6.0` | `2.6.1` *(installing)* |
+| Cluster Logging | `stable-6.4` | `v6.4.3` | `6.4.6` |
+| Node Feature Discovery | `stable` | `4.20.0-202603051149` | `4.20.0-202607141145` |
+| Loki Operator | `stable-6.4` | `v6.4.3` | `6.4.6` |
+| Red Hat OpenShift AI | `stable-3.3` *(repo)* | `3.3.2` | `3.4.2` *(on `stable-3.4`)* |
+| RHACS | `stable` | `v4.10.0` | `4.11.1` |
+| OpenShift Virtualization | `stable` | `v4.20.15` | `4.20.21` |
+| Network Observability | `stable` | *(latest)* | `1.12.1` |
+
+RHOAI is the notable gap: the repo tracks `stable-3.3` while the cluster runs `stable-3.4`,
+so a rebuild from this repo lands on a different minor version than the one validated here.
+Tracked as item 10 in [techdebt.md](techdebt.md).
+
+See [VERSIONS.md](VERSIONS.md) for the full table, operand versions, and upgrade steps.
 
 ---
 
@@ -179,7 +295,77 @@ oc get flowcollector cluster
 
 # Compliance scans running
 oc get compliancescan -n openshift-compliance
+
+# --- MaaS ---
+# Kuadrant control plane (Authorino + Limitador should be Ready)
+oc get kuadrant -n kuadrant-system
+
+# Gateway must be Programmed and have an address
+oc get gateway maas-default-gateway -n openshift-ingress
+
+# Tenant Reconciled, subscriptions Active
+oc get tenant,maassubscription,maasauthpolicy -n models-as-a-service
+
+# The controller-generated policies these produce
+oc get authpolicy,ratelimitpolicy,tokenratelimitpolicy -A
+
+# Models: MaaSModelRef should reach Ready with a URL
+oc get llminferenceservice,maasmodelref -n vllm-project
+
+# Kueue
+oc get kueue.kueue.openshift.io cluster
+
+# RHOAI monitoring (backs the "Prometheus (Data Science)" Grafana datasource)
+oc get opentelemetrycollector,tempomonolithic -n redhat-ods-monitoring
+
+# --- User workload monitoring ---
+# Should print "enableUserWorkload: true"
+oc get cm cluster-monitoring-config -n openshift-monitoring -o jsonpath='{.data.config\.yaml}'
+
+# Takes a few minutes to appear after the flag is set
+oc get pods -n openshift-user-workload-monitoring
 ```
+
+> **Heads up on UWM.** Platform Prometheus only scrapes namespaces labelled
+> `openshift.io/cluster-monitoring: "true"`; everything else needs user workload
+> monitoring. On the captured cluster *every* namespace holding a ServiceMonitor had that
+> label, so UWM was running with no targets of its own — four idle pods. It is enabled here
+> because it is a prerequisite for any workload namespace added without the label. Remove
+> `user-workload-monitoring.yaml` from
+> [operators/bases/cluster-monitoring/kustomization.yaml](operators/bases/cluster-monitoring/kustomization.yaml)
+> to reclaim the resources on SNO.
+
+---
+
+## Troubleshooting: "one or more synchronization tasks are not valid"
+
+If an Application is `OutOfSync` + **`Healthy`** but has deployed nothing at all, check:
+
+```bash
+oc get application operators-<name> -n openshift-gitops \
+  -o jsonpath='{.status.operationState.message}{"\n"}'
+```
+
+`one or more synchronization tasks are not valid` means ArgoCD could not resolve some
+rendered resource's kind against the cluster, and **refused the entire sync** — the check
+is atomic, so nothing gets applied. `Healthy` just means there are no unhealthy resources,
+because there are no resources.
+
+List exactly which ones:
+
+```bash
+oc get application operators-<name> -n openshift-gitops -o json \
+  | jq -r '.status.operationState.syncResult.resources[]
+           | select(.status != "Synced") | "\(.kind)/\(.name): \(.message)"'
+```
+
+This is expected on a cold bootstrap if an operand's CRD does not exist yet — either
+because the operator in the same app is still installing, or because it comes from another
+app. Every operand CR therefore carries a per-resource
+`argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true` annotation, so it
+degrades into a retry instead of a deadlock. If you see this error, an operand is missing
+that annotation (see [operators/README.md](operators/README.md#why-every-operand-carries-skipdryrunonmissingresource)).
+See also [techdebt.md](techdebt.md) item 14.
 
 ---
 
@@ -189,11 +375,15 @@ oc get compliancescan -n openshift-compliance
 bootstrap/          # Apply once to seed ArgoCD
 argocd/             # AppProject, ApplicationSets, RBAC
 operators/
-  layer1-install/   # Helm chart: Namespaces, OperatorGroups, Subscriptions
-  layer2-operands/  # Helm chart: Operator CRs / operands
-bases/              # Shared Helm/Kustomize bases (gatus, grafana, kyverno, get-a-username)
-overlay/            # Cluster-specific Kustomize overlays
+  bases/<name>/     # One per operator: OLM install + its operands (Kustomize)
+  overlay/my-sno-cluster/<name>/   # Cluster-specific overlay — one ArgoCD app each
+bases/              # Shared Helm/Kustomize bases (gatus, grafana, kyverno, ctfd,
+                    #   get-a-username, model-serving)
+overlay/            # Cluster-specific Kustomize overlays — one dir per workload
 docs/               # GitHub Pages documentation
+dumps/              # Live cluster resource dumps (MaaS/Kuadrant/RHOAI) kept for reference
+  identity-management/   # MaaS user + API key provisioning script (not GitOps-managed)
+techdebt.md         # Known issues, workarounds and their root causes — read before debugging
 ```
 
 ---
@@ -203,7 +393,11 @@ docs/               # GitHub Pages documentation
 Full documentation is published via GitHub Pages:
 
 - [Architecture](docs/architecture.md)
+- [Operators: bases, overlays and apps](operators/README.md) — layout, sync behaviour, cutover runbook
 - [Getting Started](docs/getting-started.md)
+- [Known issues & tech debt](techdebt.md) — current status of every known cluster-side problem
+- [MaaS identity & API key provisioning](dumps/identity-management/README.md)
+- [Grafana dashboard suite](bases/grafana/dashboard/README.md) — 9 persona-oriented dashboards
 - [Tutorials](docs/tutorials/)
   - [Adding a Workload](docs/tutorials/adding-a-workload.md)
   - [Operator Management](docs/tutorials/operator-management.md)
@@ -217,7 +411,14 @@ Full documentation is published via GitHub Pages:
 ## Uninstall
 
 ```bash
+# Operators first — their ApplicationSet sets preserveResourcesOnDeletion: true, so deleting
+# bootstrap alone would leave every operator and operand running.
+argocd app delete -l app.kubernetes.io/part-of=openshift4-operators --cascade
+
 oc delete -f bootstrap/bootstrap.yaml
 ```
 
-ArgoCD cascade deletion is enabled — removing the bootstrap Application will delete all managed Applications and their resources.
+Removing the bootstrap Application cascades to the workload Applications and their
+resources. It does **not** remove the operators and operands unless you delete the
+`operators-*` apps with `--cascade` first, as above — that is deliberate, because it
+protects LokiStack, the DataScienceCluster and their volumes from an accidental delete.

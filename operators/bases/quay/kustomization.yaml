@@ -1,0 +1,17 @@
+# ==============================================================================
+# operators/bases/quay — Red Hat Quay
+#
+# Installs the Quay operator (Manual approval). Disabled: no QuayRegistry operand is defined.
+#
+# ArgoCD app:  operators-quay   (argocd/appset-operators.yaml)
+# Installs:    quay-operator (channel stable-3.17, redhat-operators, Manual approval) into openshift-operators
+# Status:      DISABLED — excluded in argocd/appset-operators.yaml
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - subscription.yaml

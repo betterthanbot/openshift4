@@ -1,0 +1,19 @@
+# Loki Operator (Red Hat) — OLM Subscription (sync wave -1).
+#
+# openshift-operators-redhat is a standard OCP namespace for Red Hat operators that
+# need their own OperatorGroup (not the global one).
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: loki-operator
+  namespace: openshift-operators-redhat
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "stable-6.4"
+  name: "loki-operator"
+  source: "redhat-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  startingCSV: "loki-operator.v6.4.6"

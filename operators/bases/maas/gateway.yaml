@@ -1,0 +1,93 @@
+# The MaaS ingress Gateway, plus the ConfigMap that sizes its istio-proxy pods.
+#
+# CHANGE ME: `hostname` is cluster-specific — it is a placeholder here and is patched
+# per cluster in operators/overlay/my-sno-cluster/maas. It must resolve to the cluster's
+# ingress and be covered by the certificate in the Secret named by the https listener
+# (cert-manager-ingress-cert). On the source cluster this was maas.apps.<cluster-domain>,
+# with the certificate issued by cert-manager from a sandbox-provided Let's Encrypt
+# ClusterIssuer.
+#
+# NOTE this deliberately uses the built-in `openshift-default` GatewayClass, NOT the
+# `data-science-gateway-class` that RHOAI's GatewayConfig creates. The data-science
+# gateway is managed by RHOAI (GatewayConfig/default-gateway) and carries
+# opendatahub.io/managed=true; this one is ours to own.
+
+# Sizing for the istio-proxy pods that back the Gateway below. Gateway API has
+# no field for this on OpenShift, so it is passed by reference through
+# spec.infrastructure.parametersRef. Both keys are YAML-in-a-string that the
+# gateway controller strategic-merges into the generated Deployment / PDB.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: maas-default-gateway-options
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+data:
+  deployment: |
+    spec:
+      replicas: 2
+      template:
+        spec:
+          containers:
+          - name: istio-proxy
+            resources:
+              limits:
+                memory: 3Gi
+              requests:
+                memory: 256Mi
+  podDisruptionBudget: |
+    spec:
+      minAvailable: 1
+---
+# The MaaS ingress Gateway — every model request enters here.
+#
+# opendatahub.io/managed: "false" tells RHOAI to keep its hands off; RHOAI owns
+# the separate data-science-gateway (created by GatewayConfig/default-gateway).
+#
+# security.opendatahub.io/authorino-tls-bootstrap: "true" makes the platform
+# provision the TLS material Authorino needs to be called as an external
+# authorizer from this gateway — without it every AuthPolicy attached here
+# fails closed.
+#
+# PREREQUISITE: the Secret named in tlsSecretName must exist in this namespace
+# and cover `hostname`. On the source cluster it was issued by cert-manager
+# from a sandbox-provided Let's Encrypt ClusterIssuer, which is not in this repo.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: maas-default-gateway
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    opendatahub.io/managed: "false"
+    security.opendatahub.io/authorino-tls-bootstrap: "true"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  gatewayClassName: openshift-default
+  infrastructure:
+    parametersRef:
+      group: ""
+      kind: ConfigMap
+      name: maas-default-gateway-options
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      hostname: "maas.apps.example.com"  # CHANGE ME — patched per cluster in operators/overlay/my-sno-cluster/maas
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: "maas.apps.example.com"  # CHANGE ME — patched per cluster in operators/overlay/my-sno-cluster/maas
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: cert-manager-ingress-cert

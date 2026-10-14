@@ -1,0 +1,135 @@
+# Subscriptions — a tier per team. `owner.groups` must match real OpenShift Groups
+# (see groups.yaml); members authenticate with their own token and inherit the tier's
+# token budget.
+#
+# tokenRateLimits are per model, per window, per user.
+# priority breaks ties when a user is in more than one subscription.
+# tokenMetadata is echoed into the usage metrics by the TelemetryPolicy, which is what
+# makes per-cost-centre chargeback dashboards possible.
+#
+# CHANGE ME: model names/namespaces must match the LLMInferenceServices in
+# overlay/my-sno-cluster/model-serving.
+#
+# NOTE the capital C / D in team-Charlie / team-Delta. These match the OpenShift Group
+# names exactly as they exist on the cluster — group lookups are case-sensitive, and a
+# lower-cased name here silently grants nobody access.
+
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSSubscription
+metadata:
+  name: team-alpha
+  namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    # CRD comes from the DataScienceCluster (rhoai app) — see Tenant above.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    openshift.io/display-name: "Team Alpha Automated"
+spec:
+  owner:
+    groups:
+      - name: "team-alpha"
+  priority: 10
+  tokenMetadata:
+    costCenter: "CC-00001"
+    organizationId: "ORG-00001"
+  modelRefs:
+    - name: llama-32-1b-instruct-maas
+      namespace: vllm-project
+      tokenRateLimits:
+        - limit: 10000
+          window: 1m
+    - name: qwen25-05b-instruct-maas
+      namespace: vllm-project
+      tokenRateLimits:
+        - limit: 10000
+          window: 1m
+---
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSSubscription
+metadata:
+  name: team-bravo
+  namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    # CRD comes from the DataScienceCluster (rhoai app) — see Tenant above.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    openshift.io/display-name: "Team Bravo Automated"
+spec:
+  owner:
+    groups:
+      - name: "team-bravo"
+  priority: 9
+  tokenMetadata:
+    costCenter: "CC-00002"
+    organizationId: "ORG-00002"
+  modelRefs:
+    - name: llama-32-1b-instruct-maas
+      namespace: vllm-project
+      tokenRateLimits:
+        - limit: 5000
+          window: 1m
+    - name: qwen25-05b-instruct-maas
+      namespace: vllm-project
+      tokenRateLimits:
+        - limit: 5000
+          window: 1m
+---
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSSubscription
+metadata:
+  name: team-charlie
+  namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    # CRD comes from the DataScienceCluster (rhoai app) — see Tenant above.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    openshift.io/display-name: "Team Charlie Automated"
+spec:
+  owner:
+    groups:
+      - name: "team-Charlie"
+  priority: 8
+  tokenMetadata:
+    costCenter: "CC-00003"
+    organizationId: "ORG-00003"
+  modelRefs:
+    - name: llama-32-1b-instruct-maas
+      namespace: vllm-project
+      tokenRateLimits:
+        - limit: 1000
+          window: 1m
+    - name: qwen25-05b-instruct-maas
+      namespace: vllm-project
+      tokenRateLimits:
+        - limit: 1000
+          window: 1m
+---
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSSubscription
+metadata:
+  name: team-delta
+  namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    # CRD comes from the DataScienceCluster (rhoai app) — see Tenant above.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    openshift.io/display-name: "Team Delta Automated"
+spec:
+  owner:
+    groups:
+      - name: "team-Delta"
+  priority: 7
+  tokenMetadata:
+    costCenter: "CC-00004"
+    organizationId: "ORG-00004"
+  modelRefs:
+    - name: llama-32-1b-instruct-maas
+      namespace: vllm-project
+      tokenRateLimits:
+        - limit: 100
+          window: 1m
+    - name: qwen25-05b-instruct-maas
+      namespace: vllm-project
+      tokenRateLimits:
+        - limit: 100
+          window: 1m

@@ -1,0 +1,13 @@
+# Operand namespace for the Kuadrant control plane (Authorino + Limitador). The
+# rhcl-operator itself installs into openshift-operators, so this is the only Namespace
+# this app owns.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kuadrant-system
+  labels:
+    kubernetes.io/metadata.name: kuadrant-system
+    openshift.io/cluster-monitoring: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"

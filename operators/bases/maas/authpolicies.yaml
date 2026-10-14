@@ -1,0 +1,101 @@
+# MaaSAuthPolicies — who may call which model. One per subscription (<name>-policy,
+# same group and modelRefs as subscriptions.yaml); the maas-controller expands each
+# into the concrete Kuadrant AuthPolicy objects in the model namespace. Add extra,
+# decoupled policies to this file if a group needs access that is not tied to a
+# subscription.
+
+# MaaSAuthPolicy — grants a group the right to call a set of models. The
+# maas-controller expands this into the concrete Kuadrant AuthPolicy objects in
+# each model's namespace (maas-auth-<model>), which is why those are not in git.
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSAuthPolicy
+metadata:
+  name: team-alpha-policy
+  namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    # CRD comes from the DataScienceCluster (rhoai app) — see Tenant above.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    openshift.io/display-name: "team-alpha-policy"
+    openshift.io/description: "Auth policy created for subscription \"team-alpha\""
+spec:
+  subjects:
+    groups:
+      - name: "team-alpha"
+  modelRefs:
+    - name: llama-32-1b-instruct-maas
+      namespace: vllm-project
+    - name: qwen25-05b-instruct-maas
+      namespace: vllm-project
+---
+# MaaSAuthPolicy — grants a group the right to call a set of models. The
+# maas-controller expands this into the concrete Kuadrant AuthPolicy objects in
+# each model's namespace (maas-auth-<model>), which is why those are not in git.
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSAuthPolicy
+metadata:
+  name: team-bravo-policy
+  namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    # CRD comes from the DataScienceCluster (rhoai app) — see Tenant above.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    openshift.io/display-name: "team-bravo-policy"
+    openshift.io/description: "Auth policy created for subscription \"team-bravo\""
+spec:
+  subjects:
+    groups:
+      - name: "team-bravo"
+  modelRefs:
+    - name: llama-32-1b-instruct-maas
+      namespace: vllm-project
+    - name: qwen25-05b-instruct-maas
+      namespace: vllm-project
+---
+# MaaSAuthPolicy — grants a group the right to call a set of models. The
+# maas-controller expands this into the concrete Kuadrant AuthPolicy objects in
+# each model's namespace (maas-auth-<model>), which is why those are not in git.
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSAuthPolicy
+metadata:
+  name: team-charlie-policy
+  namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    # CRD comes from the DataScienceCluster (rhoai app) — see Tenant above.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    openshift.io/display-name: "team-charlie-policy"
+    openshift.io/description: "Auth policy created for subscription \"team-charlie\""
+spec:
+  subjects:
+    groups:
+      - name: "team-Charlie"
+  modelRefs:
+    - name: llama-32-1b-instruct-maas
+      namespace: vllm-project
+    - name: qwen25-05b-instruct-maas
+      namespace: vllm-project
+---
+# MaaSAuthPolicy — grants a group the right to call a set of models. The
+# maas-controller expands this into the concrete Kuadrant AuthPolicy objects in
+# each model's namespace (maas-auth-<model>), which is why those are not in git.
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSAuthPolicy
+metadata:
+  name: team-delta-policy
+  namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    # CRD comes from the DataScienceCluster (rhoai app) — see Tenant above.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    openshift.io/display-name: "team-delta-policy"
+    openshift.io/description: "Auth policy created for subscription \"team-delta\""
+spec:
+  subjects:
+    groups:
+      - name: "team-Delta"
+  modelRefs:
+    - name: llama-32-1b-instruct-maas
+      namespace: vllm-project
+    - name: qwen25-05b-instruct-maas
+      namespace: vllm-project

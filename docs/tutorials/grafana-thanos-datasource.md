@@ -182,16 +182,18 @@ A `200 OK` with Prometheus JSON confirms the token is valid.
 
 ## GitOps Integration
 
-All resources are managed by the `operators-layer2` ArgoCD Application via the `layer2-operands` Helm chart:
+All resources are managed by the `operators-grafana-operator` ArgoCD Application, built from the
+base in `operators/bases/grafana-operator/`:
 
-- **ServiceAccount + RBAC:** `operators/layer2-operands/templates/grafana-serviceaccount.yaml`
-- **Auth Job:** `operators/layer2-operands/templates/grafana-auth-job.yaml`
-- **Prometheus GrafanaDatasource:** `operators/layer2-operands/templates/grafana-datasource.yaml`
-- **Loki GrafanaDatasources:** `operators/layer2-operands/templates/grafana-loki-datasources.yaml`
+- **ServiceAccount + RBAC:** `operators/bases/grafana-operator/serviceaccount-rbac.yaml`
+- **Auth Job:** `operators/bases/grafana-operator/auth-job.yaml`
+- **Prometheus GrafanaDatasource:** `operators/bases/grafana-operator/datasource-thanos.yaml`
+- **Other datasources:** `datasources-extra.yaml` (RHOAI Thanos, MaaS Postgres) and `datasources-loki.yaml` (the three Loki tenants), in the same directory
 - **ArgoCD ignoreDifferences:** `argocd/appset-operators.yaml` under `ignoreDifferences`
-- **Values (URLs, names, toggles):** `operators/layer2-operands/values.yaml` under `grafana.serviceAccount`, `grafana.datasource`, and `grafana.lokiDatasources`
+- **URLs and names:** plain values in those same files (there is no `values.yaml` any more)
 
-To disable the datasource without removing the Grafana instance, set `grafana.datasource.enabled: false` in values.yaml.
+To disable the datasource without removing the Grafana instance, remove `datasource-thanos.yaml` from
+`operators/bases/grafana-operator/kustomization.yaml`.
 
 ---
 

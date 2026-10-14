@@ -1,0 +1,36 @@
+# LokiStack for Network Observability — the flow store behind the FlowCollector
+# (flowcollector.yaml).
+#
+# Prerequisite: the S3 Secret netobserv-loki-s3 must exist in the netobserv
+# namespace before this is applied. lokistack-s3-secret.yaml creates a placeholder —
+# edit it after first sync:
+#   oc edit secret netobserv-loki-s3 -n netobserv
+# CHANGE ME: storageClassName (and name/namespace if you change them —
+# flowcollector.yaml must match).
+#
+# The LokiStack CRD comes from the Loki operator (the `loki` app) — sync that first.
+
+apiVersion: loki.grafana.com/v1
+kind: LokiStack
+metadata:
+  name: netobserv-loki
+  namespace: netobserv
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  limits:
+    global:
+      retention:
+        days: 14
+  managementState: Managed
+  size: 1x.pico # production: 1x.extra-small | 1x.small | 1x.medium
+  storage:
+    schemas:
+      - effectiveDate: "2024-01-01"
+        version: v13
+    secret:
+      name: netobserv-loki-s3
+      type: s3
+  storageClassName: gp3-csi # CHANGE ME: match your cluster's storage class
+  tenants:
+    mode: openshift-network

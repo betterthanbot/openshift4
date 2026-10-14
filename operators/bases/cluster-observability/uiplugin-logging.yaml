@@ -1,0 +1,16 @@
+# UIPlugin — enables the Logs tab under Observe > Logs in the OpenShift console.
+# Managed by the Cluster Observability Operator (installed by this app's
+# subscription.yaml). Needs the LokiStack named below, which lives in the
+# cluster-logging app.
+apiVersion: observability.openshift.io/v1alpha1
+kind: UIPlugin
+metadata:
+  name: logging
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  type: Logging
+  logging:
+    lokiStack:
+      name: logging-loki
+      namespace: openshift-logging

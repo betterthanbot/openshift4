@@ -1,0 +1,17 @@
+# ==============================================================================
+# operators/bases/devworkspace — DevWorkspace Operator
+#
+# Installs the DevWorkspace operator (Manual approval). Disabled; no operand is defined.
+#
+# ArgoCD app:  operators-devworkspace   (argocd/appset-operators.yaml)
+# Installs:    devworkspace-operator (channel fast, redhat-operators, Manual approval) into openshift-operators
+# Status:      DISABLED — excluded in argocd/appset-operators.yaml
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - subscription.yaml

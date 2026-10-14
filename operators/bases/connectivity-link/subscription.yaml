@@ -1,0 +1,31 @@
+# Connectivity Link / Kuadrant (Red Hat) — OLM Subscription (sync wave -1).
+#
+# Provides the AuthPolicy / RateLimitPolicy / TokenRateLimitPolicy / TelemetryPolicy
+# CRDs that Models-as-a-Service builds on. Installing this one Subscription is
+# enough — OLM dependency resolution pulls in three more operators into
+# openshift-operators automatically, so they are deliberately NOT declared here
+# (declaring them would fight OLM's generated Subscriptions, which are named
+# "<pkg>-<channel>-<source>-openshift-marketplace"):
+#
+#   authorino-operator   (authorino-operator.v1.4.2)  — AuthConfig / Authorino
+#   limitador-operator   (limitador-operator.v1.4.1)  — rate limit counters
+#   dns-operator         (dns-operator.v1.4.1)        — Kuadrant DNSPolicy
+#
+# The Kuadrant CR itself is in this app too (kuadrant.yaml, kuadrant-system namespace).
+# Installs into openshift-operators (global-operators OG), so no OperatorGroup here.
+# NOTE: the source cluster used installPlanApproval: Manual — see service-mesh.
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: rhcl-operator
+  namespace: openshift-operators
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "stable"
+  name: "rhcl-operator"
+  source: "redhat-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  startingCSV: "rhcl-operator.v1.4.2"

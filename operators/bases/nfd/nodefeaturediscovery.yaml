@@ -1,0 +1,25 @@
+# Node Feature Discovery — NodeFeatureDiscovery instance.
+# Detects hardware features (GPU, CPU flags, PCI devices) and labels nodes.
+#
+# Captured from the working cluster: the instance is named `nfd` (not
+# `nfd-instance`) and runs the operator defaults — no PCI device-class
+# whitelist and no custom servicePort. The NVIDIA GPU operator only needs the
+# stock `feature.node.kubernetes.io/pci-10de.present` label, which the defaults
+# already produce, so the previous hand-tuned workerConfig was dropped.
+
+apiVersion: nfd.openshift.io/v1
+kind: NodeFeatureDiscovery
+metadata:
+  name: nfd
+  namespace: openshift-nfd
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  enableTaints: false
+  instance: ""
+  operand:
+    servicePort: 0
+  prunerOnDelete: false
+  topologyUpdater: false
+  workerConfig:
+    configData: ""

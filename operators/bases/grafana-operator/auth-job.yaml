@@ -1,0 +1,64 @@
+# Sync-hook Job (wave 3): creates a 7440h (310-day) TokenRequest token for grafana-sa,
+# writes it to grafana-thanos-auth Secret, then patches all GrafanaDatasource CRs with
+# the token directly in spec.datasource.secureJsonData. The patch triggers Grafana Operator
+# reconciliation, which pushes the token to Grafana. ArgoCD ignoreDifferences on
+# /spec/datasource/secureJsonData prevents subsequent syncs from clearing it.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: grafana-create-thanos-auth
+  namespace: grafana
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  backoffLimit: 5
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      serviceAccountName: grafana-token-builder-sa
+      restartPolicy: OnFailure
+      containers:
+        - name: builder
+          # Built-in OpenShift CLI image — available on every cluster without registry auth
+          image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+
+              TOKEN=$(oc create token grafana-sa \
+                -n grafana \
+                --duration=7440h)
+
+              if [ -z "$TOKEN" ]; then
+                echo "ERROR: oc create token returned empty token"
+                exit 1
+              fi
+
+              # Write to Secret for reference / debugging
+              oc create secret generic grafana-thanos-auth \
+                --from-literal=bearer-token="Bearer ${TOKEN}" \
+                -n grafana \
+                --dry-run=client -o yaml | oc apply -f -
+
+              # Patch secureJsonData directly into each GrafanaDatasource CR.
+              # This triggers the Grafana Operator to reconcile and push the token
+              # to Grafana via its API. ArgoCD ignoreDifferences prevents syncs
+              # from resetting this field back to empty.
+              #
+              # Datasources labelled grafana.openshift4/auth=none are skipped —
+              # they authenticate some other way (e.g. the MaaS postgres
+              # datasource uses a username/password from a Secret) and stamping
+              # an Authorization header onto them corrupts their config.
+              for CR in $(oc get grafanadatasource -n grafana \
+                            -l 'grafana.openshift4/auth!=none' -o name); do
+                oc patch "${CR}" -n grafana \
+                  --type merge \
+                  -p "{\"spec\":{\"datasource\":{\"secureJsonData\":{\"httpHeaderValue1\":\"Bearer ${TOKEN}\"}}}}"
+                echo "Patched: ${CR}"
+              done
+
+              echo "Done: all GrafanaDatasource CRs patched with fresh bearer token"

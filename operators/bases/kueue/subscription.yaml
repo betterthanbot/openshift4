@@ -1,0 +1,21 @@
+# Kueue (Red Hat) — OLM Subscription (sync wave -1).
+#
+# Standalone Kueue operator — job queueing / quota for AI workloads. RHOAI's own
+# `kueue` DSC component is set to Removed (see ../rhoai/datasciencecluster.yaml)
+# because this operator manages the Kueue instance instead. Requires cert-manager to
+# be present (it issues the webhook and metrics certs in openshift-kueue-operator).
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: kueue-operator
+  namespace: openshift-kueue-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "stable-v1.3"
+  name: "kueue-operator"
+  source: "redhat-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  startingCSV: "kueue-operator.v1.3.1"
