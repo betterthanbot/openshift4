@@ -1,0 +1,79 @@
+# Loki datasources (one per LokiStack tenant). They reuse the same grafana-sa token
+# written by the grafana-auth-job (wave 3).
+# Internal LokiStack gateway — <lokistack-name>-gateway-http.<namespace>.svc
+# (logging-loki-gateway-http.openshift-logging.svc:8080, from the cluster-logging app).
+
+# Wave 2: GrafanaDatasource CR. secureJsonData is intentionally omitted here —
+# the grafana-auth-job (wave 3) patches it directly after creating the token.
+# URL format: <gateway>/api/logs/v1/<tenant> — Grafana Loki datasource appends
+# /loki/api/v1/... automatically, producing the correct LokiStack gateway path.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: loki-application
+  namespace: grafana
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana-a
+  datasource:
+    name: Loki - Application
+    type: loki
+    access: proxy
+    url: https://logging-loki-gateway-http.openshift-logging.svc:8080/api/logs/v1/application
+    jsonData:
+      tlsSkipVerify: true
+      httpHeaderName1: "Authorization"
+---
+# Wave 2: GrafanaDatasource CR. secureJsonData is intentionally omitted here —
+# the grafana-auth-job (wave 3) patches it directly after creating the token.
+# URL format: <gateway>/api/logs/v1/<tenant> — Grafana Loki datasource appends
+# /loki/api/v1/... automatically, producing the correct LokiStack gateway path.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: loki-audit
+  namespace: grafana
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana-a
+  datasource:
+    name: Loki - Audit
+    type: loki
+    access: proxy
+    url: https://logging-loki-gateway-http.openshift-logging.svc:8080/api/logs/v1/audit
+    jsonData:
+      tlsSkipVerify: true
+      httpHeaderName1: "Authorization"
+---
+# Wave 2: GrafanaDatasource CR. secureJsonData is intentionally omitted here —
+# the grafana-auth-job (wave 3) patches it directly after creating the token.
+# URL format: <gateway>/api/logs/v1/<tenant> — Grafana Loki datasource appends
+# /loki/api/v1/... automatically, producing the correct LokiStack gateway path.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: loki-infrastructure
+  namespace: grafana
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana-a
+  datasource:
+    name: Loki - Infrastructure
+    type: loki
+    access: proxy
+    url: https://logging-loki-gateway-http.openshift-logging.svc:8080/api/logs/v1/infrastructure
+    jsonData:
+      tlsSkipVerify: true
+      httpHeaderName1: "Authorization"

@@ -90,15 +90,15 @@ bootstrap/
 argocd/
    appProject.yaml           ← GitOps project boundary (openshift4-community)
    rbac-operands.yaml        ← Permissions the operand sync needs
-   appset-operators.yaml     ← ApplicationSet → operators/layer1-install + layer2-operands
+   appset-operators.yaml     ← ApplicationSet → one Application per operators/overlay/my-sno-cluster/*
    appset-workloads.yaml     ← ApplicationSet → one Application per overlay/my-sno-cluster/*
 
 operators/
-   layer1-install/           ← Namespaces, OperatorGroups, Subscriptions (wave 1)
-   layer2-operands/          ← Operator CRs / operands (wave 2)
+   bases/<name>/             ← One per operator: OLM install + its operands (Kustomize)
+   overlay/my-sno-cluster/   ← Per-cluster overlay for each — one ArgoCD app (operators-<name>) each
 
 overlay/
-   my-sno-cluster/           ← Workload configuration (wave 3)
+   my-sno-cluster/           ← Workload configuration
 ```
 
 ---

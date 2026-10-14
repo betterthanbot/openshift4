@@ -1,0 +1,24 @@
+# techdebt.md #4 — lets the Perses server read the GLOBAL Thanos Querier.
+#
+# The Perses pod in redhat-ods-monitoring has no dedicated ServiceAccount; it runs
+# as the namespace `default` SA. Binding cluster-monitoring-view to that SA is
+# what allows the shared PersesDatasource to proxy to
+# thanos-querier.openshift-monitoring.svc:9091 instead of the isolated
+# data-science Prometheus, which cannot see cross-namespace metrics.
+#
+# Caveat: `default` in this namespace is also used by the data-science Thanos
+# Querier pod, so it inherits this read-only grant too.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: data-science-perses-cluster-monitoring-view
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-monitoring-view
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: redhat-ods-monitoring

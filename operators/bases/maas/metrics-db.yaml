@@ -1,0 +1,148 @@
+# MaaS metrics database.
+#
+# A small PostgreSQL used as the long-term store behind the "MaaS Postgres" Grafana
+# datasource (see the grafana-operator app) and the MaaS stakeholder / chargeback
+# dashboards in bases/grafana. Kuadrant + the RHOAI Thanos only keep short-window
+# counters; this is where rolled-up usage lands.
+#
+# On the source cluster this was stood up ad hoc from the OpenShift
+# `postgresql-persistent` template (as a DeploymentConfig). It is re-expressed here as a
+# plain Deployment — DeploymentConfig is deprecated in OCP 4.14+.
+#
+# NOTE: nothing in this repo writes to this database. On the source cluster it was
+# populated out-of-band. Treat it as the store, not the pipeline.
+#
+# The image is the built-in OpenShift postgresql imagestream — no registry auth needed.
+# CHANGE ME: storageClassName must name an Immediate-binding class (see the
+# storageclass app).
+
+# Placeholder credentials. Prune=false + IgnoreExtraneous keep ArgoCD from
+# reverting the real password once you set it. Replace it, then restart the
+# deployment:
+#   oc create secret generic maas-postgres -n redhat-ods-applications \
+#     --from-literal=database-name=maas \
+#     --from-literal=database-user=maas \
+#     --from-literal=database-password='<pick-one>' \
+#     --dry-run=client -o yaml | oc apply -f -
+#   oc rollout restart deploy/maas-postgres -n redhat-ods-applications
+# The same password goes into the maas-postgres-grafana-auth Secret in the
+# grafana namespace (see the grafana-operator app, maas-postgres-auth-secret.yaml).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: maas-postgres
+  namespace: redhat-ods-applications
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: Prune=false
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+type: Opaque
+stringData:
+  database-name: "maas"
+  database-user: "maas"
+  database-password: "CHANGE_ME"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: maas-postgres
+  namespace: redhat-ods-applications
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: gp3-csi-immediate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: maas-postgres
+  namespace: redhat-ods-applications
+  labels:
+    app: maas-postgres
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  type: ClusterIP
+  selector:
+    app: maas-postgres
+  ports:
+    - name: postgresql
+      port: 5432
+      protocol: TCP
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: maas-postgres
+  namespace: redhat-ods-applications
+  labels:
+    app: maas-postgres
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: maas-postgres
+  strategy:
+    # Recreate, not RollingUpdate: the PVC is ReadWriteOnce, so two pods can
+    # never be up at once anyway.
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: maas-postgres
+    spec:
+      containers:
+        - name: postgresql
+          image: image-registry.openshift-image-registry.svc:5000/openshift/postgresql:15-el9
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: maas-postgres
+                  key: database-name
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: maas-postgres
+                  key: database-user
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: maas-postgres
+                  key: database-password
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 50m
+              memory: 256Mi
+          readinessProbe:
+            exec:
+              command: ["/usr/libexec/check-container"]
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["/usr/libexec/check-container", "--live"]
+            initialDelaySeconds: 120
+            timeoutSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/pgsql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: maas-postgres

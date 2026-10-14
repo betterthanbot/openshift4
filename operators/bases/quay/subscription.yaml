@@ -1,0 +1,28 @@
+# Red Hat Quay — OLM Subscription (sync wave -1).
+#
+# DISABLED BY DEFAULT (excluded in argocd/appset-operators.yaml): present on the
+# source cluster but never configured — no QuayRegistry CR existed (the
+# `quayregistry` namespace was created but left empty). Quay is heavy; enable only if
+# you actually want a registry, and add a QuayRegistry operand.
+# Installs into openshift-operators (global-operators OG), so no OperatorGroup here.
+#
+# installPlanApproval is Manual: the first InstallPlan has to be approved by hand
+#   oc get installplan -n openshift-operators
+#   oc patch installplan <name> -n openshift-operators --type merge -p '{"spec":{"approved":true}}'
+# and ArgoCD's built-in Subscription health check holds this app's later sync waves
+# (anything that needs the operator's CRDs) until that happens.
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: quay-operator
+  namespace: openshift-operators
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "stable-3.17"
+  name: "quay-operator"
+  source: "redhat-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Manual
+  startingCSV: "quay-operator.v3.17.3"

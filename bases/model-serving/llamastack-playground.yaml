@@ -1,6 +1,6 @@
 # ==============================================================================
 # LlamaStackDistribution — backs the Gen AI playground in the RHOAI dashboard
-# (enabled by dashboardConfig.genAiStudio in operators/layer2-operands).
+# (enabled by dashboardConfig.genAiStudio in operators/bases/rhoai/odhdashboardconfig.yaml).
 #
 # Its inference providers are configured in the llama-stack-config ConfigMap
 # (llama-stack-config.yaml), which points at the in-cluster vLLM services.

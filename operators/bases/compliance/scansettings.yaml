@@ -1,0 +1,53 @@
+# Compliance Operator — ScanSettings.
+# The "default" and "default-auto-apply" ScanSettings are built into the operator;
+# only the custom ones are managed here.
+
+apiVersion: compliance.openshift.io/v1alpha1
+kind: ScanSetting
+metadata:
+  name: cis-1.7-full
+  namespace: openshift-compliance
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+maxRetryOnTimeout: 2
+rawResultStorage:
+  enabled: true
+  pvAccessModes:
+    - ReadWriteOnce
+  rotation: 3
+  size: "1Gi"
+roles:
+  - master
+  - worker
+scanTolerations:
+  - operator: Exists
+schedule: "0 0 1 * *"
+showNotApplicable: false
+strictNodeScan: false
+suspend: false
+timeout: "15m0s"
+---
+apiVersion: compliance.openshift.io/v1alpha1
+kind: ScanSetting
+metadata:
+  name: ownself-monitor-ownself
+  namespace: openshift-compliance
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+maxRetryOnTimeout: 2
+rawResultStorage:
+  enabled: true
+  pvAccessModes:
+    - ReadWriteOnce
+  rotation: 3
+  size: "1Gi"
+roles:
+  - master
+  - worker
+scanTolerations:
+  - operator: Exists
+schedule: "0 0 1 * *"
+showNotApplicable: false
+strictNodeScan: false
+suspend: false
+timeout: "15m0s"

@@ -63,7 +63,8 @@ oc create secret generic logging-loki-s3 \
 
 ## Verify LokiStack starts
 
-After saving the secret, trigger an ArgoCD sync on `operators-layer2`, then check:
+After saving the secret, trigger an ArgoCD sync on `operators-cluster-logging` (or
+`operators-netobserv` for the network-observability LokiStack), then check:
 
 ```bash
 # LokiStack should move to Ready

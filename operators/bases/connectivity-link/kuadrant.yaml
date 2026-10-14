@@ -1,0 +1,20 @@
+# Kuadrant control plane. The rhcl-operator (this app's subscription.yaml)
+# watches this CR and creates the Authorino and Limitador instances that every
+# AuthPolicy / RateLimitPolicy / TokenRateLimitPolicy below depends on.
+#
+# Applied early (wave 1) because the MaaS gateway policies are useless — and
+# Kuadrant's admission webhooks reject them — until Authorino and Limitador are
+# actually running.
+apiVersion: kuadrant.io/v1beta1
+kind: Kuadrant
+metadata:
+  name: kuadrant
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  # observability.enable wires Kuadrant's own metrics into user-workload
+  # monitoring, which the MaaS Grafana dashboards query.
+  observability:
+    enable: true

@@ -1,0 +1,25 @@
+# ==============================================================================
+# operators/bases/netobserv — Network Observability
+#
+# Installs the Network Observability operator, a dedicated LokiStack for flow storage
+# (netobserv-loki) and the cluster-scoped FlowCollector (eBPF agents + processor +
+# console plugin).
+#
+# ArgoCD app:  operators-netobserv   (argocd/appset-operators.yaml)
+# Installs:    netobserv-operator (channel stable, redhat-operators) into netobserv
+# Needs:       loki  (LokiStack CRD)
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml
+  # Operands
+  - lokistack-s3-secret.yaml
+  - lokistack.yaml
+  - flowcollector.yaml

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-operators-redhat
+  labels:
+    kubernetes.io/metadata.name: openshift-operators-redhat
+    openshift.io/cluster-monitoring: "true"
+    security.openshift.io/MinimallySufficientPodSecurityStandard: "restricted"
+    security.openshift.io/scc.podSecurityLabelSync: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"

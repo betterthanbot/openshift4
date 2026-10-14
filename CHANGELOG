@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheryou des to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Changed
+- **Operators are now one Kustomize base + overlay + ArgoCD app each.** The Helm charts `operators/layer1-install` (every Subscription) and `operators/layer2-operands` (every operand) — which showed up in ArgoCD as just `operators-layer1` and `operators-layer2` — are replaced by `operators/bases/<name>/` (the OLM install *and* the operator's own operands) and `operators/overlay/my-sno-cluster/<name>/`. 27 components, 20 enabled, 7 excluded. See `operators/README.md`.
+- `argocd/appset-operators.yaml` — rewritten: a git-directory generator over `operators/overlay/my-sno-cluster/*` creating one `operators-<name>` Application per directory (was a two-entry list generator). `ignoreDifferences` (20 entries) and `retry` are unchanged; `CreateNamespace=true` dropped (every namespace is declared); Applications are labelled `app.kubernetes.io/part-of: openshift4-operators`. **`preserveResourcesOnDeletion` is now `true` (was `false`)**: with `false`, removing an Application cascade-deletes the operator, its operands and the Namespace with its volumes. Side effect: deleting the `bootstrap` Application no longer tears the operators down.
+- Install resources carry sync waves — Namespace `-3`, OperatorGroup `-2`, Subscription `-1` — so, inside one app, operands wait for ArgoCD's built-in Subscription health check (`AtLatestKnown`) before they are applied. Every operand CR carries `argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true`, which bundling makes mandatory (see `techdebt.md` item 14).
+- Cluster-specific values moved into overlays: MaaS gateway hostname (`overlay/my-sno-cluster/maas`), CNV software emulation (`overlay/my-sno-cluster/cnv`), the `vllm-project` Namespace (`overlay/my-sno-cluster/rhoai`).
+- Where things landed: `Kuadrant` CR + `kuadrant-system` → `connectivity-link`; logging `UIPlugin` → `cluster-observability`; the two LokiStacks and their S3 Secrets → `cluster-logging` / `netobserv`; user-workload monitoring + the RHOAI monitoring workarounds → `cluster-monitoring`; `gp3-csi-immediate` → `storageclass`; the rest of `maas.*` → `maas`. Each Namespace is declared in exactly one base.
+- Corrected stale comments that referred to the old structure or to wrong sync-wave numbers (Grafana auth Job is wave 3, the DataScienceCluster is wave 0).
+- Docs updated for the new layout: `README.md`, `VERSIONS.md`, `argocd/README.md`, `bootstrap/README.md`, `docs/architecture.md`, `docs/getting-started.md`, `docs/tutorials/operator-management.md` (rewritten), and the LokiStack, Grafana and CNV tutorials. `README.md`/`VERSIONS.md` now agree with `values` that 17 operators are enabled (KMM Hub has been off since `e44e81f`).
+
+### Added
+- `operators/README.md` — layout, the app table, how a sync behaves, everyday tasks, and a **runbook for moving an existing cluster off `operators-layer1` / `operators-layer2`** (the old Applications carry a cascade-delete finalizer, so the ApplicationSet must be protected first).
+
+### Removed
+- `operators/layer1-install/` and `operators/layer2-operands/` (Helm charts) and the `operators-layer1` / `operators-layer2` Applications.
+
+### Verified
+- `kustomize build` of every overlay renders exactly the resources `helm template` of the old charts rendered — 124 for what is enabled, 144 with every disabled feature switched on — apart from Helm metadata, the new sync-wave annotations, `SkipDryRunOnMissingResource` and `OperatorGroup` `spec: null` → `{}`.
 
 ## [Released]
 ## [1.5.0] - 2026-07-04

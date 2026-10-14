@@ -53,8 +53,8 @@ metadata:
     kubevirt.kubevirt.io/jsonpatch: '[{"op":"add","path":"/spec/configuration/developerConfiguration","value":{"useEmulation":true}}]'
 ```
 
-This is what `operators/layer2-operands/values.yaml` (`cnv.hyperConverged.annotations`)
-already configures, matching what's live on this cluster. Once HCO reconciles
+This is what the cluster overlay, `operators/overlay/my-sno-cluster/cnv/kustomization.yaml`,
+already patches onto the base `HyperConverged`, matching what's live on this cluster. Once HCO reconciles
 this, `virt-handler` marks every node schedulable regardless of `/dev/kvm`:
 
 ```bash

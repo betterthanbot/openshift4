@@ -18,7 +18,7 @@ This guide walks you through deploying the OpenShift4 GitOps platform from scrat
 |-------------|---------|
 | OpenShift version | 4.14 or later |
 | Topology | Single-Node OpenShift (SNO) recommended; multi-node works |
-| Storage | `gp3-csi` StorageClass available (AWS default) — adjust `lokiStack.spec.storageClassName` in `values.yaml` for other providers |
+| Storage | `gp3-csi` StorageClass available (AWS default) — adjust `storageClassName` in `operators/bases/cluster-logging/lokistack.yaml` and `operators/bases/netobserv/lokistack.yaml` for other providers |
 | AWS S3 (or compatible) | Required for LokiStack log storage — one bucket, one IAM user with read/write access |
 | `cluster-admin` access | Required to apply the bootstrap Application and RBAC |
 
@@ -68,13 +68,17 @@ oc get route openshift-gitops-server -n openshift-gitops
 
 ## Step 3 — Review cluster-specific values
 
-Before bootstrapping, review these values in `operators/layer2-operands/values.yaml` and adjust for your cluster:
+Each operator is its own base under `operators/bases/<name>/`, with a per-cluster overlay under
+`operators/overlay/my-sno-cluster/<name>/`. Before bootstrapping, review these and adjust for your cluster
+(`grep -rn "CHANGE ME" operators/` lists the ones marked in the files):
 
-| Key | Default | Notes |
-|-----|---------|-------|
-| `lokiStack.spec.storageClassName` | `gp3-csi` | Change for non-AWS clusters |
-| `rhacs.securedCluster.clusterName` | `my-cluster` | Logical name shown in RHACS console |
-| `grafana.instance.spec.config.security.admin_password` | `secret` | Change before deploying to production |
+| File | Setting | Default | Notes |
+|------|---------|---------|-------|
+| `operators/bases/{cluster-logging,netobserv}/lokistack.yaml` | `storageClassName` | `gp3-csi` | Change for non-AWS clusters |
+| `operators/overlay/my-sno-cluster/maas/kustomization.yaml` | gateway `hostname` | this sandbox's domain | Must be `maas.apps.<your-cluster-domain>` |
+| `operators/bases/rhacs/securedcluster.yaml` | `clusterName` | `my-cluster` | Logical name shown in RHACS console |
+| `operators/bases/grafana-operator/grafana.yaml` | `admin_password` | `secret` | Change before deploying to production |
+| `operators/overlay/my-sno-cluster/cnv/kustomization.yaml` | software emulation | on | Delete the patch on bare-metal nodes |
 
 ---
 
@@ -90,11 +94,12 @@ This creates a single ArgoCD `Application` in the `openshift-gitops` namespace p
 
 | Time | Event |
 |------|-------|
-| ~30s | ArgoCD syncs `argocd/` — creates AppProject, ApplicationSets, RBAC |
-| ~2m | `operators-layer1` syncs — Namespaces, OperatorGroups, OLM Subscriptions applied |
-| ~10–15m | OLM installs all operators (download + install takes time) |
-| ~20m | `operators-layer2` syncs — Grafana, LokiStack, RHACS, NFD, etc. CRs applied |
-| ~25m | `gatus`, `grafana`, `kyverno` workloads sync |
+| ~30s | ArgoCD syncs `argocd/` — creates the AppProject, ApplicationSets and RBAC. The ApplicationSets then generate one Application per operator (`operators-*`) and one per workload |
+| you | Nothing is automated — sync the `operators-*` apps in the UI, or all at once: `argocd app sync -l app.kubernetes.io/part-of=openshift4-operators` |
+| ~10–15m | Each operator app installs its operator (Namespace → OperatorGroup → Subscription), waits for OLM, then applies its operands. Apps that need another app's CRDs (e.g. `maas` needs `rhoai`) retry until they exist |
+| after | Workloads (`gatus`, `grafana`, `model-serving`, …) sync — they also retry until their operators' CRDs exist |
+
+The order that avoids the retries is in `operators/README.md` (section "How a sync behaves").
 
 ---
 
@@ -113,7 +118,7 @@ oc create secret generic logging-loki-s3 \
   --dry-run=client -o yaml | oc apply -f -
 ```
 
-See [lokistack-s3-setup.md](tutorials/lokistack-s3-setup.md) for full details including Web Console instructions.
+Then re-sync `operators-cluster-logging`. See [lokistack-s3-setup.md](tutorials/lokistack-s3-setup.md) for full details including Web Console instructions.
 
 ---
 
@@ -167,10 +172,13 @@ oc get route -n grafana
 
 ## Resetting / Uninstalling
 
-To delete everything managed by this repo, delete the bootstrap Application. Because cascade deletion is wired via finalizers, ArgoCD will delete all child applications and their resources:
+Deleting the bootstrap Application deletes the ApplicationSets it created, and with them the workload Applications and their resources. It deliberately does **not** remove the operators: the operators ApplicationSet sets `preserveResourcesOnDeletion: true`, so LokiStack, the DataScienceCluster and their volumes survive an accidental delete.
+
+To tear the whole platform down, remove the operator apps with cascade first, then bootstrap:
 
 ```bash
+argocd app delete -l app.kubernetes.io/part-of=openshift4-operators --cascade
 oc delete application bootstrap -n openshift-gitops
 ```
 
-> **Warning:** This deletes all operands, operator subscriptions, and workloads. It does not delete the OpenShift GitOps operator itself (which was pre-installed).
+> **Warning:** This deletes all operands, operator subscriptions, and workloads. It does not delete the OpenShift GitOps operator itself (which was pre-installed). Deleting a Subscription also leaves its ClusterServiceVersion behind — see `docs/tutorials/operator-management.md`.

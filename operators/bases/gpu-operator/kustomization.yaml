@@ -1,0 +1,22 @@
+# ==============================================================================
+# operators/bases/gpu-operator — NVIDIA GPU Operator
+#
+# Installs the certified NVIDIA GPU Operator and its ClusterPolicy (driver, toolkit,
+# device plugin, DCGM, GFD).
+#
+# ArgoCD app:  operators-gpu-operator   (argocd/appset-operators.yaml)
+# Installs:    gpu-operator-certified (channel v26.3, certified-operators) into nvidia-gpu-operator
+# Needs:       nfd  (labels the GPU nodes: feature.node.kubernetes.io/pci-10de.present)
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml
+  # Operands
+  - clusterpolicy.yaml

@@ -8,6 +8,17 @@ something wrong in this repo.
 **Every item below was re-verified against the live cluster on 2026-07-26.** Four have
 since resolved and are kept for the root cause; three are still open; three are new.
 
+> **2026-10-14 — layout change.** `operators/layer1-install` and `operators/layer2-operands`
+> (and the `operators-layer1` / `operators-layer2` Applications) no longer exist: every operator is
+> now a Kustomize base in `operators/bases/<name>/` with its own Application `operators-<name>`, see
+> `operators/README.md`. File and Application names in the items below are kept as written because
+> they are the historical record. Rough map: `layer2-operands/templates/cluster-monitoring.yaml` →
+> `bases/cluster-monitoring/`; `maas-*.yaml` → `bases/maas/` (the `Kuadrant` CR is
+> `bases/connectivity-link/kuadrant.yaml`); `rhods-*.yaml` → `bases/rhoai/`; `grafana-*.yaml` →
+> `bases/grafana-operator/`; `gpu-clusterpolicy.yaml` → `bases/gpu-operator/`. The lesson of item 14
+> now applies to **every** operand: bundling an operator with its operands makes
+> `SkipDryRunOnMissingResource=true` mandatory on each operand CR, and it is set on all of them.
+
 | # | Item | Status as of 2026-07-26 |
 |---|---|---|
 | 1 | Grafana dashboards missing datasource mapping | ✅ **resolved** — verified on cluster |

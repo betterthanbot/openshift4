@@ -1,6 +1,6 @@
 # Operator Versions
 
-Version floors for all operators managed by `operators/layer1-install/`.
+Version floors for all operators managed under `operators/bases/` (each operator's `subscription.yaml`).
 
 > **`startingCSV` is a floor, not a pin.** Every subscription here uses
 > `installPlanApproval: Automatic`, so OLM installs *at least* the named CSV and then
@@ -8,7 +8,7 @@ Version floors for all operators managed by `operators/layer1-install/`.
 > operator to `installPlanApproval: Manual` — editing `startingCSV` alone will not hold
 > a version. The drift this produces is tracked as item 10 in [techdebt.md](techdebt.md).
 
-## Declared in `values.yaml`
+## Declared in `operators/bases/<operator>/subscription.yaml`
 
 | Operator | `startingCSV` | Channel | Source | Namespace | Approval | Enabled |
 |----------|--------------|---------|--------|-----------|----------|---------|
@@ -16,7 +16,7 @@ Version floors for all operators managed by `operators/layer1-install/`.
 | NVIDIA GPU Operator | `gpu-operator-certified.v26.3.3` | `v26.3` | certified-operators | `nvidia-gpu-operator` | Automatic | ✅ |
 | Cluster Observability | `cluster-observability-operator.v1.5.1` | `stable` | redhat-operators | `openshift-cluster-observability-operator` | Automatic | ✅ |
 | Compliance Operator | `compliance-operator.v1.9.1` | `stable` | redhat-operators | `openshift-compliance` | Automatic | ✅ |
-| Kernel Module Management Hub | `kernel-module-management-hub.v2.6.1` | `stable` | redhat-operators | `openshift-kmm-hub` | Automatic | ✅ |
+| Kernel Module Management Hub | `kernel-module-management-hub.v2.6.1` | `stable` | redhat-operators | `openshift-kmm-hub` | Automatic | ❌ |
 | Cluster Logging | `cluster-logging.v6.4.6` | `stable-6.4` | redhat-operators | `openshift-logging` | Automatic | ✅ |
 | Node Feature Discovery | `nfd.4.20.0-202607171900` | `stable` | redhat-operators | `openshift-nfd` | Automatic | ✅ |
 | Loki Operator | `loki-operator.v6.4.6` | `stable-6.4` | redhat-operators | `openshift-operators-redhat` | Automatic | ✅ |
@@ -51,7 +51,7 @@ they are left alone:
 | Limitador | `1.4.1` |
 | Kuadrant DNS | `1.4.1` |
 
-### Why the four disabled entries are still listed
+### Why the six disabled entries are still listed
 
 | Operator | Why off |
 |----------|---------|
@@ -60,6 +60,7 @@ they are left alone:
 | OpenShift Lightspeed | Installed on the source cluster but never configured — no `OLSConfig` existed. |
 | Red Hat Quay | Installed on the source cluster but never configured — no `QuayRegistry` existed. |
 | DevWorkspace | Not present on the cluster. |
+| Kernel Module Management Hub | Turned off in commit `e44e81f` (2026-09-02); no reason is recorded. It was running at the 2026-08-04 capture. No operand is defined. |
 
 ## Actually running (verified 2026-08-04)
 
@@ -102,7 +103,7 @@ closed by re-pinning `values.yaml` to what is live.
 
 ## Operand Versions
 
-Key operands deployed by `operators/layer2-operands/`.
+Key operands deployed by the bases in `operators/bases/`.
 
 | Operand | Version | Notes |
 |---------|---------|-------|
@@ -112,7 +113,7 @@ Key operands deployed by `operators/layer2-operands/`.
 | OdhDashboardConfig | via RHOAI 3.4.2 | MaaS + Gen AI Studio feature flags; patched with ServerSideApply so the operator keeps ownership |
 | RHACS Central + SecuredCluster | `4.11.2` (via RHACS Operator) | Central route enabled; needs a manual init bundle — see [README](README.md#4-configure-rhacs-post-install) |
 | Grafana | `13.0.1` (via Grafana Operator) | 9 dashboards from [bases/grafana/generated/](bases/grafana/generated/); 6 datasources (Thanos, 3× Loki, RHOAI Thanos, MaaS Postgres) |
-| NVIDIA ClusterPolicy | via GPU Operator `26.3.3` | Operator defaults, captured verbatim — see the long comment in [layer2 values](operators/layer2-operands/values.yaml) |
+| NVIDIA ClusterPolicy | via GPU Operator `26.3.3` | Operator defaults, captured verbatim — see the long comment in [clusterpolicy.yaml](operators/bases/gpu-operator/clusterpolicy.yaml) |
 | Kuadrant | `1.4.2` (via RHCL Operator) | Creates Authorino + Limitador in `kuadrant-system`; observability on |
 | Kueue | `1.3.1` (via Kueue Operator) | Cluster-scoped `Kueue/cluster`; Deployment/Pod/PyTorchJob/Ray/StatefulSet/TrainJob integrations |
 | MaaS Tenant + 4 Subscriptions | via RHOAI 3.4.2 | `default-tenant` on `maas-default-gateway`; team-alpha/bravo/Charlie/Delta tiers |
@@ -139,7 +140,7 @@ CSVs are copied into every namespace by the global OperatorGroups, hence the
    oc get packagemanifest <package-name> -n openshift-marketplace \
      -o jsonpath='{.status.channels[?(@.name=="<channel>")].currentCSV}'
    ```
-2. Update `startingCSV` (and `channel` if changing) in `operators/layer1-install/values.yaml`.
+2. Update `startingCSV` (and `channel` if changing) in `operators/bases/<operator>/subscription.yaml`.
    With `Automatic` approval this only raises the floor for a fresh install — an existing
    cluster has already moved on its own.
 3. If `installPlanApproval: Manual`, approve the InstallPlan after sync:

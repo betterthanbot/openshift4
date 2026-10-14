@@ -1,0 +1,26 @@
+# OpenShift Virtualization / CNV (Red Hat) — OLM Subscription (sync wave -1).
+#
+# A previous manual install of this operator was torn down with
+# operators/cleanup-cnv-stale.sh (its Subscription/CSV had been deleted without a
+# clean uninstall, orphaning all operand Deployments). This is a from-scratch install.
+#
+# This cluster's nodes (m6a.4xlarge on AWS) are not bare-metal, so they have no
+# /dev/kvm and no vmx/svm CPU flags — AWS only exposes hardware virtualization on
+# .metal instance types. VMs run via QEMU software emulation instead; that is
+# switched on by the overlay (operators/overlay/my-sno-cluster/cnv), not here.
+# See docs/tutorials/openshift-virtualization-on-ec2.md.
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "stable"
+  name: "kubevirt-hyperconverged"
+  source: "redhat-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  startingCSV: "kubevirt-hyperconverged-operator.v4.20.21"

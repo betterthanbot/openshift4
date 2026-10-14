@@ -1,0 +1,81 @@
+# extraDatasources — datasources that are not Thanos and not LokiStack.
+#
+# `bearerTokenAuth: true` opts a datasource in to the grafana-auth-job, which
+# patches spec.datasource.secureJsonData.httpHeaderValue1 with a fresh
+# grafana-sa token. Anything else (postgres, mysql, ...) must leave it off — i.e.
+# carry the `grafana.openshift4/auth: none` label — or the job would stamp an
+# Authorization header onto a non-HTTP datasource.
+
+# RHOAI's own monitoring stack, stood up by DSCInitialization.spec.monitoring (see
+# ../rhoai/dscinitialization.yaml). This is where vLLM / KServe / MaaS gateway metrics
+# actually live — they are NOT in the cluster's default Thanos, which is why the MaaS
+# dashboards in bases/grafana need this datasource to exist.
+#
+# Wave 2, same as the Thanos datasource: created before the grafana-auth-job
+# (wave 3) so the job can find and patch the ones that want a bearer token.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: data-science-prometheus
+  namespace: grafana
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  allowCrossNamespaceImport: false
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana-a
+  datasource:
+    name: "Prometheus (Data Science)"
+    type: prometheus
+    access: proxy
+    url: "http://thanos-querier-data-science-thanos-querier.redhat-ods-monitoring.svc:10902"
+    isDefault: false
+    jsonData:
+      httpHeaderName1: Authorization
+      timeInterval: 5s
+      tlsSkipVerify: true
+---
+# Long-term MaaS usage / chargeback store — see ../maas/metrics-db.yaml.
+# Credentials come from the Secret named in valuesFrom (maas-postgres-grafana-auth),
+# NOT from git.
+#
+# Wave 2, same as the Thanos datasource: created before the grafana-auth-job
+# (wave 3) so the job can find and patch the ones that want a bearer token.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: maas-postgres
+  namespace: grafana
+  labels:
+    # Read by the grafana-auth-job to decide what to skip.
+    grafana.openshift4/auth: none
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  allowCrossNamespaceImport: false
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana-a
+  valuesFrom:
+    - targetPath: secureJsonData.password
+      valueFrom:
+        secretKeyRef:
+          name: maas-postgres-grafana-auth
+          key: password
+  datasource:
+    name: "MaaS Postgres"
+    type: postgres
+    access: proxy
+    url: "maas-postgres.redhat-ods-applications.svc.cluster.local:5432"
+    isDefault: false
+    database: maas
+    user: maas
+    jsonData:
+      postgresVersion: 1000
+      sslmode: disable
+      timescaledb: false
+    secureJsonData:
+      password: ${PASSWORD}

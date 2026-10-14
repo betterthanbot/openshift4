@@ -8,8 +8,8 @@
 # orphaned with no operator reconciling it (see PLAN.md Known Issue #8).
 #
 # This script wipes that install entirely — including the two existing VMs
-# and their disks — so operators/layer1-install + operators/layer2-operands
-# can do a from-scratch install via GitOps. THERE IS NO UNDO.
+# and their disks — so the operators-cnv app (operators/bases/cnv) can do a
+# from-scratch install via GitOps. THERE IS NO UNDO.
 #
 # Deletes:
 #   - VirtualMachines/VirtualMachineInstances in my-vms (fedora-copper-lemur-85,
@@ -186,4 +186,4 @@ echo "    oc get ns my-vms openshift-cnv openshift-virtualization-os-images"
 echo "    oc get apiservices | grep openshift-cnv"
 echo "    oc get crd | grep kubevirt"
 echo ""
-echo "Next: sync ArgoCD (or 'helm template'/apply operators/layer1-install + layer2-operands) for a fresh install."
+echo "Next: sync the operators-cnv ArgoCD app (or 'kustomize build operators/overlay/my-sno-cluster/cnv | oc apply -f -') for a fresh install."

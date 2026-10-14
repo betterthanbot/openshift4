@@ -1,0 +1,23 @@
+# ==============================================================================
+# operators/bases/kueue — Kueue
+#
+# Installs the standalone Red Hat Kueue operator and the cluster-scoped Kueue instance
+# (job queueing / quota for AI workloads).
+#
+# ArgoCD app:  operators-kueue   (argocd/appset-operators.yaml)
+# Installs:    kueue-operator (channel stable-v1.3, redhat-operators) into openshift-kueue-operator
+# Needs:       cert-manager  (webhook/metrics certs; sandbox-provided on this cluster — see the
+#              cert-manager app, which is disabled by default)
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml
+  # Operands
+  - kueue.yaml

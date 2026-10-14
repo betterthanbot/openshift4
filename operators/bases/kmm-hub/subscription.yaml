@@ -1,0 +1,19 @@
+# Kernel Module Management Hub (Red Hat) — OLM Subscription (sync wave -1).
+#
+# DISABLED (excluded in argocd/appset-operators.yaml): turned off in commit e44e81f
+# (2026-09-02); it was enabled in the original import. No operand is defined.
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: kernel-module-management-hub
+  namespace: openshift-kmm-hub
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "stable"
+  name: "kernel-module-management-hub"
+  source: "redhat-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  startingCSV: "kernel-module-management-hub.v2.6.1"

@@ -5,10 +5,10 @@
 # a scheduler/EPP Deployment, an HTTPRoute onto the MaaS gateway, and a
 # MaaSModelRef. None of those are in git — they are all owned by this CR.
 #
-# router.gateway.refs points at maas-default-gateway (layer2-operands: maas.gateway),
+# router.gateway.refs points at maas-default-gateway (operators/bases/maas/gateway.yaml),
 # which is what puts these models behind MaaS auth + rate limiting. The model
-# names here MUST match maas.subscriptions.defaultModelRefs in
-# operators/layer2-operands/values.yaml.
+# names here MUST match the modelRefs in operators/bases/maas/subscriptions.yaml
+# and authpolicies.yaml.
 #
 # serving.kserve.io/stop: "true" is the dashboard's "stopped" state — the CR
 # exists but no pods run. The two -maas services are the live ones; the two

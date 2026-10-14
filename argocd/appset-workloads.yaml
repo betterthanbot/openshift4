@@ -14,7 +14,9 @@
 #   2. Push to main — ArgoCD auto-discovers and creates the Application.
 #      No changes to this file required.
 #
-# Sync-wave 3 ensures workloads deploy after operators (waves 1 & 2).
+# Workloads need their operators' CRDs. Nothing orders separate Applications (sync
+# waves only order the resources inside one), so they rely on the retry policy below —
+# see operators/README.md. The sync-wave annotation on the template is informational only.
 # ==============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet

@@ -1,0 +1,15 @@
+# RHACS Central — the main RHACS console and API server.
+# After first deploy the operator will generate an admin password in a secret
+# named "central-htpasswd" in the stackrox namespace.
+apiVersion: platform.stackrox.io/v1alpha1
+kind: Central
+metadata:
+  name: stackrox-central-services
+  namespace: stackrox
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  central:
+    exposure:
+      route:
+        enabled: true

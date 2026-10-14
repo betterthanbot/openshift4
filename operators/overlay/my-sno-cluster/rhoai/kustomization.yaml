@@ -1,0 +1,17 @@
+# ==============================================================================
+# Red Hat OpenShift AI (RHODS) — my-sno-cluster overlay
+#
+# Discovered by argocd/appset-operators.yaml (git directory generator over
+# operators/overlay/my-sno-cluster/*) -> ArgoCD Application "operators-rhoai".
+#
+# Adds the vllm-project namespace: the namespace the demo models are served from. It
+# is also referenced by the MaaS subscriptions (operators/bases/maas) and by
+# overlay/my-sno-cluster/model-serving. Created in this app so RHOAI can label it
+# (opendatahub.io/dashboard) before any model lands there.
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../bases/rhoai
+  - namespace-vllm-project.yaml

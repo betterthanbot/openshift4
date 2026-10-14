@@ -1,0 +1,53 @@
+# OdhDashboardConfig — feature flags for the RHOAI dashboard.
+#
+# The RHOAI operator creates and owns this object; we only want to drive the
+# fields set below and leave everything else (and the operator's own
+# platform.opendatahub.io/* annotations) untouched:
+#
+#   ServerSideApply=true  -> patch the listed fields instead of replacing the
+#                            whole object, so the operator keeps ownership of
+#                            the fields we do not set
+#   sync-wave "4"         -> after the DataScienceCluster (wave 0) has had a
+#                            chance to create the CR in the first place. If the
+#                            dashboard component has not reconciled yet the
+#                            first sync fails; ArgoCD retries and converges.
+#
+# On a brand-new cluster it is normal for this to be OutOfSync/Degraded for a
+# few minutes while RHOAI installs the dashboard.
+apiVersion: opendatahub.io/v1alpha
+kind: OdhDashboardConfig
+metadata:
+  name: odh-dashboard-config
+  namespace: redhat-ods-applications
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    # OdhDashboardConfig's CRD is registered by the DataScienceCluster's dashboard
+    # component, in this same Application — SkipDryRunOnMissingResource stops a cold
+    # bootstrap rejecting the whole sync over it. See techdebt.md #14.
+    argocd.argoproj.io/sync-options: ServerSideApply=true,SkipDryRunOnMissingResource=true
+spec:
+  # Every flag under dashboardConfig here is off by default in a stock RHOAI
+  # install — these are exactly the toggles that surface the MaaS UI:
+  #   modelAsService        — "Models as a Service" nav section
+  #   maasAuthPolicies      — subscription / auth-policy management screens
+  #   vLLMDeploymentOnMaaS  — lets a vLLM deploy target the MaaS gateway
+  #   genAiStudio           — Gen AI playground (backed by the `ogx` DSC
+  #                           component; see the llamastackoperator note in
+  #                           datasciencecluster.yaml)
+  #   observabilityDashboard— per-model metrics tab
+  dashboardConfig:
+    genAiStudio: true
+    maasAuthPolicies: true
+    modelAsService: true
+    observabilityDashboard: true
+    vLLMDeploymentOnMaaS: true
+  hardwareProfileOrder: []
+  modelServing:
+    deploymentStrategy: recreate
+    isLLMdDefault: true
+  notebookController:
+    enabled: true
+    notebookNamespace: rhods-notebooks
+    pvcSize: 20Gi
+  templateDisablement: []
+  templateOrder: []

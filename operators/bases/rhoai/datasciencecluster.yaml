@@ -1,0 +1,74 @@
+# DataScienceCluster
+#
+# Deltas from the previous version of this file, all captured live:
+#   kserve.modelsAsService: Managed    — the MaaS platform itself (maas-api +
+#                                        maas-controller in
+#                                        redhat-ods-applications, the
+#                                        maas.opendatahub.io CRDs, and the
+#                                        models-as-a-service namespace)
+#   kserve.nim: Managed, airGapped:false
+#   kueue: Managed -> Removed          — the standalone Red Hat Kueue operator owns
+#                                        the Kueue instance instead; see the
+#                                        `kueue` app
+#   trustyai: Removed -> Managed       — guardrails / LM-Eval / detectors
+#   trainer, trainingoperator, ray, mlflowoperator: Removed (unchanged)
+#   llamastackoperator: Managed -> Removed
+#     RHOAI 3.5 deprecated the standalone LlamaStackOperator component in
+#     favor of the new `ogx` module (the GenAI Studio backend). The operator
+#     refuses to provision ogx's CRDs/controller while llamastackoperator is
+#     still Managed ("LlamaStackOperator is set to Managed; it has been
+#     deprecated, set it to Removed before enabling OGX"), which is why
+#     GenAI Studio > Playground failed API discovery for ogx.io/v1beta1 —
+#     the CRDs were never installed. No LlamaStackDistribution instance is
+#     deployed anywhere in this repo, so nothing depends on it.
+
+apiVersion: datasciencecluster.opendatahub.io/v2
+kind: DataScienceCluster
+metadata:
+  name: default-dsc
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  components:
+    aipipelines:
+      managementState: Managed
+    dashboard:
+      managementState: Managed
+    feastoperator: {}
+    kserve:
+      managementState: Managed
+      modelsAsService:
+        managementState: Managed
+      nim:
+        airGapped: false
+        managementState: Managed
+      rawDeploymentServiceConfig: Headed
+    kueue:
+      defaultClusterQueueName: default
+      defaultLocalQueueName: default
+      # Removed here on purpose — the openshift-kueue-operator manages the
+      # Kueue instance (see the `kueue` app). Setting this back to
+      # Managed makes the two controllers fight over the same CRDs.
+      managementState: Removed
+    llamastackoperator:
+      managementState: Removed
+    mlflowoperator:
+      managementState: Removed
+    modelregistry:
+      registriesNamespace: rhoai-model-registries
+    ray:
+      managementState: Removed
+    trainer:
+      managementState: Removed
+    trainingoperator:
+      managementState: Removed
+    trustyai:
+      eval:
+        lmeval:
+          permitCodeExecution: deny
+          permitOnline: deny
+      managementState: Managed
+      mcpGuardrailsMode: false
+    workbenches:
+      managementState: Managed
+      workbenchNamespace: rhods-notebooks

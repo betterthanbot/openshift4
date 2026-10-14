@@ -1,0 +1,56 @@
+# Cluster StorageClasses.
+#
+# The platform assumes a gp3 class with Immediate binding exists, because several PVCs
+# are applied in an earlier sync wave than the workload that mounts them. The stock
+# gp3-csi (WaitForFirstConsumer) deadlocks in that arrangement — see the explanation
+# below.
+#
+# CHANGE ME on non-AWS clusters: provisioner/parameters are ebs.csi.aws.com specific.
+# Exclude this app in argocd/appset-operators.yaml and point the maas metrics database
+# (bases/maas/metrics-db.yaml, storageClassName) at an equivalent Immediate-binding
+# class of your own.
+
+# ------------------------------------------------------------------------------
+# gp3-csi-immediate — gp3-csi, but with volumeBindingMode: Immediate.
+#
+# WHY THIS EXISTS. The stock gp3-csi StorageClass uses WaitForFirstConsumer, so
+# a PVC stays Pending until some pod consumes it. That is correct for multi-AZ
+# EBS (it lets the scheduler pick the node before the volume is pinned to an
+# AZ), but it deadlocks against ArgoCD sync waves whenever a PVC is placed in an
+# earlier wave than the workload that mounts it:
+#
+#   wave 1: PVC        -> Pending (no consumer yet) -> ArgoCD health: Progressing
+#   wave 2: Deployment -> never applied, because wave 1 never went Healthy
+#            \___ the consumer that would have bound the PVC
+#
+# Observed on cluster-dgs2z 2026-08-14: maas-postgres's PVC sat Pending for
+# 7d4h and the Deployment/Service were simply absent from the cluster.
+#
+# Immediate binding breaks the cycle: the volume is provisioned as soon as the
+# PVC is created, wave 1 reaches Healthy, and wave 2 proceeds.
+#
+# TRADE-OFF, read before reusing this for other workloads: with Immediate, the
+# EBS volume is placed in an AZ before any pod is scheduled, and the resulting
+# PV carries nodeAffinity for that AZ. The pod must then land there. That is
+# fine for singleton, ReadWriteOnce workloads like maas-postgres on a cluster
+# with workers in every AZ. Do NOT use it for anything that needs the scheduler
+# to choose placement freely — use gp3-csi and put the PVC in the same sync wave
+# as its workload instead.
+# ------------------------------------------------------------------------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3-csi-immediate
+  annotations:
+    # Wave 0 — must exist before any PVC that names it. maas-postgres (the maas app)
+    # is the one that does, so sync this app first.
+    argocd.argoproj.io/sync-wave: "0"
+    # Never the cluster default; gp3-csi keeps that role.
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: ebs.csi.aws.com
+parameters:
+  encrypted: "true"
+  type: gp3
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: Immediate

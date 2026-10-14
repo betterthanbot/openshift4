@@ -1,0 +1,14 @@
+# OAuth is a cluster singleton, fully owned by this app — any identity
+# provider added manually outside git will be reverted on the next ArgoCD sync.
+apiVersion: config.openshift.io/v1
+kind: OAuth
+metadata:
+  name: cluster
+spec:
+  identityProviders:
+    - name: workshop-htpasswd
+      mappingMethod: claim
+      type: HTPasswd
+      htpasswd:
+        fileData:
+          name: workshop-htpasswd
