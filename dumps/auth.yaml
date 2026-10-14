@@ -1,9 +1,0 @@
-apiVersion: services.platform.opendatahub.io/v1alpha1
-kind: Auth
-metadata:
-  name: auth
-spec:
-  adminGroups:
-    - rhods-admins
-  allowedGroups:
-    - system:authenticated
