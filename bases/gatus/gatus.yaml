@@ -6,7 +6,7 @@ metadata:
   name: gatus-config
   namespace: gatus
   labels:
-    helm.sh/chart: gatus-1.0.2
+    helm.sh/chart: gatus-1.0.5
     app.kubernetes.io/name: gatus
     app.kubernetes.io/instance: gatus
     app.kubernetes.io/version: "latest"
@@ -41,7 +41,7 @@ metadata:
   name: gatus-data
   namespace: gatus
   labels:
-    helm.sh/chart: gatus-1.0.2
+    helm.sh/chart: gatus-1.0.5
     app.kubernetes.io/name: gatus
     app.kubernetes.io/instance: gatus
     app.kubernetes.io/version: "latest"
@@ -60,7 +60,7 @@ metadata:
   name: gatus
   namespace: gatus
   labels:
-    helm.sh/chart: gatus-1.0.2
+    helm.sh/chart: gatus-1.0.5
     app.kubernetes.io/name: gatus
     app.kubernetes.io/instance: gatus
     app.kubernetes.io/version: "latest"
@@ -83,7 +83,7 @@ metadata:
   name: gatus
   namespace: gatus
   labels:
-    helm.sh/chart: gatus-1.0.2
+    helm.sh/chart: gatus-1.0.5
     app.kubernetes.io/name: gatus
     app.kubernetes.io/instance: gatus
     app.kubernetes.io/version: "latest"
@@ -104,7 +104,7 @@ spec:
     spec:
       containers:
         - name: gatus
-          image: "quay.io/rhn-support-gong/gatus:1.0.2"
+          image: "quay.io/rhn-support-gong/gatus:1.0.5"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -152,7 +152,7 @@ metadata:
   name: gatus
   namespace: gatus
   labels:
-    helm.sh/chart: gatus-1.0.2
+    helm.sh/chart: gatus-1.0.5
     app.kubernetes.io/name: gatus
     app.kubernetes.io/instance: gatus
     app.kubernetes.io/version: "latest"
