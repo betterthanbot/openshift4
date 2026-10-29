@@ -27,3 +27,42 @@ patches:
                 matchLabels:
                   app.kubernetes.io/instance: openrag
                   app.kubernetes.io/component: langflow
+# The chart's init containers (curlimages/curl, busybox) set no numeric user, but the pod
+# requires runAsNonRoot, so the kubelet refuses to start them ("image has non-numeric user
+# (curl_user)"). Give them the same UID as the app containers.
+- target:
+    kind: Deployment
+    name: openrag-backend
+  patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: openrag-backend
+    spec:
+      template:
+        spec:
+          initContainers:
+            - name: load-default-documents
+              securityContext:
+                runAsUser: 1000
+                runAsGroup: 1000
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+            - name: load-default-flows
+              securityContext:
+                runAsUser: 1000
+                runAsGroup: 1000
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+            - name: wait-for-langflow
+              securityContext:
+                runAsUser: 1000
+                runAsGroup: 1000
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
