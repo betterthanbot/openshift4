@@ -7,6 +7,14 @@ resources:
 
 namespace: openrag
 
+# The chart's vllm/vllm-openai:v0.30.0-cu129 dies on import ("operator
+# torchvision::nms does not exist"). Use the Red Hat vLLM image that already
+# serves the MaaS model on this cluster's T4 nodes.
+images:
+- name: vllm/vllm-openai
+  newName: registry.redhat.io/rhaii/vllm-cuda-rhel9
+  digest: sha256:c056e61672b6aea489ad5dde0bd2f8497230f5333e87f7cf6c494eba3bfdc808
+
 patches:
 # EBS volumes are ReadWriteOnce: a RollingUpdate surge pod scheduled on another
 # node would hang on Multi-Attach. Recreate the PVC-backed Deployments instead.
