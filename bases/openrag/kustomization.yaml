@@ -18,9 +18,11 @@ images:
 patches:
 # EBS volumes are ReadWriteOnce: a RollingUpdate surge pod scheduled on another
 # node would hang on Multi-Attach. Recreate the PVC-backed Deployments instead.
+# The embedder needs the same: both T4s are taken (one by the MaaS model), so a
+# surge pod can never schedule while the old one holds its GPU.
 - target:
     kind: Deployment
-    name: openrag-(openrag|minio)
+    name: openrag-(openrag|minio|embedder-deployment-vllm)
   patch: |-
     - op: replace
       path: /spec/strategy
