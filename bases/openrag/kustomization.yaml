@@ -27,6 +27,17 @@ patches:
                 matchLabels:
                   app.kubernetes.io/instance: openrag
                   app.kubernetes.io/component: langflow
+# Kubernetes injects docker-link style env vars for every Service (OPENRAG_BACKEND_PORT=
+# tcp://10.x:8000, ...). The Service `openrag-backend` therefore overwrites the frontend's own
+# OPENRAG_BACKEND_PORT setting, and its proxy builds http://openrag-backend:tcp://10.x:8000/...
+# (ERR_INVALID_URL -> every /api call returns 500 "Failed to proxy request"). Turn them off.
+- target:
+    kind: Deployment
+    name: openrag-(frontend|backend|langflow)
+  patch: |-
+    - op: add
+      path: /spec/template/spec/enableServiceLinks
+      value: false
 # Single-node OpenSearch. The chart's .env has none of these, so the backend falls back to its
 # multi-node production defaults: it waits for several nodes before reporting ready (and is
 # killed by its liveness probe first, exit 137) and creates indices with 2 shards / 2 replicas.

@@ -69,6 +69,7 @@ spec:
         app.kubernetes.io/instance: openrag
         app.kubernetes.io/part-of: openrag
     spec:
+      enableServiceLinks: false
       securityContext:
         runAsNonRoot: true
         seccompProfile:

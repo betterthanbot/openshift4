@@ -47,6 +47,8 @@ spec:
         app.kubernetes.io/instance: openrag
         app.kubernetes.io/part-of: openrag
     spec:
+      # Service-link env vars would set DOCLING_SERVE_PORT=tcp://... (this app's own setting prefix).
+      enableServiceLinks: false
       securityContext:
         runAsNonRoot: true
         seccompProfile:

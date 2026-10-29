@@ -56,6 +56,8 @@ spec:
         app.kubernetes.io/instance: openrag
         app.kubernetes.io/part-of: openrag
     spec:
+      # Its setup script reads OPENRAG_BACKEND_* env vars; keep service links from polluting them.
+      enableServiceLinks: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
