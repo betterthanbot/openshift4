@@ -1,0 +1,160 @@
+---
+# Embedding model for OpenRAG: Qwen3-Embedding-0.6B on vLLM, one T4.
+#
+# Why a plain Deployment and not an LLMInferenceService behind the MaaS gateway: embedding calls
+# are non-streaming, and that gateway currently returns empty 200 bodies for a large share of
+# non-streaming requests. In-namespace, plain HTTP, no auth.
+#
+# Same image (by digest) as the Red Hat vLLM that already serves maas-demo/qwen25-15b-instruct on
+# these T4 nodes — the community vllm/vllm-openai:v0.30.0 image crashed on `torchvision::nms`.
+# The model is pulled from Hugging Face on first start into the cache PVC (egress required).
+#
+# The T4s: one is held by the Qwen chat model, this takes the other. Strategy is Recreate for
+# that reason — a rolling update could never schedule its surge pod.
+apiVersion: v1
+kind: Service
+metadata:
+  name: openrag-embedder
+  namespace: openrag
+  labels:
+    app.kubernetes.io/name: embedder
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/part-of: openrag
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: embedder
+    app.kubernetes.io/instance: openrag
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openrag-embedder-cache
+  namespace: openrag
+  labels:
+    app.kubernetes.io/name: embedder
+    app.kubernetes.io/instance: openrag
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openrag-embedder
+  namespace: openrag
+  labels:
+    app.kubernetes.io/name: embedder
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/part-of: openrag
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: embedder
+      app.kubernetes.io/instance: openrag
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: embedder
+        app.kubernetes.io/instance: openrag
+        app.kubernetes.io/part-of: openrag
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: vllm
+          image: registry.redhat.io/rhaii/vllm-cuda-rhel9@sha256:c056e61672b6aea489ad5dde0bd2f8497230f5333e87f7cf6c494eba3bfdc808
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command:
+            - vllm
+            - serve
+            - Qwen/Qwen3-Embedding-0.6B
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+            - --served-model-name
+            - Qwen/Qwen3-Embedding-0.6B
+            - --runner
+            - pooling
+            - --convert
+            - embed
+            # T4 is compute capability 7.5: no bf16.
+            - --dtype
+            - half
+            - --max-model-len
+            - "2048"
+            - --gpu-memory-utilization
+            - "0.5"
+            - --no-enable-prefix-caching
+            - --trust-remote-code
+          env:
+            - name: HOME
+              value: /tmp
+            - name: HF_HOME
+              value: /hf-cache
+            - name: DO_NOT_TRACK
+              value: "1"
+          ports:
+            - name: http
+              containerPort: 8000
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 90   # first start downloads the model and warms up
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: "2"
+              memory: 6Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "4"
+              memory: 10Gi
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /hf-cache
+            - name: dshm
+              mountPath: /dev/shm
+      volumes:
+        - name: hf-cache
+          persistentVolumeClaim:
+            claimName: openrag-embedder-cache
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi

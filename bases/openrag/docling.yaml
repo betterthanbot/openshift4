@@ -1,0 +1,94 @@
+---
+# docling-serve — document parsing for OpenRAG's ingestion flows. The upstream chart does not
+# deploy it (global.docling in values.yaml points at this Service).
+#
+# The two DOCLING_SERVE_* switches are what the chart's own values.yaml says an external
+# docling-serve needs for OpenRAG's VLM pipeline (remote OpenAI/watsonx vision models).
+# The CPU image bundles its models; it runs as UID 1001/GID 0 and is fine under restricted-v2.
+apiVersion: v1
+kind: Service
+metadata:
+  name: docling-serve
+  labels:
+    app.kubernetes.io/name: docling-serve
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/part-of: openrag
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: docling-serve
+    app.kubernetes.io/instance: openrag
+  ports:
+    - name: http
+      port: 5001
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docling-serve
+  labels:
+    app.kubernetes.io/name: docling-serve
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/part-of: openrag
+spec:
+  replicas: 1
+  # Stateless, but heavy: avoid briefly running two copies during a rollout.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: docling-serve
+      app.kubernetes.io/instance: openrag
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: docling-serve
+        app.kubernetes.io/instance: openrag
+        app.kubernetes.io/part-of: openrag
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: docling-serve
+          image: quay.io/docling-project/docling-serve-cpu:v1.38.2
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: DOCLING_SERVE_ENABLE_REMOTE_SERVICES
+              value: "true"
+            - name: DOCLING_SERVE_ALLOW_CUSTOM_VLM_CONFIG
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 5001
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: "1"
+              memory: 4Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi

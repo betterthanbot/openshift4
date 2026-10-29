@@ -3,69 +3,27 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-- ./openrag.yaml
+- ./openrag.yaml     # upstream chart, rendered by `make` (no Secrets — see Makefile)
+- ./opensearch.yaml  # not in the chart
+- ./docling.yaml     # not in the chart
 
 namespace: openrag
 
-# The chart's vllm/vllm-openai:v0.30.0-cu129 dies on import ("operator
-# torchvision::nms does not exist"). Use the Red Hat vLLM image that already
-# serves the MaaS model on this cluster's T4 nodes.
-images:
-- name: vllm/vllm-openai
-  newName: registry.redhat.io/rhaii/vllm-cuda-rhel9
-  digest: sha256:c056e61672b6aea489ad5dde0bd2f8497230f5333e87f7cf6c494eba3bfdc808
-
 patches:
-# EBS volumes are ReadWriteOnce: a RollingUpdate surge pod scheduled on another
-# node would hang on Multi-Attach. Recreate the PVC-backed Deployments instead.
-# The embedder needs the same: both T4s are taken (one by the MaaS model), so a
-# surge pod can never schedule while the old one holds its GPU.
+# backend and langflow both mount the openrag-shared volume. Upstream asks for ReadWriteMany;
+# this cluster only has EBS (ReadWriteOnce), which two pods can share only on the SAME node.
+# Pin the backend to wherever langflow runs (langflow has no such constraint, so no deadlock).
 - target:
     kind: Deployment
-    name: openrag-(openrag|minio|embedder-deployment-vllm)
-  patch: |-
-    - op: replace
-      path: /spec/strategy
-      value:
-        type: Recreate
-# The reranker shares openrag-model-weights with the app upstream (RWX). On RWO
-# that pins both pods to one node — give the reranker its own throwaway HF cache.
-- target:
-    kind: Deployment
-    name: openrag-reranker
-  patch: |-
-    - op: replace
-      path: /spec/template/spec/volumes/0
-      value:
-        name: hf-cache
-        emptyDir:
-          sizeLimit: 5Gi
-# The Milvus image ships /milvus/bin/milvus (0774) and /milvus/lib (0754) owned by
-# uid/gid 999 with no "other" execute bit, so restricted-v2's random UID dies with
-# "exec milvus failed: Permission denied". Pin 999 (admitted by the overlay's
-# nonroot-v2 binding) and hand the PVC to gid 999.
-- target:
-    kind: Deployment
-    name: openrag-milvus-standalone
-  patch: |-
-    - op: replace
-      path: /spec/template/spec/securityContext
-      value:
-        runAsNonRoot: true
-        runAsUser: 999
-        runAsGroup: 999
-        fsGroup: 999
-        seccompProfile:
-          type: RuntimeDefault
-# openrag builds its Python env with `uv run` on first start and keeps it on the
-# openrag-venv volume, but a fresh ext4 PVC contains lost+found, so uv rejects
-# /app/.venv ("not a valid Python environment"). Build the env in a subdirectory.
-- target:
-    kind: Deployment
-    name: openrag-openrag
+    name: openrag-backend
   patch: |-
     - op: add
-      path: /spec/template/spec/containers/0/env/-
+      path: /spec/template/spec/affinity
       value:
-        name: UV_PROJECT_ENVIRONMENT
-        value: /app/.venv/env
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: openrag
+                  app.kubernetes.io/component: langflow

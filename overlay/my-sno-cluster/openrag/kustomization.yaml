@@ -7,9 +7,9 @@ resources:
   - namespace.yaml
   - scc-nonroot.yaml
   - route.yaml
+  - embedder.yaml
+  - model-providers.yaml
 
-# Chat LLM endpoint — points at your own RHOAI model.
-# Edit llm-endpoint-patch.yaml and put the endpoint's token in openrag-env-secrets
-# (key API_KEY). See README.md.
+# Chat + embeddings through the RHOAI provider (endpoints, key Secret, provider allow-list).
 patches:
-  - path: llm-endpoint-patch.yaml
+  - path: backend-rhoai-patch.yaml

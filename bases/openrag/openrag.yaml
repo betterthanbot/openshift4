@@ -1,1641 +1,682 @@
 ---
-# Source: openrag-stack/charts/postgresql/templates/primary/pdb.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: openrag-postgresql
-  namespace: "openrag"
-  labels:
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/version: 18.6.0
-    helm.sh/chart: postgresql-18.12.16
-    app.kubernetes.io/component: primary
-spec:
-  maxUnavailable: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/instance: openrag
-      app.kubernetes.io/name: postgresql
-      app.kubernetes.io/component: primary
----
-# Source: openrag-stack/charts/milvus/charts/minio/templates/serviceaccount.yaml
+# Source: openrag/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: "openrag-minio"
-  namespace: "openrag"
+  name: openrag
+  namespace: openrag
   labels:
-    app: minio
-    chart: minio-8.0.17
-    release: "openrag"
----
-# Source: openrag-stack/charts/postgresql/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: openrag-postgresql
-  namespace: "openrag"
-  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
     app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
     app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/version: 18.6.0
-    helm.sh/chart: postgresql-18.12.16
 automountServiceAccountToken: false
 ---
-# Source: openrag-stack/charts/vllm/templates/secrets.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: "openrag-secrets"
-  namespace: openrag
-type: Opaque
-data:
----
-# Source: openrag-stack/charts/milvus/charts/minio/templates/configmap.yaml
+# Source: openrag/templates/configmaps/app-config-configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: openrag-minio
-  labels:
-    app: minio
-    chart: minio-8.0.17
-    release: openrag
-    heritage: Helm
-data:
-  initialize: |-
-    #!/bin/sh
-    set -e ; # Have script exit in the event of a failed command.
-    MC_CONFIG_DIR="/etc/minio/mc/"
-    MC="/usr/bin/mc --insecure --config-dir ${MC_CONFIG_DIR}"
-    
-    # connectToMinio
-    # Use a check-sleep-check loop to wait for Minio service to be available
-    connectToMinio() {
-      SCHEME=$1
-      ATTEMPTS=0 ; LIMIT=29 ; # Allow 30 attempts
-      set -e ; # fail if we can't read the keys.
-      ACCESS=$(cat /config/accesskey) ; SECRET=$(cat /config/secretkey) ;
-      set +e ; # The connections to minio are allowed to fail.
-      echo "Connecting to Minio server: $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT" ;
-      MC_COMMAND="${MC} config host add myminio $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT $ACCESS $SECRET" ;
-      $MC_COMMAND ;
-      STATUS=$? ;
-      until [ $STATUS = 0 ]
-      do
-        ATTEMPTS=`expr $ATTEMPTS + 1` ;
-        echo \"Failed attempts: $ATTEMPTS\" ;
-        if [ $ATTEMPTS -gt $LIMIT ]; then
-          exit 1 ;
-        fi ;
-        sleep 2 ; # 1 second intervals between attempts
-        $MC_COMMAND ;
-        STATUS=$? ;
-      done ;
-      set -e ; # reset `e` as active
-      return 0
-    }
-    
-    # checkBucketExists ($bucket)
-    # Check if the bucket exists, by using the exit code of `mc ls`
-    checkBucketExists() {
-      BUCKET=$1
-      CMD=$(${MC} ls myminio/$BUCKET > /dev/null 2>&1)
-      return $?
-    }
-    
-    # createBucket ($bucket, $policy, $purge)
-    # Ensure bucket exists, purging if asked to
-    createBucket() {
-      BUCKET=$1
-      POLICY=$2
-      PURGE=$3
-      VERSIONING=$4
-    
-      # Purge the bucket, if set & exists
-      # Since PURGE is user input, check explicitly for `true`
-      if [ $PURGE = true ]; then
-        if checkBucketExists $BUCKET ; then
-          echo "Purging bucket '$BUCKET'."
-          set +e ; # don't exit if this fails
-          ${MC} rm -r --force myminio/$BUCKET
-          set -e ; # reset `e` as active
-        else
-          echo "Bucket '$BUCKET' does not exist, skipping purge."
-        fi
-      fi
-    
-      # Create the bucket if it does not exist
-      if ! checkBucketExists $BUCKET ; then
-        echo "Creating bucket '$BUCKET'"
-        ${MC} mb myminio/$BUCKET
-      else
-        echo "Bucket '$BUCKET' already exists."
-      fi
-    
-    
-      # set versioning for bucket
-      if [ ! -z $VERSIONING ] ; then
-        if [ $VERSIONING = true ] ; then
-            echo "Enabling versioning for '$BUCKET'"
-            ${MC} version enable myminio/$BUCKET
-        elif [ $VERSIONING = false ] ; then
-            echo "Suspending versioning for '$BUCKET'"
-            ${MC} version suspend myminio/$BUCKET
-        fi
-      else
-          echo "Bucket '$BUCKET' versioning unchanged."
-      fi
-    
-      # At this point, the bucket should exist, skip checking for existence
-      # Set policy on the bucket
-      echo "Setting policy of bucket '$BUCKET' to '$POLICY'."
-      ${MC} policy set $POLICY myminio/$BUCKET
-    }
-    
-    # Try connecting to Minio instance
-    scheme=http
-    connectToMinio $scheme
----
-# Source: openrag-stack/charts/milvus/templates/configmap.yaml
-# If customConfigMap is not set, this ConfigMap will be redendered.
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: openrag-milvus
+  name: openrag-app-config
   namespace: openrag
-data:
-  default.yaml: |+
-    # Copyright (C) 2019-2021 Zilliz. All rights reserved.
-    #
-    # Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance
-    # with the License. You may obtain a copy of the License at
-    #
-    # http://www.apache.org/licenses/LICENSE-2.0
-    #
-    # Unless required by applicable law or agreed to in writing, software distributed under the License
-    # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-    # or implied. See the License for the specific language governing permissions and limitations under the License.
-    
-    etcd:
-      endpoints:
-      - openrag-etcd-0.openrag-etcd-headless.openrag.svc.cluster.local:2379
-    
-    metastore:
-      type: etcd
-    
-    minio:
-      address: openrag-minio
-      port: 9000
-      accessKeyID: 
-      secretAccessKey: 
-      useSSL: false
-      bucketName: milvus-bucket
-      rootPath: file
-      useIAM: false
-      useVirtualHost: false
-    
-    mq:
-      type: woodpecker
-    
-    messageQueue: woodpecker
-    
-    mq:
-      type: woodpecker
-    
-    messageQueue: woodpecker
-    
-    rootCoord:
-      address: localhost
-      port: 53100
-      enableActiveStandby: false  # Enable rootcoord active-standby
-    
-    proxy:
-      port: 19530
-      internalPort: 19529
-    
-    queryCoord:
-      address: localhost
-      port: 19531
-    
-      enableActiveStandby: false  # Enable querycoord active-standby
-    
-    queryNode:
-      port: 21123
-      enableDisk: true # Enable querynode load disk index, and search on disk index
-    
-    indexCoord:
-      address: localhost
-      port: 31000
-      enableActiveStandby: false  # Enable indexcoord active-standby
-    
-    indexNode:
-      port: 21121
-      enableDisk: true # Enable index node build disk vector index
-    
-    dataCoord:
-      address: localhost
-      port: 13333
-      enableActiveStandby: false  # Enable datacoord active-standby
-    
-    dataNode:
-      port: 21124
-    
-    log:
-      level: info
-      file:
-        rootPath: ""
-        maxSize: 300
-        maxAge: 10
-        maxBackups: 20
-      format: text
-    
-    woodpecker:
-      storage:
-        type: minio
-        rootPath: /var/lib/milvus/wp
-  user.yaml: |-
-    #    For example enable rest http for milvus proxy
-    #    proxy:
-    #      http:
-    #        enabled: true
-    #      maxUserNum: 100
-    #      maxRoleNum: 10
-    ##  Enable tlsMode and set the tls cert and key
-    #  tls:
-    #    serverPemPath: /etc/milvus/certs/tls.crt
-    #    serverKeyPath: /etc/milvus/certs/tls.key
-    #   common:
-    #     security:
-    #       tlsMode: 1
----
-# Source: openrag-stack/templates/configmap-env.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: openrag-env
-data:
-  APP_PORT: "8080"
-  ASSISTANT_NAME: ""
-  BASE_URL: ""
-  EMBEDDER_BASE_URL: "http://openrag-embedder-engine-service/v1"
-  EMBEDDER_MODEL_NAME: "Qwen/Qwen3-Embedding-0.6B"
-  ENABLE_RAY_SERVE: "false"
-  GRAFANA_URL: ""
-  LLM_SEMAPHORE: "50"
-  LOG_FORMAT: "json"
-  MARKER_MAX_PROCESSES: "15"
-  MARKER_MAX_TASKS_PER_CHILD: "10"
-  MARKER_NUM_GPUS: "0"
-  MARKER_POOL_SIZE: "3"
-  METRICS_ALLOW_UNAUTHENTICATED: "false"
-  MODEL: ""
-  MODEL_ENDPOINT_SYNC_ON_BOOT: "false"
-  PDFLOADER: "PyMuPDFLoader"
-  POSTGRES_AUTO_CREATE_DB: "true"
-  POSTGRES_HOST: "openrag-postgresql"
-  POSTGRES_PORT: "5432"
-  POSTGRES_RUN_MIGRATIONS: "true"
-  POSTGRES_USER: "root"
-  PROMPTS_REFRESH_DEFAULTS: "true"
-  RAY_COLOR_PREFIX: "0"
-  RAY_DASHBOARD_PORT: "8265"
-  RAY_DEDUP_LOGS: "0"
-  RAY_ENABLE_UV_RUN_RUNTIME_ENV: "0"
-  RAY_MAX_TASKS_PER_WORKER: "50"
-  RAY_NUM_GPUS: "0"
-  RAY_POOL_SIZE: "3"
-  RAY_SERVE_NUM_REPLICAS: "4"
-  RAY_SERVE_PORT: "80"
-  RAY_task_retry_delay_ms: "3000"
-  READINESS_REQUIRE_EMBEDDER: "false"
-  RERANKER_BASE_URL: "http://openrag-reranker:7997"
-  RERANKER_ENABLED: "true"
-  RERANKER_MODEL: "Alibaba-NLP/gte-multilingual-reranker-base"
-  RERANKER_PROVIDER: "infinity"
-  RERANKER_TOP_K: "4"
-  SAVE_UPLOADED_FILES: "true"
-  TRANSCRIBER_BASE_URL: ""
-  UV_CACHE_DIR: "/tmp/uv-cache"
-  UV_LINK_MODE: "copy"
-  UV_PYTHON: "python3"
-  UV_PYTHON_PREFERENCE: "only-system"
-  VDB_CONNECTOR_NAME: "milvus"
-  VDB_HOST: "openrag-milvus"
-  VDB_PORT: "19530"
-  VLM_BASE_URL: ""
-  VLM_MODEL: ""
-  VLM_SEMAPHORE: "50"
-  WITH_CHAINLIT_UI: "false"
-  XDG_CACHE_HOME: "/app/model_weights"
----
-# Source: openrag-stack/charts/milvus/charts/minio/templates/pvc.yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: openrag-minio
-  annotations:
-    helm.sh/resource-policy: keep
   labels:
-    app: minio
-    chart: minio-8.0.17
-    release: openrag
-    heritage: Helm
-spec:
-  accessModes:
-    - "ReadWriteOnce"
-  resources:
-    requests:
-      storage: "20Gi"
----
-# Source: openrag-stack/charts/milvus/templates/pvc.yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: openrag-milvus
-  namespace: openrag
-  annotations:
-    helm.sh/resource-policy: keep
-  labels:
-    helm.sh/chart: milvus-5.0.27
-    app.kubernetes.io/name: milvus
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
     app.kubernetes.io/instance: openrag
-    app.kubernetes.io/version: "3.0.1"
+    app.kubernetes.io/version: "0.1.52"
     app.kubernetes.io/managed-by: Helm
-spec:
-  accessModes:
-  - "ReadWriteOnce"
-  resources:
-    requests:
-      storage: 50Gi
+data:
+  config.yaml: |
+    agent:
+      llm_model: "qwen25-15b-instruct"
+      llm_provider: "rhoai"
+    edited: false
+    knowledge:
+      chunk_overlap: 200
+      chunk_size: 1000
+      embedding_model: "Qwen/Qwen3-Embedding-0.6B"
+      embedding_provider: "rhoai"
+      ocr: false
+      picture_descriptions: false
+      table_structure: true
+    providers:
+      anthropic:
+        configured: false
+      ollama:
+        configured: false
+      openai:
+        configured: false
+      watsonx:
+        configured: false
+        endpoint: "https://us-south.ml.cloud.ibm.com"
 ---
-# Source: openrag-stack/templates/pvc.yaml
+# Source: openrag/templates/configmaps/flow-ids-configmap.yaml
 apiVersion: v1
-kind: PersistentVolumeClaim
+kind: ConfigMap
 metadata:
-  name: openrag-model-weights
-  annotations:
-    helm.sh/resource-policy: keep
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 20Gi
-  storageClassName: gp3-csi
+  name: openrag-flow-ids
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+data:
+  chat-flow-id: "1098eea1-6649-4e1d-aed1-b77249fb8dd0"
+  ingest-flow-id: "5488df7c-b93f-4f87-a446-b67028bc0813"
+  url-ingest-flow-id: "72c3d17c-2dac-4a73-b48a-6518473d7830"
+  nudges-flow-id: "ebc01d31-1976-46ce-a385-b0240327226c"
 ---
-# Source: openrag-stack/templates/pvc.yaml
+# Source: openrag/templates/storage/data-pvc.yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: openrag-data
-  annotations:
-    helm.sh/resource-policy: keep
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 20Gi
-  storageClassName: gp3-csi
----
-# Source: openrag-stack/templates/pvc.yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: openrag-venv
-  annotations:
-    helm.sh/resource-policy: keep
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: backend
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
       storage: 10Gi
-  storageClassName: gp3-csi
 ---
-# Source: openrag-stack/charts/milvus/charts/etcd/templates/svc-headless.yaml
+# Source: openrag/templates/storage/langflow-pvc.yaml
 apiVersion: v1
-kind: Service
+kind: PersistentVolumeClaim
 metadata:
-  name: openrag-etcd-headless
-  namespace: "openrag"
-  labels:
-    app.kubernetes.io/name: etcd
-    helm.sh/chart: etcd-8.12.0
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "3.5.9"
-  annotations:
-    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
-spec:
-  type: ClusterIP
-  clusterIP: None
-  publishNotReadyAddresses: true
-  ports:
-    - name: client
-      port: 2379
-      targetPort: client
-    - name: peer
-      port: 2380
-      targetPort: peer
-  selector:
-    app.kubernetes.io/name: etcd
-    app.kubernetes.io/instance: openrag
----
-# Source: openrag-stack/charts/milvus/charts/etcd/templates/svc.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: openrag-etcd
-  namespace: "openrag"
-  labels:
-    app.kubernetes.io/name: etcd
-    helm.sh/chart: etcd-8.12.0
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "3.5.9"
-  annotations:
-spec:
-  type: ClusterIP
-  sessionAffinity: None
-  ports:
-    - name: "client"
-      port: 2379
-      targetPort: client
-      nodePort: null
-    - name: "peer"
-      port: 2380
-      targetPort: peer
-      nodePort: null
-  selector:
-    app.kubernetes.io/name: etcd
-    app.kubernetes.io/instance: openrag
----
-# Source: openrag-stack/charts/milvus/charts/minio/templates/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: openrag-minio
-  labels:
-    app: minio
-    chart: minio-8.0.17
-    release: openrag
-    heritage: Helm
-spec:
-  type: ClusterIP
-  ports:
-    - name: http
-      port: 9000
-      protocol: TCP
-      targetPort: 9000
-  selector:
-    app: minio
-    release: openrag
----
-# Source: openrag-stack/charts/milvus/templates/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: openrag-milvus
+  name: openrag-langflow
   namespace: openrag
   labels:
-    helm.sh/chart: milvus-5.0.27
-    app.kubernetes.io/name: milvus
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/version: "3.0.1"
-    app.kubernetes.io/managed-by: Helm
-    component: "standalone"
-spec:
-  type: ClusterIP
-  ports:
-    - name: milvus
-      port: 19530
-      protocol: TCP
-      targetPort: milvus
-    - name: metrics
-      protocol: TCP
-      port: 9091
-      targetPort: metrics
-  selector:
-    app.kubernetes.io/name: milvus
-    app.kubernetes.io/instance: openrag
-    component: "standalone"
----
-# Source: openrag-stack/charts/postgresql/templates/primary/svc-headless.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: openrag-postgresql-hl
-  namespace: "openrag"
-  labels:
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/version: 18.6.0
-    helm.sh/chart: postgresql-18.12.16
-    app.kubernetes.io/component: primary
-  annotations:
-spec:
-  type: ClusterIP
-  clusterIP: None
-  # We want all pods in the StatefulSet to have their addresses published for
-  # the sake of the other Postgresql pods even before they're ready, since they
-  # have to be able to talk to each other in order to become ready.
-  publishNotReadyAddresses: true
-  ports:
-    - name: tcp-postgresql
-      port: 5432
-      targetPort: tcp-postgresql
-  selector:
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/component: primary
----
-# Source: openrag-stack/charts/postgresql/templates/primary/svc.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: openrag-postgresql
-  namespace: "openrag"
-  labels:
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/version: 18.6.0
-    helm.sh/chart: postgresql-18.12.16
-    app.kubernetes.io/component: primary
-spec:
-  type: ClusterIP
-  ports:
-    - name: tcp-postgresql
-      port: 5432
-      targetPort: tcp-postgresql
-      nodePort: null
-  selector:
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/component: primary
----
-# Source: openrag-stack/charts/vllm/templates/service-vllm.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: "openrag-embedder-engine-service"
-  namespace: openrag
-  labels:
-    app.kubernetes.io/name: embedder
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/component: serving-engine
-    app.kubernetes.io/part-of: vllm
-    app.kubernetes.io/managed-by: helm
-    environment: test
-    release: test
-spec:
-  type: ClusterIP
-  ports:
-    - name: "service-port"
-      port: 80
-      targetPort: "container-port"
-      protocol: TCP
-    - name: zmq-port
-      port: 55555
-      targetPort: zmq-port
-      protocol: TCP
-    - name: ucx-port
-      port: 9999
-      targetPort: ucx-port
-      protocol: TCP
-    
-  selector:
-    model: "embedder"
-    helm-release-name: "openrag"
-    app.kubernetes.io/name: embedder
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/component: serving-engine
-    app.kubernetes.io/part-of: vllm
-    app.kubernetes.io/managed-by: helm
-    environment: test
-    release: test
----
-# Source: openrag-stack/templates/admin-ui.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: openrag-admin-ui
-  labels:
-    helm.sh/chart: openrag-stack-0.7.10
-    app.kubernetes.io/name: admin-ui
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/version: "2.3.3"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  type: ClusterIP
-  selector:
-    app.kubernetes.io/name: admin-ui
-    app.kubernetes.io/instance: openrag
-  ports:
-    - name: admin-ui
-      port: 8080
-      targetPort: 8080
----
-# Source: openrag-stack/templates/infinity.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: openrag-reranker
-  labels:
-    helm.sh/chart: openrag-stack-0.7.10
-    app.kubernetes.io/name: reranker
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/version: "2.3.3"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  selector:
-    app.kubernetes.io/name: reranker
-    app.kubernetes.io/instance: openrag
-  ports:
-    - name: reranker
-      protocol: TCP
-      port: 7997
-      targetPort: reranker
-  type: ClusterIP
----
-# Source: openrag-stack/templates/openrag.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: openrag-openrag
-  labels:
-    helm.sh/chart: openrag-stack-0.7.10
+    helm.sh/chart: openrag-0.2.0
     app.kubernetes.io/name: openrag
     app.kubernetes.io/instance: openrag
-    app.kubernetes.io/version: "2.3.3"
+    app.kubernetes.io/version: "0.1.52"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: langflow
 spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Source: openrag/templates/storage/shared-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openrag-shared
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: backend
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Source: openrag/templates/backend/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: openrag-backend
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: http
+      protocol: TCP
+      name: http
   selector:
     app.kubernetes.io/name: openrag
     app.kubernetes.io/instance: openrag
-  ports:
-    - name: openrag
-      protocol: TCP
-      port: 8080
-      targetPort: 8080
-  type: ClusterIP
+    app.kubernetes.io/component: backend
 ---
-# Source: openrag-stack/charts/milvus/charts/minio/templates/deployment.yaml
+# Source: openrag/templates/frontend/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: openrag-frontend
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: frontend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/component: frontend
+---
+# Source: openrag/templates/langflow/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: openrag-langflow
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: langflow
+spec:
+  type: ClusterIP
+  ports:
+    - port: 7860
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/component: langflow
+---
+# Source: openrag/templates/backend/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: openrag-minio
+  name: openrag-backend
+  namespace: openrag
   labels:
-    app: minio
-    chart: minio-8.0.17
-    release: openrag
-    heritage: Helm
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: backend
 spec:
+  replicas: 1  # Single pod for vertical scaling
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 100%
-      maxUnavailable: 0
+    type: Recreate  # Required for RWO PVCs
   selector:
     matchLabels:
-      app: minio
-      release: openrag
+      app.kubernetes.io/name: openrag
+      app.kubernetes.io/instance: openrag
+      app.kubernetes.io/component: backend
   template:
     metadata:
-      name: openrag-minio
       labels:
-        app: minio
-        release: openrag
+        app.kubernetes.io/name: openrag
+        app.kubernetes.io/instance: openrag
+        app.kubernetes.io/component: backend
       annotations:
-        checksum/secrets: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
-        checksum/config: 540be43825bc79125ff2996772802ca014c4da97abc879266cee3fc4c09863c5
+        checksum/secret-opensearch: b062e8775d678cdad819ddb6c8f6bb07e1707abdc213751689b0d8728abd4d5e
+        checksum/secret-langflow: 122b69a0784d5d8e260f8e8eaefbaf985ecbc58fa988b2c8ac457df63b1ad414
+        checksum/config-flows: e7f093f3764a86d758bcea4831a2cc07374161bdbe38111c55b87cfda93f6523
+        checksum/config-app: 09bfd635cb3a63710203d2e20f3d7adb507a44dc6e7b690c7f8f2a30f855e7b1
+        checksum/secret-backend: c92357bc747a5ad4f060f85ff7d258c821cd455d52959cb79c68442444e27abc
+        checksum/secret-dotenv: a8d54a32907634ed6bde897794aee3974cc1feed6ad92efd025211e929f6e688
     spec:
-      serviceAccountName: "openrag-minio"
+      serviceAccountName: openrag
       securityContext:
-        runAsUser: 1000
-        runAsGroup: 1000
         fsGroup: 1000
-      containers:
-        - name: minio
-          image: "pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46"
-          imagePullPolicy: IfNotPresent
-          command:
-            - "/bin/sh"
-            - "-ce"
-            - "/usr/bin/docker-entrypoint.sh minio -S /etc/minio/certs/ server /export"
+        runAsNonRoot: true
+      initContainers:
+        - name: load-default-documents
+          image: curlimages/curl:8.5.0
+          resources:
+            limits:
+              ephemeral-storage: 500Mi
+            requests:
+              ephemeral-storage: 500Mi
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+
+              DOCS_DIR="/shared/openrag-documents"
+
+              OWNER="langflow-ai"
+              REPO="openrag"
+              BRANCH="main"
+              GIT_REF="a1d691b9ef6ef9154d83c8a3565c23d185c06f8e"
+              REPO_PATH="openrag-documents"
+
+              # Raw base URL: https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>
+              GITHUB_RAW_URL="https://raw.githubusercontent.com/${OWNER}/${REPO}/${GIT_REF}/${REPO_PATH}"
+
+              mkdir -p "$DOCS_DIR"
+
+              if [ -z "$(ls -A "$DOCS_DIR" 2>/dev/null)" ]; then
+                echo "Loading default documents from ${OWNER}/${REPO}@${GIT_REF}/${REPO_PATH} ..."
+
+                download_with_retry() {
+                  file="$1"
+                  url="${GITHUB_RAW_URL}/${file}"
+                  dest="${DOCS_DIR}/${file}"
+                  max_retries=3
+                  timeout=60
+                  retry=0
+
+                  while [ "$retry" -lt "$max_retries" ]; do
+                    echo "Downloading ${file} (attempt $((retry + 1))/${max_retries})..."
+                    if curl -f -L -m "$timeout" -o "$dest" "$url"; then
+                      echo "OK: ${file}"
+                      return 0
+                    fi
+                    retry=$((retry + 1))
+                    if [ "$retry" -lt "$max_retries" ]; then
+                      echo "Retrying ${file}..."
+                      sleep 2
+                    fi
+                  done
+
+                  echo "ERROR: Failed to download ${file} from ${url}"
+                  return 1
+                }
+
+                failed=0
+                if ! download_with_retry "docling.pdf"; then failed=1; fi
+                if ! download_with_retry "ibm_anthropic.pdf"; then failed=1; fi
+                if ! download_with_retry "openrag-documentation.pdf"; then failed=1; fi
+                if ! download_with_retry "warmup_ocr.pdf"; then failed=1; fi
+
+                if [ "$failed" -eq 1 ]; then
+                  echo "ERROR: One or more documents failed to download"
+                  exit 1
+                fi
+
+                echo "Documents loaded: $(ls "$DOCS_DIR")"
+              else
+                echo "Documents already exist in $DOCS_DIR, skipping download."
+              fi
           volumeMounts:
-            - name: export
-              mountPath: /export            
+            - name: shared
+              mountPath: "/shared"
+        - name: load-default-flows
+          image: curlimages/curl:8.5.0
+          resources:
+            limits:
+              ephemeral-storage: 500Mi
+            requests:
+              ephemeral-storage: 500Mi
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+
+              FLOWS_DIR="/shared/flows"
+
+              OWNER="langflow-ai"
+              REPO="openrag"
+              BRANCH="main"
+              GIT_REF="a1d691b9ef6ef9154d83c8a3565c23d185c06f8e"
+              REPO_PATH="flows"
+
+              # Raw base URL: https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>
+              GITHUB_RAW_URL="https://raw.githubusercontent.com/${OWNER}/${REPO}/${GIT_REF}/${REPO_PATH}"
+
+              mkdir -p "$FLOWS_DIR"
+
+              if [ -z "$(ls -A "$FLOWS_DIR" 2>/dev/null)" ]; then
+                echo "Loading default flows from ${OWNER}/${REPO}@${GIT_REF}/${REPO_PATH} ..."
+
+                download_with_retry() {
+                  file="$1"
+                  url="${GITHUB_RAW_URL}/${file}"
+                  dest="${FLOWS_DIR}/${file}"
+                  max_retries=3
+                  timeout=60
+                  retry=0
+
+                  while [ "$retry" -lt "$max_retries" ]; do
+                    echo "Downloading ${file} (attempt $((retry + 1))/${max_retries})..."
+                    if curl -f -L -m "$timeout" -o "$dest" "$url"; then
+                      echo "OK: ${file}"
+                      return 0
+                    fi
+                    retry=$((retry + 1))
+                    if [ "$retry" -lt "$max_retries" ]; then
+                      echo "Retrying ${file}..."
+                      sleep 2
+                    fi
+                  done
+
+                  echo "ERROR: Failed to download ${file} from ${url}"
+                  return 1
+                }
+
+                failed=0
+                if ! download_with_retry "ingestion_flow.json"; then failed=1; fi
+                if ! download_with_retry "openrag_agent.json"; then failed=1; fi
+                if ! download_with_retry "openrag_nudges.json"; then failed=1; fi
+                if ! download_with_retry "openrag_url_mcp.json"; then failed=1; fi
+
+                if [ "$failed" -eq 1 ]; then
+                  echo "ERROR: One or more flows failed to download"
+                  exit 1
+                fi
+
+                echo "Flows loaded: $(ls "$FLOWS_DIR")"
+              else
+                echo "Flows already exist in $FLOWS_DIR, skipping download."
+              fi
+          volumeMounts:
+            - name: shared
+              mountPath: "/shared"
+        - name: wait-for-langflow
+          image: busybox:1.36
+          resources:
+            limits:
+              ephemeral-storage: 10Mi
+            requests:
+              ephemeral-storage: 10Mi
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Langflow to be ready..."
+              until nc -z openrag-langflow 7860; do
+                echo "Langflow not ready, sleeping 5s..."
+                sleep 5
+              done
+              echo "Langflow is ready!"
+      containers:
+        - name: backend
+          image: "langflowai/openrag-backend:0.8.0"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsUser: 1000
           ports:
             - name: http
-              containerPort: 9000
-          livenessProbe:
-            httpGet:
-              path: /minio/health/live
-              port: http
-              scheme: HTTP
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 5
-            successThreshold: 1
-            failureThreshold: 5
-          readinessProbe:
-            tcpSocket:
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 1
-            successThreshold: 1
-            failureThreshold: 5
-          startupProbe:
-            tcpSocket:
-              port: http
-            initialDelaySeconds: 0
-            periodSeconds: 10
-            timeoutSeconds: 5
-            successThreshold: 1
-            failureThreshold: 60
-          env:
-            - name: MINIO_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: openrag-minio-credentials
-                  key: accesskey
-            - name: MINIO_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: openrag-minio-credentials
-                  key: secretkey
-          resources:
-            requests:
-              memory: 2Gi      
-      volumes:
-        - name: export
-          persistentVolumeClaim:
-            claimName: openrag-minio
-        - name: minio-user
-          secret:
-            secretName: openrag-minio-credentials
----
-# Source: openrag-stack/charts/milvus/templates/standalone-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: openrag-milvus-standalone
-  namespace: openrag
-  labels:
-    helm.sh/chart: milvus-5.0.27
-    app.kubernetes.io/name: milvus
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/version: "3.0.1"
-    app.kubernetes.io/managed-by: Helm
-    component: "standalone"
-    
-  annotations:
-    
-    milvus.io/message-queue: woodpecker
-
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: milvus
-      app.kubernetes.io/instance: openrag
-      component: "standalone"
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: milvus
-        app.kubernetes.io/instance: openrag
-        component: "standalone"
-        
-      annotations:
-        checksum/config: f8edb530abbd7e199b4821b1cfc186e29be0f83bd83e767d49661c3916093d4d
-        
-    spec:
-      serviceAccountName: default
-      initContainers:
-      containers:
-      - name: standalone
-        image: "milvusdb/milvus:v3.0.2"
-        imagePullPolicy: IfNotPresent
-        
-        
-        args: [ "milvus", "run", "standalone" ]
-        ports:
-          - name: milvus
-            containerPort: 19530
-            protocol: TCP
-          - name: metrics
-            containerPort: 9091
-            protocol: TCP
-        livenessProbe:
-          tcpSocket:
-            port: metrics
-          initialDelaySeconds: 90
-          periodSeconds: 30
-          timeoutSeconds: 5
-          successThreshold: 1
-          failureThreshold: 5
-        readinessProbe:
-          httpGet:
-            path: /healthz
-            port: metrics
-          initialDelaySeconds: 90
-          periodSeconds: 10
-          timeoutSeconds: 5
-          successThreshold: 1
-          failureThreshold: 5
-        resources:
-          {}
-        env:
-        - name: MINIO_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              key: accesskey
-              name: openrag-minio-credentials
-              optional: true
-        - name: MINIO_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              key: secretkey
-              name: openrag-minio-credentials
-              optional: true
-        volumeMounts:
-        - mountPath: /milvus/tools
-          name: tools
-        - name: milvus-config
-          mountPath: /milvus/configs/default.yaml
-          subPath: default.yaml
-          readOnly: true
-        - name: milvus-config
-          mountPath: /milvus/configs/user.yaml
-          subPath: user.yaml
-          readOnly: true
-        - name: milvus-data-disk
-          mountPath: "/var/lib/milvus"
-          subPath: 
-        - mountPath: /var/lib/milvus/data
-          name: disk
-      securityContext:
-        fsGroup: null
-        fsGroupChangePolicy: null
-
-      volumes:
-      - emptyDir: {}
-        name: tools
-      - name: milvus-config
-        configMap:
-          name: openrag-milvus
-      - name: milvus-data-disk
-        persistentVolumeClaim:
-          claimName: openrag-milvus
-      - name: disk
-        emptyDir: {}
----
-# Source: openrag-stack/charts/vllm/templates/deployment-vllm-multi.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: "openrag-embedder-deployment-vllm"
-  namespace: openrag
-  labels:
-    model: embedder
-    helm-release-name: openrag
-    app.kubernetes.io/name: embedder
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/component: serving-engine
-    app.kubernetes.io/part-of: vllm
-    app.kubernetes.io/managed-by: helm
-    environment: test
-    release: test
-spec:
-  replicas: 1
-  strategy:
-    rollingUpdate:
-      maxSurge: 100%
-      maxUnavailable: 0
-  selector:
-    matchLabels:
-      model: embedder
-      helm-release-name: openrag
-      app.kubernetes.io/name: embedder
-      app.kubernetes.io/instance: openrag
-      app.kubernetes.io/component: serving-engine
-      app.kubernetes.io/part-of: vllm
-      app.kubernetes.io/managed-by: helm
-      environment: test
-      release: test
-  progressDeadlineSeconds: 1200
-  template:
-    metadata:
-      labels:
-        model: embedder
-        helm-release-name: openrag
-        app.kubernetes.io/name: embedder
-        app.kubernetes.io/instance: openrag
-        app.kubernetes.io/component: serving-engine
-        app.kubernetes.io/part-of: vllm
-        app.kubernetes.io/managed-by: helm
-        environment: test
-        release: test
-    spec:
-      securityContext:
-        fsGroup: 10001
-        runAsGroup: 10001
-        runAsNonRoot: true
-        runAsUser: 10001
-        seccompProfile:
-          type: RuntimeDefault
-      hostname: "openrag-embedder-vllm"
-      subdomain: "openrag-embedder-engine-service"
-      containers:
-        - name: "vllm"
-          image: "vllm/vllm-openai:v0.30.0-cu129"
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-            runAsNonRoot: true
-          command:
-          - "vllm"
-          - "serve"
-          - "Qwen/Qwen3-Embedding-0.6B"
-          - "--host"
-          - "0.0.0.0"
-          - "--port"
-          - "8000"
-          - "--no-enable-prefix-caching"
-          - "--max-model-len"
-          - "2048"
-          - "--dtype"
-          - "half"
-          - "--gpu_memory_utilization"
-          - "0.5"
-          - "--runner"
-          - "pooling"
-          - "--trust-remote-code"
-          - "--convert"
-          - "embed"
-          imagePullPolicy: "IfNotPresent"
-          env:
-          - name: PYTHONHASHSEED
-            value: "123"
-          - name: HF_HOME
-            value: /tmp
-          - name: POD_IP
-            valueFrom:
-              fieldRef:
-                fieldPath: status.podIP
-          - name: PROMETHEUS_MULTIPROC_DIR
-            value: "/tmp"
-          - name: HF_TOKEN
-            valueFrom:
-              secretKeyRef:
-                name: openrag-env-secrets
-                key: HF_TOKEN
-          - name: HOME
-            value: /tmp
-          - name: XDG_CACHE_HOME
-            value: /tmp/.cache
-          ports:
-            - name: "container-port"
               containerPort: 8000
-            - name: zmq-port
-              containerPort: 55555
-            - name: ucx-port
-              containerPort: 9999          
-          startupProbe:
-            initialDelaySeconds: 15
-            periodSeconds: 10
-            failureThreshold: 60
-            httpGet:
-              path:  /health
-              port: 8000
-          livenessProbe:
-            initialDelaySeconds: 15
-            periodSeconds: 10
-            failureThreshold: 3
-            httpGet:
-              path:  /health
-              port: 8000
-          readinessProbe:
-            initialDelaySeconds: 15
-            periodSeconds: 5
-            failureThreshold: 3
-            httpGet:
-              path:  /health
-              port: 8000
-          resources:
-            requests:
-              memory: "8Gi"
-              cpu: "2"
-              nvidia.com/gpu: "1"
-            limits:
-              memory: "12Gi"
-              cpu: "4"
-              nvidia.com/gpu: "1"
-      tolerations:
-        - effect: NoSchedule
-          key: nvidia.com/gpu
-          operator: Exists
-      runtimeClassName: nvidia
----
-# Source: openrag-stack/templates/admin-ui.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: openrag-admin-ui
-  labels:
-    helm.sh/chart: openrag-stack-0.7.10
-    app.kubernetes.io/name: admin-ui
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/version: "2.3.3"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: admin-ui
-      app.kubernetes.io/instance: openrag
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: admin-ui
-        app.kubernetes.io/instance: openrag
-    spec:
-      securityContext:
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 10001
-        seccompProfile:
-          type: RuntimeDefault
-      automountServiceAccountToken: false
-      containers:
-        - name: admin-ui
-          image: "docker.io/linagoraai/openrag-admin-ui:v2.3.3"
-          imagePullPolicy: IfNotPresent
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-            readOnlyRootFilesystem: false
-          ports:
-            - containerPort: 8080
-              name: admin-ui
-          # nginx serves the SPA at /app/; probe it so a crash-looping or stuck
-          # pod is restarted and gated out of rollout traffic.
-          readinessProbe:
-            httpGet:
-              path: /app/
-              port: admin-ui
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /app/
-              port: admin-ui
-            initialDelaySeconds: 10
-            periodSeconds: 20
-          resources:
-            {}
----
-# Source: openrag-stack/templates/infinity.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: openrag-reranker
-  labels:
-    helm.sh/chart: openrag-stack-0.7.10
-    app.kubernetes.io/name: reranker
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/version: "2.3.3"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: reranker
-      app.kubernetes.io/instance: openrag
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: reranker
-        app.kubernetes.io/instance: openrag
-    spec:
-      securityContext:
-        fsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
-        seccompProfile:
-          type: RuntimeDefault
-      automountServiceAccountToken: false
-      containers:
-        - name: reranker
-          image: "docker.io/michaelf34/infinity:0.0.77"
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-            readOnlyRootFilesystem: false
-          args:
-            - "v2"
-            - "--model-id"
-            - "Alibaba-NLP/gte-multilingual-reranker-base"
-            - "--port"
-            - "7997"
-          ports:
-            - containerPort: 7997
-              name: reranker
-          resources:
-            limits:
-              cpu: "4"
-              memory: 8Gi
-            requests:
-              cpu: "2"
-              memory: 4Gi
-          startupProbe:
-            failureThreshold: 60
-            httpGet:
-              path: /health
-              port: reranker
-            periodSeconds: 10
-          readinessProbe:
-            failureThreshold: 6
-            httpGet:
-              path: /health
-              port: reranker
-            periodSeconds: 10
-          livenessProbe:
-            failureThreshold: 3
-            httpGet:
-              path: /health
-              port: reranker
-            initialDelaySeconds: 60
-            periodSeconds: 30
+              protocol: TCP
           volumeMounts:
-            - name: hf-cache
-              mountPath: /app/.cache/huggingface
-          envFrom:
-            - configMapRef:
-                name: openrag-env
+            - name: openrag-dotenv
+              mountPath: /app/.env
+              subPath: .env
+              readOnly: true
+            - name: data
+              mountPath: "/data"
+            - name: shared
+              mountPath: "/shared"
+              readOnly: true
+          resources:
+            limits:
+              cpu: "4"
+              ephemeral-storage: 2Gi
+              memory: 16Gi
+            requests:
+              cpu: 500m
+              ephemeral-storage: 1Gi
+              memory: 2Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  FAILED=0
+
+                  # Langflow health
+                  echo "Checking Langflow..."
+                  if ! curl -sf "http://openrag-langflow:7860/health" >/dev/null 2>&1; then
+                    echo "ERROR: Langflow health check failed at http://openrag-langflow:7860/health"
+                    FAILED=1
+                  else
+                    echo "Langflow: OK"
+                  fi
+
+                  echo "All health checks passed"
+                  exit 0
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
       volumes:
-        - name: hf-cache
+        - name: openrag-dotenv
+          secret:
+            secretName: openrag-dotenv
+            defaultMode: 0400
+            items:
+              - key: .env
+                path: .env
+        - name: data
           persistentVolumeClaim:
-            claimName: openrag-model-weights
+            claimName: openrag-data
+        - name: shared
+          persistentVolumeClaim:
+            claimName: openrag-shared
 ---
-# Source: openrag-stack/templates/openrag.yaml
+# Source: openrag/templates/frontend/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: openrag-openrag
+  name: openrag-frontend
+  namespace: openrag
   labels:
-    helm.sh/chart: openrag-stack-0.7.10
+    helm.sh/chart: openrag-0.2.0
     app.kubernetes.io/name: openrag
     app.kubernetes.io/instance: openrag
-    app.kubernetes.io/version: "2.3.3"
+    app.kubernetes.io/version: "0.1.52"
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: frontend
 spec:
   replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: openrag
       app.kubernetes.io/instance: openrag
+      app.kubernetes.io/component: frontend
   template:
     metadata:
-      annotations:
-        checksum/config: f7f4b3d694576d1e52a3ba7ef8a54f9832ea90f463b10637b1652d5af23ddd16
-        prometheus.io/scrape: "true"
-        prometheus.io/path: "/metrics"
-        prometheus.io/port: "8080"
       labels:
         app.kubernetes.io/name: openrag
         app.kubernetes.io/instance: openrag
+        app.kubernetes.io/component: frontend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
     spec:
+      serviceAccountName: openrag
       securityContext:
-        fsGroup: 10001
-        runAsGroup: 0
+        fsGroup: 1000
         runAsNonRoot: true
-        runAsUser: 10001
-        seccompProfile:
-          type: RuntimeDefault
-      automountServiceAccountToken: false
       containers:
-        - name: openrag
-          image: "docker.io/linagoraai/openrag:v2.3.3"
+        - name: frontend
+          image: "langflowai/openrag-frontend:0.8.0"
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
             readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsUser: 1000
           ports:
-            - containerPort: 8080
-              name: openrag
-            - containerPort: 8090
-              name: ray-metrics
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          env:
+            # Backend connection (uses internal service name)
+            - name: OPENRAG_BACKEND_HOST
+              value: "openrag-backend"
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+# Source: openrag/templates/langflow/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openrag-langflow
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: langflow
+spec:
+  replicas: 1  # Always 1 for SQLite-based Langflow
+  strategy:
+    type: Recreate  # Required for RWO PVC
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openrag
+      app.kubernetes.io/instance: openrag
+      app.kubernetes.io/component: langflow
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openrag
+        app.kubernetes.io/instance: openrag
+        app.kubernetes.io/component: langflow
+      annotations:
+        checksum/secret: 122b69a0784d5d8e260f8e8eaefbaf985ecbc58fa988b2c8ac457df63b1ad414
+        checksum/config: e7f093f3764a86d758bcea4831a2cc07374161bdbe38111c55b87cfda93f6523
+        checksum/dotenv: 260beec30dc024de710c5485c05df7eea3ff6022766afd08b3fbdd88e2edaf07
+    spec:
+      serviceAccountName: openrag
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+
+
+      containers:
+        - name: langflow
+          image: "langflowai/openrag-langflow:0.8.0"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsUser: 1000
+
+          ports:
+            - name: http
+              containerPort: 7860
+              protocol: TCP
+
+          command: ["langflow", "run", "--env-file", "/app/.env"]
+
+          volumeMounts:
+            - name: openrag-langflow-dotenv
+              mountPath: /app/.env
+              subPath: .env
+              readOnly: true
+            - name: langflow-data
+              mountPath: /app/data
+            - name: shared
+              mountPath: "/shared"
+              readOnly: true
+
           resources:
             limits:
               cpu: "4"
-              memory: 12Gi
-            requests:
-              cpu: "2"
+              ephemeral-storage: 2Gi
               memory: 8Gi
-          startupProbe:
-            failureThreshold: 30
-            httpGet:
-              path: /health_check
-              port: openrag
-            periodSeconds: 10
-            timeoutSeconds: 5
-          readinessProbe:
-            failureThreshold: 3
-            httpGet:
-              path: /ready
-              port: openrag
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
+            requests:
+              cpu: 500m
+              ephemeral-storage: 1Gi
+              memory: 1Gi
           livenessProbe:
-            failureThreshold: 3
             httpGet:
-              path: /health_check
-              port: openrag
-            initialDelaySeconds: 60
-            periodSeconds: 30
-          env:
-            - name: RAY_METRICS_EXPORT_PORT
-              value: "8090"
-          envFrom:
-            - configMapRef:
-                name: openrag-env
-            - secretRef:
-                name: openrag-env-secrets
-          volumeMounts:
-            - name: model-weights
-              mountPath: /app/model_weights
-            - name: data
-              mountPath: /app/data
-            - name: venv
-              mountPath: /app/.venv
-      volumes:
-        - name: model-weights
-          persistentVolumeClaim:
-            claimName: openrag-model-weights
-        - name: data
-          persistentVolumeClaim:
-            claimName: openrag-data
-        - name: venv
-          persistentVolumeClaim:
-            claimName: openrag-venv
----
-# Source: openrag-stack/charts/milvus/charts/etcd/templates/statefulset.yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: openrag-etcd
-  namespace: "openrag"
-  labels:
-    app.kubernetes.io/name: etcd
-    helm.sh/chart: etcd-8.12.0
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "3.5.9"
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: etcd
-      app.kubernetes.io/instance: openrag
-  serviceName: openrag-etcd-headless
-  podManagementPolicy: Parallel
-  updateStrategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: etcd
-        helm.sh/chart: etcd-8.12.0
-        app.kubernetes.io/instance: openrag
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/version: "3.5.9"
-      annotations:
-    spec:
-      
-      affinity:
-        podAffinity:
-          
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - podAffinityTerm:
-                labelSelector:
-                  matchLabels:
-                    app.kubernetes.io/instance: openrag
-                    app.kubernetes.io/name: etcd
-                topologyKey: kubernetes.io/hostname
-              weight: 1
-        nodeAffinity:
-          
-      securityContext:
-        fsGroup: 1001
-      serviceAccountName: "default"
-      containers:
-        - name: etcd
-          image: docker.io/milvusdb/etcd:3.5.25-r1
-          imagePullPolicy: "IfNotPresent"
-          securityContext:
-            allowPrivilegeEscalation: false
-            runAsNonRoot: true
-            runAsUser: 1001
-          env:
-            - name: BITNAMI_DEBUG
-              value: "false"
-            - name: MY_POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            - name: MY_POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: MY_STS_NAME
-              value: "openrag-etcd"
-            - name: ETCDCTL_API
-              value: "3"
-            - name: ETCD_ON_K8S
-              value: "yes"
-            - name: ETCD_START_FROM_SNAPSHOT
-              value: "no"
-            - name: ETCD_DISASTER_RECOVERY
-              value: "no"
-            - name: ETCD_NAME
-              value: "$(MY_POD_NAME)"
-            - name: ETCD_DATA_DIR
-              value: "/bitnami/etcd/data"
-            - name: ETCD_LOG_LEVEL
-              value: "info"
-            - name: ALLOW_NONE_AUTHENTICATION
-              value: "yes"
-            - name: ETCD_ADVERTISE_CLIENT_URLS
-              value: "http://$(MY_POD_NAME).openrag-etcd-headless.openrag.svc.cluster.local:2379,http://openrag-etcd.openrag.svc.cluster.local:2379"
-            - name: ETCD_LISTEN_CLIENT_URLS
-              value: "http://0.0.0.0:2379"
-            - name: ETCD_INITIAL_ADVERTISE_PEER_URLS
-              value: "http://$(MY_POD_NAME).openrag-etcd-headless.openrag.svc.cluster.local:2380"
-            - name: ETCD_LISTEN_PEER_URLS
-              value: "http://0.0.0.0:2380"
-            - name: ETCD_AUTO_COMPACTION_MODE
-              value: "revision"
-            - name: ETCD_AUTO_COMPACTION_RETENTION
-              value: "1000"
-            - name: ETCD_CLUSTER_DOMAIN
-              value: "openrag-etcd-headless.openrag.svc.cluster.local"
-            - name: ETCD_QUOTA_BACKEND_BYTES
-              value: "4294967296"
-            - name: ETCD_HEARTBEAT_INTERVAL
-              value: "500"
-            - name: ETCD_ELECTION_TIMEOUT
-              value: "2500"
-          envFrom:
-          ports:
-            - name: client
-              containerPort: 2379
-              protocol: TCP
-            - name: peer
-              containerPort: 2380
-              protocol: TCP
-          livenessProbe:
-            exec:
-              command:
-                - /opt/bitnami/scripts/etcd/healthcheck.sh
+              path: /health
+              port: http
             initialDelaySeconds: 60
             periodSeconds: 30
             timeoutSeconds: 10
-            successThreshold: 1
-            failureThreshold: 5
+            failureThreshold: 3
           readinessProbe:
-            exec:
-              command:
-                - /opt/bitnami/scripts/etcd/healthcheck.sh
-            initialDelaySeconds: 60
-            periodSeconds: 20
-            timeoutSeconds: 10
-            successThreshold: 1
-            failureThreshold: 5
-          resources:
-            limits: {}
-            requests: {}
-          volumeMounts:
-            - name: data
-              mountPath: /bitnami/etcd
-      volumes:
-  volumeClaimTemplates:
-    - metadata:
-        name: data
-      spec:
-        accessModes:
-          - "ReadWriteOnce"
-        resources:
-          requests:
-            storage: "10Gi"
----
-# Source: openrag-stack/charts/postgresql/templates/primary/statefulset.yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: openrag-postgresql
-  namespace: "openrag"
-  labels:
-    app.kubernetes.io/instance: openrag
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/version: 18.6.0
-    helm.sh/chart: postgresql-18.12.16
-    app.kubernetes.io/component: primary
-spec:
-  replicas: 1
-  serviceName: openrag-postgresql-hl
-  updateStrategy:
-    rollingUpdate: {}
-    type: RollingUpdate
-  selector:
-    matchLabels:
-      app.kubernetes.io/instance: openrag
-      app.kubernetes.io/name: postgresql
-      app.kubernetes.io/component: primary
-  template:
-    metadata:
-      name: openrag-postgresql
-      labels:
-        app.kubernetes.io/instance: openrag
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: postgresql
-        app.kubernetes.io/version: 18.6.0
-        helm.sh/chart: postgresql-18.12.16
-        app.kubernetes.io/component: primary
-    spec:
-      serviceAccountName: openrag-postgresql
-      
-      automountServiceAccountToken: false
-      affinity:
-        podAffinity:
-          
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - podAffinityTerm:
-                labelSelector:
-                  matchLabels:
-                    app.kubernetes.io/instance: openrag
-                    app.kubernetes.io/name: postgresql
-                    app.kubernetes.io/component: primary
-                topologyKey: kubernetes.io/hostname
-              weight: 1
-        nodeAffinity:
-          
-      enableServiceLinks: true
-      securityContext:
-        fsGroupChangePolicy: Always
-        seccompProfile:
-          type: RuntimeDefault
-        supplementalGroups: []
-        sysctls: []
-      hostNetwork: false
-      hostIPC: false
-      containers:
-        - name: postgresql
-          image: registry-1.docker.io/bitnami/postgresql:latest
-          imagePullPolicy: "IfNotPresent"
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-            privileged: false
-            readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            seccompProfile:
-              type: RuntimeDefault
-          env:
-            - name: BITNAMI_DEBUG
-              value: "false"
-            - name: POSTGRESQL_PORT_NUMBER
-              value: "5432"
-            - name: POSTGRESQL_VOLUME_DIR
-              value: "/bitnami/postgresql"
-            - name: OPENSSL_FIPS
-              value: "yes"
-            - name: OPENSSL_FIPS_PROVIDER_PATH
-              value: "/etc/ssl/provider_fips.cnf"
-            - name: PGDATA
-              value: "/bitnami/postgresql/data"
-            # Authentication
-            - name: POSTGRES_USER
-              value: "root"
-            - name: POSTGRES_PASSWORD_FILE
-              value: /opt/bitnami/postgresql/secrets/POSTGRES_PASSWORD
-            - name: POSTGRES_POSTGRES_PASSWORD_FILE
-              value: /opt/bitnami/postgresql/secrets/POSTGRES_PASSWORD
-            # LDAP
-            - name: POSTGRESQL_ENABLE_LDAP
-              value: "no"
-            # TLS
-            - name: POSTGRESQL_ENABLE_TLS
-              value: "no"
-            # Audit
-            - name: POSTGRESQL_LOG_HOSTNAME
-              value: "false"
-            - name: POSTGRESQL_LOG_CONNECTIONS
-              value: "false"
-            - name: POSTGRESQL_LOG_DISCONNECTIONS
-              value: "false"
-            - name: POSTGRESQL_PGAUDIT_LOG_CATALOG
-              value: "off"
-            # Others
-            - name: POSTGRESQL_CLIENT_MIN_MESSAGES
-              value: "error"
-            - name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES
-              value: "pgaudit"
-          ports:
-            - name: tcp-postgresql
-              containerPort: 5432
-          livenessProbe:
-            failureThreshold: 6
+            httpGet:
+              path: /health
+              port: http
             initialDelaySeconds: 30
             periodSeconds: 10
-            successThreshold: 1
             timeoutSeconds: 5
-            exec:
-              command:
-                - /bin/sh
-                - -ec
-                - |
-                  exec pg_isready -U "root" -h 127.0.0.1 -p 5432
-          readinessProbe:
-            failureThreshold: 6
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 5
-            exec:
-              command:
-                - /bin/sh
-                - -ec
-                - |
-                  exec pg_isready -U "root" -h 127.0.0.1 -p 5432
-                  [ -f /opt/bitnami/postgresql/tmp/.initialized ] || [ -f /bitnami/postgresql/.initialized ]
-          resources:
-            limits:
-              cpu: 150m
-              ephemeral-storage: 2Gi
-              memory: 192Mi
-            requests:
-              cpu: 100m
-              ephemeral-storage: 50Mi
-              memory: 128Mi
-          volumeMounts:
-            - name: empty-dir
-              mountPath: /tmp
-              subPath: tmp-dir
-            - name: empty-dir
-              mountPath: /opt/bitnami/postgresql/conf
-              subPath: app-conf-dir
-            - name: empty-dir
-              mountPath: /opt/bitnami/postgresql/tmp
-              subPath: app-tmp-dir
-            - name: postgresql-password
-              mountPath: /opt/bitnami/postgresql/secrets/
-            - name: dshm
-              mountPath: /dev/shm
-            - name: data
-              mountPath: /bitnami/postgresql
+            failureThreshold: 3
+
       volumes:
-        - name: empty-dir
-          emptyDir: {}
-        - name: postgresql-password
+        - name: openrag-langflow-dotenv
           secret:
-            secretName: openrag-env-secrets
-        - name: dshm
-          emptyDir:
-            medium: Memory
-  volumeClaimTemplates:
-    - apiVersion: v1
-      kind: PersistentVolumeClaim
-      metadata:
-        name: data
-      spec:
-        accessModes:
-          - "ReadWriteOnce"
-        resources:
-          requests:
-            storage: "10Gi"
+            secretName: openrag-langflow-dotenv
+            defaultMode: 0400
+            items:
+              - key: .env
+                path: .env
+        - name: langflow-data
+          persistentVolumeClaim:
+            claimName: openrag-langflow
+        - name: shared
+          persistentVolumeClaim:
+            claimName: openrag-shared
+---
+# Source: openrag/templates/postgres/deployment.yaml
+# Made with Bob
+---
+# Source: openrag/templates/postgres/service.yaml
+# Made with Bob
+---
+# Source: openrag/templates/secrets/postgres-secret.yaml
+# Made with Bob
+---
+# Source: openrag/templates/storage/postgres-pvc.yaml
+# Made with Bob

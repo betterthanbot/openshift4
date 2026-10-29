@@ -1,8 +1,8 @@
 ---
-# The openrag-stack subcharts pin non-root UIDs (app/embedder 10001, MinIO 1000,
-# etcd 1001) that fall outside the namespace's restricted-v2 range. nonroot-v2
-# admits any non-zero UID and still forbids root; pods that don't pin a UID keep
-# getting restricted-v2.
+# The chart's pods (frontend/backend/langflow) and OpenSearch pin UID/GID 1000, which falls
+# outside the namespace's restricted-v2 range. nonroot-v2 admits any non-zero UID and still
+# forbids root; pods that don't pin a UID (docling-serve, the embedder) keep getting
+# restricted-v2.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:

@@ -1,0 +1,125 @@
+---
+# OpenSearch for OpenRAG — single node. The upstream chart does not deploy it.
+#
+# Uses the project's own image (docker.io/langflowai/openrag-opensearch): stock OpenSearch plus
+# the jvector/neural-search plugins and the OIDC + document-level-security config OpenRAG relies
+# on. Its entrypoint wrapper applies that security config ~15s after start, and the script
+# rewrites files under /usr/share/opensearch/securityconfig that belong to UID 1000, so the pod
+# must run as 1000 (admitted by the overlay's nonroot-v2 binding), not a random restricted-v2 UID.
+#
+# The admin password comes from the out-of-band Secret `openrag-opensearch` (key `password`),
+# created by `make secrets` from the same value the backend/langflow .env files carry.
+#
+# vm.max_map_count: single-node discovery skips the bootstrap checks, so the node default
+# (65530 on RHCOS) is tolerated. If large indices ever fail with "Map failed", raise it with a
+# Tuned/MachineConfig on the nodes rather than here (a pod cannot set it unprivileged).
+apiVersion: v1
+kind: Service
+metadata:
+  name: openrag-opensearch
+  labels:
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/part-of: openrag
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/instance: openrag
+  ports:
+    - name: https
+      port: 9200
+      targetPort: https
+    - name: perf
+      port: 9600
+      targetPort: perf
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: openrag-opensearch
+  labels:
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/part-of: openrag
+spec:
+  serviceName: openrag-opensearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opensearch
+      app.kubernetes.io/instance: openrag
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: opensearch
+        app.kubernetes.io/instance: openrag
+        app.kubernetes.io/part-of: openrag
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: opensearch
+          image: docker.io/langflowai/openrag-opensearch:0.8.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: discovery.type
+              value: single-node
+            - name: OPENSEARCH_JAVA_OPTS
+              value: "-Xms1g -Xmx1g"
+            - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openrag-opensearch
+                  key: password
+            # The security config's OIDC settings call back to the backend (JWKS).
+            - name: OPENRAG_BACKEND_INTERNAL_URL
+              value: http://openrag-backend:8000
+          ports:
+            - name: https
+              containerPort: 9200
+            - name: perf
+              containerPort: 9600
+          startupProbe:
+            tcpSocket:
+              port: https
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: https
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            tcpSocket:
+              port: https
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              memory: 4Gi
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/opensearch/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi

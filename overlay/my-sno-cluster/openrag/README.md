@@ -1,78 +1,92 @@
 # OpenRAG Overlay
 
-[OpenRAG](https://github.com/linagora/openrag) (LINAGORA) — RAG over your documents:
-upload files, they are parsed, embedded into Milvus, and answered from via an LLM.
-Chart: `oci://ghcr.io/linagora/openrag-stack` 0.7.10 (app v2.3.3), rendered into
-`bases/openrag/openrag.yaml`.
+[OpenRAG](https://github.com/langflow-ai/openrag) (langflow-ai) — an agentic RAG platform:
+upload documents, they are parsed (Docling), embedded into OpenSearch, and answered from by an
+LLM through a Langflow-built agent. Upstream chart `kubernetes/helm/openrag` at **v0.8.0**
+(images `0.8.0`), rendered into `bases/openrag/openrag.yaml`.
 
-## What runs (lean profile)
+> This replaced an earlier deployment of the unrelated LINAGORA `openrag-stack` chart.
+
+## What runs
 
 | Component | Where | Notes |
 |-----------|-------|-------|
-| OpenRAG API + UI | `openrag-openrag` | CPU only. Route `/` |
-| Admin UI | `openrag-admin-ui` | Route `/app/` |
-| Embedder | vLLM, `Qwen/Qwen3-Embedding-0.6B` | **1 T4 GPU** |
-| Reranker | Infinity, `gte-multilingual-reranker-base` | CPU |
-| Vector DB | Milvus standalone + MinIO + etcd | |
-| SQL | Bitnami PostgreSQL | |
-| **Chat LLM** | **external — your RHOAI endpoint** | off until `llm-endpoint-patch.yaml` is enabled |
+| UI + API | `openrag-frontend` (3000) → `openrag-backend` (8000) | Route `openrag.apps.<domain>` |
+| Langflow | `openrag-langflow` (7860) | SQLite on its own PVC; flows pinned to the v0.8.0 commit |
+| OpenSearch | `openrag-opensearch` StatefulSet | project image; **not in the chart** → `bases/openrag/opensearch.yaml` |
+| docling-serve | `docling-serve` (5001) | CPU; **not in the chart** → `bases/openrag/docling.yaml` |
+| Embeddings | `openrag-embedder` — vLLM, Qwen3-Embedding-0.6B | **1 T4**; `embedder.yaml` |
+| Chat LLM | your MaaS model `maas-demo/qwen25-15b-instruct` | via the RHOAI provider, see below |
 
-Turned off vs. upstream defaults: Whisper (audio transcription), VLM (image
-captioning), in-chart LLM, Ray/KubeRay, bundled Prometheus/Grafana. The upstream
-defaults need ~5 GPUs and ReadWriteMany storage; see the header of
-`bases/openrag/values.yaml`.
+## 1. First deploy (in this order)
 
-## 1. Create the Secrets (once, before the first sync)
-
-Nothing sensitive is in git. The chart reads two Secrets that must exist first:
+Nothing sensitive is in git. Four Secrets are created by hand; the pods stay in
+`CreateContainerConfigError` until they exist.
 
 ```bash
-oc new-project openrag 2>/dev/null || true
+# a) generates passwords and creates openrag-dotenv, openrag-langflow-dotenv, openrag-opensearch
+#    (creates the namespace if needed; refuses to run twice). Needs helm, git, openssl, oc.
+make -C bases/openrag secrets
 
-oc create secret generic openrag-env-secrets -n openrag \
-  --from-literal=POSTGRES_PASSWORD="$(openssl rand -hex 16)" \
-  --from-literal=AUTH_TOKEN="$(openssl rand -hex 24)" \
-  --from-literal=METRICS_TOKEN="$(openssl rand -hex 24)" \
-  --from-literal=API_KEY="<token for your LLM endpoint, e.g. a MaaS token>" \
-  --from-literal=EMBEDDER_API_KEY=EMPTY \
-  --from-literal=VLM_API_KEY=EMPTY \
-  --from-literal=TRANSCRIBER_API_KEY=EMPTY \
-  --from-literal=RERANKER_API_KEY=EMPTY \
-  --from-literal=HF_TOKEN="<huggingface token, or EMPTY for public models>"
-
-oc create secret generic openrag-minio-credentials -n openrag \
-  --from-literal=accesskey=openrag \
-  --from-literal=secretkey="$(openssl rand -hex 24)"
+# b) the MaaS key the backend uses for chat. Mint one as a maas-team-a member (e.g. platform-admin):
+#    POST https://maas.apps.<domain>/maas-api/v1/api-keys  {"name":"openrag"}
+read -rs KEY
+oc create secret generic openrag-rhoai -n openrag --from-literal=api-key="$KEY"; unset KEY
 ```
 
-`AUTH_TOKEN` is the admin API key for OpenRAG itself — keep it to log in.
+Then push and sync — the `openrag` Application has **no auto-sync**:
 
-## 2. Point it at your RHOAI model
+```bash
+oc annotate application openrag -n openshift-gitops argocd.argoproj.io/refresh=hard --overwrite
+oc patch application openrag -n openshift-gitops --type merge -p '{"operation":{"sync":{}}}'
+```
 
-1. Edit `llm-endpoint-patch.yaml` — `BASE_URL` (ending in `/v1/`) and `MODEL`.
-   It ships with the MaaS Qwen2.5-1.5B example.
-2. Make sure `API_KEY` in `openrag-env-secrets` is a valid token for that endpoint
-   (`oc edit secret openrag-env-secrets -n openrag`, then restart `openrag-openrag`).
-3. Uncomment the `patches:` block in `kustomization.yaml` and push.
+## 2. Chat LLM → RHOAI
 
-Without this, the stack deploys and ingests documents, but chat has no LLM.
+The backend runs OpenRAG's `rhoai` provider (`backend-rhoai-patch.yaml`): chat goes to the MaaS
+gateway, embeddings to the in-namespace embedder. The provider is hidden by default, so
+`model-providers.yaml` enables it (`OPENRAG_MODEL_PROVIDERS_CONFIG`, not hot-reloaded).
 
-GPU budget: the embedder takes one T4. The MaaS example model uses the
-`t4-g4dn2xlarge` hardware profile, i.e. the other one.
+- **Tool calling is required.** OpenRAG's agent drives the model with tool calls; without
+  `--enable-auto-tool-choice` and a `--tool-call-parser` vLLM answers every one with a 400.
+  The model's `VLLM_ADDITIONAL_ARGS` must include
+  `--enable-auto-tool-choice --tool-call-parser=hermes` (hermes is Qwen2.5's parser).
+- **Seeded once.** `LLM_PROVIDER`, `RHOAI_*` etc. are read only on the backend's first boot; after that
+  the stored config wins. Change provider/model afterwards in the UI's Settings, not here.
+- **Limits of this model.** Qwen2.5-1.5B with `--max-model-len=8192`, and the `team-a-sub`
+  subscription caps it at 8192 tokens/min — tight for an agent with tool definitions + retrieved chunks.
 
-## Updating the chart
+## 3. Security
+
+With no auth provider configured OpenRAG is in **no-auth mode: every visitor is an admin** (uploads,
+settings, and your MaaS key). Configure Google/Microsoft OAuth, or restrict the Route with the
+`haproxy.router.openshift.io/ip_whitelist` annotation shown in `route.yaml`.
+
+## Known caveats
+
+- **MaaS gateway** intermittently returns an empty 200 body for non-streaming requests. Chat is mostly
+  streaming and tolerates it; embeddings are not, hence the direct embedder.
+- **maas-db has no storage**: if that Postgres restarts, the MaaS key is lost (restart `maas-api` to
+  re-create its schema, mint a new key, update `openrag-rhoai`, restart the backend).
+- **Shared RWO volume**: backend and langflow share `openrag-shared`; the base pins the backend to
+  langflow's node (podAffinity). Upstream wants ReadWriteMany, which this cluster doesn't have.
+- **OpenSearch** relies on single-node discovery to skip bootstrap checks (`vm.max_map_count` is the
+  RHCOS default). If large indices fail with "Map failed", raise it with a Tuned/MachineConfig.
+- The embedder downloads the model from Hugging Face on first start (egress needed) into its PVC.
+
+## Updating
 
 ```bash
 cd bases/openrag
-# bump OPENRAG_VERSION in Makefile, then:
-make            # helm pull into vendor/ (gitignored) + helm template -> openrag.yaml
+# bump OPENRAG_REF in the Makefile, global.imageTag + hashes in values.yaml, the OpenSearch image
+# tag in opensearch.yaml and (if wanted) docling's tag in docling.yaml, then:
+make
 ```
 
-Commit `openrag.yaml`. Base-level OpenShift fixes (Recreate strategy for RWO
-volumes, reranker cache) are kustomize patches in `bases/openrag/kustomization.yaml`,
-so they survive re-rendering.
+Commit `openrag.yaml`, never `vendor/`. `make` strips the chart's generated Secrets and an unused
+IBM-Cloud StorageClass (`filter-render.py`).
 
 ## Cluster domain
 
-The Routes pin `openrag.apps.<cluster-domain>` in `route.yaml` (and the MaaS URL in
-`llm-endpoint-patch.yaml`). Update both when the cluster changes.
+The Route host in `route.yaml` and the MaaS URL in `backend-rhoai-patch.yaml` pin
+`apps.cluster-68qgz.68qgz.sandbox2261.opentlc.com`. Update both when the cluster changes.

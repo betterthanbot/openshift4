@@ -1,40 +1,27 @@
 ---
-# Same layout as the chart's own Ingress: API/UI on "/", admin UI on "/app/",
-# one host. The host must be explicit so both Routes share it — update it when
-# the cluster domain changes.
+# The UI/API entry point: the frontend (Next.js) proxies API calls to the backend internally,
+# so one Route is enough. The host is explicit — update it when the cluster domain changes.
+#
+# SECURITY: with no auth provider configured OpenRAG runs in "no-auth" mode, where every
+# visitor is an admin who can upload documents, change settings and spend your MaaS key.
+# Either configure Google/Microsoft OAuth (see the project's docs) or restrict the Route:
+#   haproxy.router.openshift.io/ip_whitelist: "203.0.113.7 198.51.100.0/24"
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: openrag
   namespace: openrag
+  annotations:
+    # Chat/agent replies can sit silent longer than the 30s router default.
+    haproxy.router.openshift.io/timeout: 5m
 spec:
   host: openrag.apps.cluster-68qgz.68qgz.sandbox2261.opentlc.com
-  path: /
   to:
     kind: Service
-    name: openrag-openrag
+    name: openrag-frontend
     weight: 100
   port:
-    targetPort: openrag
-  tls:
-    termination: edge
-    insecureEdgeTerminationPolicy: Redirect
-  wildcardPolicy: None
----
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  name: openrag-admin-ui
-  namespace: openrag
-spec:
-  host: openrag.apps.cluster-68qgz.68qgz.sandbox2261.opentlc.com
-  path: /app/
-  to:
-    kind: Service
-    name: openrag-admin-ui
-    weight: 100
-  port:
-    targetPort: admin-ui
+    targetPort: http
   tls:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect
