@@ -27,6 +27,32 @@ patches:
                 matchLabels:
                   app.kubernetes.io/instance: openrag
                   app.kubernetes.io/component: langflow
+# Single-node OpenSearch. The chart's .env has none of these, so the backend falls back to its
+# multi-node production defaults: it waits for several nodes before reporting ready (and is
+# killed by its liveness probe first, exit 137) and creates indices with 2 shards / 2 replicas.
+# Same values the project's own .env.example and docker-compose.yml use for one node.
+- target:
+    kind: Deployment
+    name: openrag-backend
+  patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: openrag-backend
+    spec:
+      template:
+        spec:
+          containers:
+            - name: backend
+              env:
+                - name: OPENSEARCH_NODE_COUNT_CHECK_ENABLED
+                  value: "false"
+                - name: OPENRAG_OPENSEARCH_NUMBER_OF_SHARDS
+                  value: "1"
+                - name: OPENRAG_OPENSEARCH_NUMBER_OF_REPLICAS
+                  value: "0"
+                - name: OPENRAG_ENSURE_INDEX_REPLICAS_ON_STARTUP
+                  value: "false"
 # The chart's init containers (curlimages/curl, busybox) set no numeric user, but the pod
 # requires runAsNonRoot, so the kubelet refuses to start them ("image has non-numeric user
 # (curl_user)"). Give them the same UID as the app containers.

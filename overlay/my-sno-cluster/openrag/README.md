@@ -51,6 +51,13 @@ gateway, embeddings to the in-namespace embedder. The provider is hidden by defa
   `--enable-auto-tool-choice` and a `--tool-call-parser` vLLM answers every one with a 400.
   The model's `VLLM_ADDITIONAL_ARGS` must include
   `--enable-auto-tool-choice --tool-call-parser=hermes` (hermes is Qwen2.5's parser).
+  **Already applied live** to `maas-demo/qwen25-15b-instruct` (it is not managed from this repo) and
+  verified: a tool request went from HTTP 400 to `finish_reason: tool_calls`. If you recreate the
+  model, re-add the flags.
+- **Changing that model's spec deadlocks the rollout.** Its `models` volume is ReadWriteOnce, so the
+  replacement pod can't attach it while the old pod (which only leaves once the new one is Ready)
+  holds it, and both T4s are taken. Finish it by scaling the old ReplicaSet to 0
+  (`oc scale rs <old-rs> -n maas-demo --replicas=0`): a few minutes of model downtime.
 - **Seeded once.** `LLM_PROVIDER`, `RHOAI_*` etc. are read only on the backend's first boot; after that
   the stored config wins. Change provider/model afterwards in the UI's Settings, not here.
 - **Limits of this model.** Qwen2.5-1.5B with `--max-model-len=8192`, and the `team-a-sub`
@@ -61,6 +68,21 @@ gateway, embeddings to the in-namespace embedder. The provider is hidden by defa
 With no auth provider configured OpenRAG is in **no-auth mode: every visitor is an admin** (uploads,
 settings, and your MaaS key). Configure Google/Microsoft OAuth, or restrict the Route with the
 `haproxy.router.openshift.io/ip_whitelist` annotation shown in `route.yaml`.
+
+## Troubleshooting
+
+- **Backend logs `Attempt to generate Langflow API key failed` (400, then 429), Langflow logs
+  `Fernet key must be 32 url-safe base64-encoded bytes`.** `LANGFLOW_SECRET_KEY` isn't a valid Fernet
+  key (Langflow uses any value >= 32 chars verbatim as one). `make secrets` now generates a valid
+  one; on an install made earlier run `make -C bases/openrag rotate-langflow-key` (rewrites the value
+  in both `.env` Secrets, restarts langflow + backend; the admin password and database are untouched).
+- **Backend log loops on `OpenSearch healthy but cluster has not reached expected node count` and the
+  pod is killed (exit 137).** The backend assumes a multi-node OpenSearch unless
+  `OPENSEARCH_NODE_COUNT_CHECK_ENABLED=false`; the base patches that in for the single node.
+- **Embedder: `LocalEntryNotFoundError ... outgoing traffic has been disabled`.** The Red Hat vLLM
+  image ships with Hugging Face offline mode on; `embedder.yaml` sets `HF_HUB_OFFLINE=0`.
+- **Backend init: `image has non-numeric user (curl_user)`.** The chart's init containers set no
+  numeric user; the base patches in UID 1000.
 
 ## Known caveats
 

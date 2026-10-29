@@ -23,7 +23,7 @@ PLACEHOLDERS := \
 	--set-string backend.auth.sessionSecret=render-placeholder \
 	--set-string backend.encryption.key=render-placeholder
 
-.PHONY: all template vendor secrets clean
+.PHONY: all template vendor secrets rotate-langflow-key clean
 
 all: template
 
@@ -53,7 +53,7 @@ secrets: vendor
 	@OS_PW="$$(openssl rand -hex 14)-Aa1"; LF_PW="$$(openssl rand -hex 14)"; \
 	helm template openrag $(CHART) --namespace $(NAMESPACE) -f values.yaml \
 		--set-string global.opensearch.password="$$OS_PW" \
-		--set-string langflow.auth.secretKey="$$(openssl rand -hex 32)" \
+		--set-string langflow.auth.secretKey="$$(openssl rand -base64 32 | tr '+/' '-_')" \
 		--set-string langflow.auth.superuserPassword="$$LF_PW" \
 		--set-string backend.auth.sessionSecret="$$(openssl rand -hex 32)" \
 		--set-string backend.encryption.key="$$(openssl rand -base64 32)" \
@@ -62,6 +62,19 @@ secrets: vendor
 		-s templates/secrets/opensearch-secret.yaml \
 		| sed -E "s|^( +SESSION_SECRET=).*|\\1\"$$(openssl rand -hex 32)\"|" \
 		| oc apply -n $(NAMESPACE) -f -
+
+# Langflow uses LANGFLOW_SECRET_KEY verbatim as a Fernet key when it is >= 32 characters (shorter
+# ones are hashed), so it must be 32 random bytes as URL-safe base64 — NOT `openssl rand -hex 32`,
+# which makes Langflow fail every encryption ("Fernet key must be 32 url-safe base64-encoded
+# bytes"), breaking API-key creation. Replaces the value in both .env Secrets (they must agree)
+# and restarts langflow + backend. Admin password and Langflow's database are untouched.
+rotate-langflow-key:
+	@NEW="$$(openssl rand -base64 32 | tr '+/' '-_')"; export NEW; \
+	for s in openrag-dotenv openrag-langflow-dotenv; do \
+		oc get secret $$s -n $(NAMESPACE) -o json | python3 -I rotate-langflow-key.py \
+			| oc patch secret $$s -n $(NAMESPACE) --type merge --patch-file /dev/stdin || exit 1; \
+	done; \
+	oc rollout restart deploy/openrag-langflow deploy/openrag-backend -n $(NAMESPACE)
 
 clean:
 	rm -rf vendor
