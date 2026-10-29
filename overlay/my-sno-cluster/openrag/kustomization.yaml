@@ -8,8 +8,8 @@ resources:
   - scc-nonroot.yaml
   - route.yaml
 
-# Chat LLM endpoint — off until you point it at your own RHOAI model.
-# Edit llm-endpoint-patch.yaml, put the endpoint's token in openrag-env-secrets
-# (key API_KEY), then uncomment. See README.md.
-# patches:
-#   - path: llm-endpoint-patch.yaml
+# Chat LLM endpoint — points at your own RHOAI model.
+# Edit llm-endpoint-patch.yaml and put the endpoint's token in openrag-env-secrets
+# (key API_KEY). See README.md.
+patches:
+  - path: llm-endpoint-patch.yaml

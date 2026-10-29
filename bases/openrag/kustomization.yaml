@@ -30,3 +30,32 @@ patches:
         name: hf-cache
         emptyDir:
           sizeLimit: 5Gi
+# The Milvus image ships /milvus/bin/milvus (0774) and /milvus/lib (0754) owned by
+# uid/gid 999 with no "other" execute bit, so restricted-v2's random UID dies with
+# "exec milvus failed: Permission denied". Pin 999 (admitted by the overlay's
+# nonroot-v2 binding) and hand the PVC to gid 999.
+- target:
+    kind: Deployment
+    name: openrag-milvus-standalone
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/securityContext
+      value:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+# openrag builds its Python env with `uv run` on first start and keeps it on the
+# openrag-venv volume, but a fresh ext4 PVC contains lost+found, so uv rejects
+# /app/.venv ("not a valid Python environment"). Build the env in a subdirectory.
+- target:
+    kind: Deployment
+    name: openrag-openrag
+  patch: |-
+    - op: add
+      path: /spec/template/spec/containers/0/env/-
+      value:
+        name: UV_PROJECT_ENVIRONMENT
+        value: /app/.venv/env
