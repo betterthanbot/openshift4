@@ -20,9 +20,9 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  channel: "stable-3.17"
+  channel: "stable-3.18"
   name: "quay-operator"
   source: "redhat-operators"
   sourceNamespace: openshift-marketplace
   installPlanApproval: Manual
-  startingCSV: "quay-operator.v3.17.3"
+  startingCSV: "quay-operator.v3.18.2"

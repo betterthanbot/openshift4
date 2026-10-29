@@ -8,9 +8,9 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  channel: "stable-3.4"
+  channel: "stable-3.x"
   name: "rhods-operator"
   source: "redhat-operators"
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
-  startingCSV: "rhods-operator.3.4.2"
+  startingCSV: "rhods-operator.3.5.2"

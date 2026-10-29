@@ -4,7 +4,7 @@
 # Installs the Quay operator (Manual approval). Disabled: no QuayRegistry operand is defined.
 #
 # ArgoCD app:  operators-quay   (argocd/appset-operators.yaml)
-# Installs:    quay-operator (channel stable-3.17, redhat-operators, Manual approval) into openshift-operators
+# Installs:    quay-operator (channel stable-3.18, redhat-operators, Manual approval) into openshift-operators
 # Status:      DISABLED — excluded in argocd/appset-operators.yaml
 # ==============================================================================
 apiVersion: kustomize.config.k8s.io/v1beta1

@@ -16,4 +16,4 @@ spec:
   source: "redhat-operators"
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
-  startingCSV: "kernel-module-management-hub.v2.6.1"
+  startingCSV: "kernel-module-management-hub.v2.7.1"

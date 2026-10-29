@@ -11,9 +11,9 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  channel: "stable-6.4"
+  channel: "stable-6.6"
   name: "loki-operator"
   source: "redhat-operators"
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
-  startingCSV: "loki-operator.v6.4.6"
+  startingCSV: "loki-operator.v6.6.1"

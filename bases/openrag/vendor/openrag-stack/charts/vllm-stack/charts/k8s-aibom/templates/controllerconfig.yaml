@@ -1,0 +1,41 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# AIBOMControllerConfig is cluster-scoped and managed as a regular release
+# resource so install/upgrade/rollback/uninstall ownership is deterministic.
+# (Previously created via a pre-install hook, which Helm never upgrades or
+# removes, and carried an invalid namespace on a cluster-scoped object.)
+apiVersion: aibom.k8saibom.dev/v1beta1
+kind: AIBOMControllerConfig
+metadata:
+  name: default
+  labels:
+    {{- include "k8s-aibom.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.config.discovery }}
+  discovery:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  bomGeneration:
+    {{- toYaml .Values.config.bomGeneration | nindent 4 }}
+  {{- with .Values.config.sinks }}
+  sinks:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  logging:
+    {{- toYaml .Values.config.logging | nindent 4 }}
+  {{- with .Values.config.verification }}
+  verification:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}

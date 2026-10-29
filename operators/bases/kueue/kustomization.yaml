@@ -5,7 +5,7 @@
 # (job queueing / quota for AI workloads).
 #
 # ArgoCD app:  operators-kueue   (argocd/appset-operators.yaml)
-# Installs:    kueue-operator (channel stable-v1.3, redhat-operators) into openshift-kueue-operator
+# Installs:    kueue-operator (channel stable-v1.5, redhat-operators) into openshift-kueue-operator
 # Needs:       cert-manager  (webhook/metrics certs; sandbox-provided on this cluster — see the
 #              cert-manager app, which is disabled by default)
 # ==============================================================================

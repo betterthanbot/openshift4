@@ -13,4 +13,4 @@ spec:
   source: "redhat-operators"
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
-  startingCSV: "cluster-observability-operator.v1.5.1"
+  startingCSV: "cluster-observability-operator.v1.5.3"

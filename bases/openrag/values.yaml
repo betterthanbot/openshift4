@@ -1,0 +1,126 @@
+# OpenRAG (LINAGORA) — openrag-stack values, "lean" profile for this cluster.
+#
+# Upstream defaults want ~5 GPUs (app, embedder, whisper, VLM, 2-GPU LLM) and
+# ReadWriteMany storage. This cluster has 2x T4 and EBS (RWO) only, so:
+#   - embedder runs in-chart on vLLM, 1 GPU (Qwen3-Embedding-0.6B)
+#   - chat LLM is EXTERNAL (RHOAI / MaaS) — wired in by the overlay patch
+#     overlay/my-sno-cluster/openrag/llm-endpoint-patch.yaml, off by default
+#   - whisper, VLM, in-chart LLM, Ray/KubeRay, bundled Prometheus: off
+#   - reranker on CPU, app without a GPU
+#   - Milvus standalone, single-node MinIO
+#
+# No credentials in here. Everything sensitive comes from Secrets created out of
+# band — see overlay/my-sno-cluster/openrag/README.md.
+#
+# Re-render after editing:  make template
+
+global:
+  compatibility:
+    openshift:
+      # helm template can't detect OpenShift, so "auto" would never trigger.
+      adaptSecurityContext: force
+
+networkPolicy:
+  # Upstream policy only admits 8080 from ingress-nginx-style sources; the
+  # OpenShift router lives in openshift-ingress and would be blocked.
+  enabled: false
+
+monitoring:
+  bundled: false
+
+persistence:
+  accessMode: ReadWriteOnce
+  storageClass: gp3-csi
+  volumes:
+    modelWeights: { size: 20Gi }
+    data: { size: 20Gi }
+    venv: { size: 10Gi }
+
+kuberay:
+  enabled: false
+ray:
+  enabled: false
+
+env:
+  # Created out of band: keys API_KEY, EMBEDDER_API_KEY, VLM_API_KEY,
+  # TRANSCRIBER_API_KEY, RERANKER_API_KEY, POSTGRES_PASSWORD, AUTH_TOKEN,
+  # METRICS_TOKEN, HF_TOKEN.
+  existingSecret: openrag-env-secrets
+  config:
+    # Chat LLM — left empty here, set by the overlay's llm-endpoint-patch.yaml.
+    BASE_URL: ""
+    MODEL: ""
+    # No VLM / whisper in the lean profile.
+    VLM_BASE_URL: ""
+    VLM_MODEL: ""
+    TRANSCRIBER_BASE_URL: ""
+    MARKER_NUM_GPUS: "0"
+    RAY_NUM_GPUS: "0"
+
+minioCredentials:
+  # Secret openrag-minio-credentials (keys accesskey, secretkey) is created out of band.
+  create: false
+
+postgresql:
+  auth:
+    # Reuse the env Secret's POSTGRES_PASSWORD for the bitnami chart too.
+    existingSecret: openrag-env-secrets
+    secretKeys:
+      adminPasswordKey: POSTGRES_PASSWORD
+      userPasswordKey: POSTGRES_PASSWORD
+
+milvus:
+  cluster: { enabled: false }
+  # fsGroup 999 with no runAsUser fits neither restricted-v2 nor nonroot-v2 for
+  # the (root) Milvus image — drop it and let restricted-v2 assign IDs.
+  securityContext:
+    fsGroup: null
+    fsGroupChangePolicy: null
+  minio:
+    mode: standalone
+    replicas: 1
+  etcd:
+    replicaCount: 1
+
+vllm:
+  enabled: true
+  servingEngineSpec:
+    modelSpec:
+      - name: "embedder"
+        repository: "vllm/vllm-openai"
+        tag: "v0.30.0-cu129"
+        modelURL: "Qwen/Qwen3-Embedding-0.6B"
+        replicaCount: 1
+        requestCPU: 2
+        requestMemory: "8Gi"
+        requestGPU: 1
+        limitCPU: 4
+        limitMemory: "12Gi"
+        hf_token:
+          secretName: openrag-env-secrets
+          secretKey: HF_TOKEN
+        vllmConfig:
+          gpuMemoryUtilization: 0.5
+          maxModelLen: 2048
+          runner: "pooling"
+          # T4 is compute capability 7.5 — no bf16.
+          dtype: "half"
+          extraArgs: ["--trust-remote-code", "--convert", "embed"]
+        nodeSelectorTerms: []
+        # GPU nodes are tainted nvidia.com/gpu=true:NoSchedule.
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule
+
+reranker:
+  enabled: true
+  resources:
+    requests: { cpu: "2", memory: "4Gi" }
+    limits: { cpu: "4", memory: "8Gi" }
+
+openrag:
+  # Helm deep-merges maps, so the upstream nvidia.com/gpu: 1 survives unless nulled.
+  resources:
+    requests: { cpu: "2", memory: "8Gi", nvidia.com/gpu: null }
+    limits: { cpu: "4", memory: "12Gi", nvidia.com/gpu: null }

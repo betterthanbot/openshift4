@@ -23,4 +23,4 @@ spec:
   source: "redhat-operators"
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
-  startingCSV: "servicemeshoperator3.v3.4.0"
+  startingCSV: "servicemeshoperator3.v3.4.3"

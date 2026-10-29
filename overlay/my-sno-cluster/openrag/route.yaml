@@ -1,0 +1,41 @@
+---
+# Same layout as the chart's own Ingress: API/UI on "/", admin UI on "/app/",
+# one host. The host must be explicit so both Routes share it — update it when
+# the cluster domain changes.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: openrag
+  namespace: openrag
+spec:
+  host: openrag.apps.cluster-68qgz.68qgz.sandbox2261.opentlc.com
+  path: /
+  to:
+    kind: Service
+    name: openrag-openrag
+    weight: 100
+  port:
+    targetPort: openrag
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: openrag-admin-ui
+  namespace: openrag
+spec:
+  host: openrag.apps.cluster-68qgz.68qgz.sandbox2261.opentlc.com
+  path: /app/
+  to:
+    kind: Service
+    name: openrag-admin-ui
+    weight: 100
+  port:
+    targetPort: admin-ui
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None

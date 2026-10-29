@@ -13,4 +13,4 @@ spec:
   source: "redhat-operators"
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
-  startingCSV: "nfd.4.20.0-202607171900"
+  startingCSV: "nfd.4.22.0-202610231407"

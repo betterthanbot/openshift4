@@ -8,7 +8,7 @@
 # The overlay also creates the vllm-project namespace the demo models are served from.
 #
 # ArgoCD app:  operators-rhoai   (argocd/appset-operators.yaml)
-# Installs:    rhods-operator (channel stable-3.4, redhat-operators) into redhat-ods-operator
+# Installs:    rhods-operator (channel stable-3.x, redhat-operators) into redhat-ods-operator
 # Needs:       service-mesh, connectivity-link  (KServe gateway + MaaS)
 #              opentelemetry, tempo             (DSCI monitoring block)
 # ==============================================================================

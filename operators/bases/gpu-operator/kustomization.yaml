@@ -5,7 +5,7 @@
 # device plugin, DCGM, GFD).
 #
 # ArgoCD app:  operators-gpu-operator   (argocd/appset-operators.yaml)
-# Installs:    gpu-operator-certified (channel v26.3, certified-operators) into nvidia-gpu-operator
+# Installs:    gpu-operator-certified (channel v26.7, certified-operators) into nvidia-gpu-operator
 # Needs:       nfd  (labels the GPU nodes: feature.node.kubernetes.io/pci-10de.present)
 # ==============================================================================
 apiVersion: kustomize.config.k8s.io/v1beta1

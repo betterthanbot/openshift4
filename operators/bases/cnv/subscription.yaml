@@ -23,4 +23,4 @@ spec:
   source: "redhat-operators"
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
-  startingCSV: "kubevirt-hyperconverged-operator.v4.20.21"
+  startingCSV: "kubevirt-hyperconverged-operator.v4.22.12"

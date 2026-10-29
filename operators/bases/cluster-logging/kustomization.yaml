@@ -9,7 +9,7 @@
 # in this app's namespace, openshift-logging. The CRD comes from the Loki operator.
 #
 # ArgoCD app:  operators-cluster-logging   (argocd/appset-operators.yaml)
-# Installs:    cluster-logging (channel stable-6.4, redhat-operators) into openshift-logging
+# Installs:    cluster-logging (channel stable-6.6, redhat-operators) into openshift-logging
 # Needs:       loki  (LokiStack CRD)
 # ==============================================================================
 apiVersion: kustomize.config.k8s.io/v1beta1

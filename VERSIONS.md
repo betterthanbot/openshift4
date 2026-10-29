@@ -12,31 +12,35 @@ Version floors for all operators managed under `operators/bases/` (each operator
 
 | Operator | `startingCSV` | Channel | Source | Namespace | Approval | Enabled |
 |----------|--------------|---------|--------|-----------|----------|---------|
-| Grafana Community | `grafana-operator.v5.24.0` | `v5` | community-operators | `grafana` | Automatic | ✅ |
-| NVIDIA GPU Operator | `gpu-operator-certified.v26.3.3` | `v26.3` | certified-operators | `nvidia-gpu-operator` | Automatic | ✅ |
-| Cluster Observability | `cluster-observability-operator.v1.5.1` | `stable` | redhat-operators | `openshift-cluster-observability-operator` | Automatic | ✅ |
-| Compliance Operator | `compliance-operator.v1.9.1` | `stable` | redhat-operators | `openshift-compliance` | Automatic | ✅ |
-| Kernel Module Management Hub | `kernel-module-management-hub.v2.6.1` | `stable` | redhat-operators | `openshift-kmm-hub` | Automatic | ❌ |
-| Cluster Logging | `cluster-logging.v6.4.6` | `stable-6.4` | redhat-operators | `openshift-logging` | Automatic | ✅ |
-| Node Feature Discovery | `nfd.4.20.0-202607171900` | `stable` | redhat-operators | `openshift-nfd` | Automatic | ✅ |
-| Loki Operator | `loki-operator.v6.4.6` | `stable-6.4` | redhat-operators | `openshift-operators-redhat` | Automatic | ✅ |
-| Red Hat OpenShift AI | `rhods-operator.3.4.2` | `stable-3.4` | redhat-operators | `redhat-ods-operator` | Automatic | ✅ |
-| RHACS | `rhacs-operator.v4.11.2` | `stable` | redhat-operators | `stackrox` | Automatic | ✅ |
-| OpenShift Virtualization | `kubevirt-hyperconverged-operator.v4.20.21` | `stable` | redhat-operators | `openshift-cnv` | Automatic | ✅ |
-| Network Observability | `network-observability-operator.v1.12.1` | `stable` | redhat-operators | `netobserv` | Automatic | ✅ |
-| **Service Mesh 3 (Sail)** | `servicemeshoperator3.v3.4.0` | `stable` | redhat-operators | `openshift-operators` | Automatic | ✅ |
-| **Connectivity Link (Kuadrant)** | `rhcl-operator.v1.4.2` | `stable` | redhat-operators | `openshift-operators` | Automatic | ✅ |
-| **Kueue** | `kueue-operator.v1.3.1` | `stable-v1.3` | redhat-operators | `openshift-kueue-operator` | Automatic | ✅ |
+| Grafana Community | `grafana-operator.v5.25.0` | `v5` | community-operators | `grafana` | Automatic | ✅ |
+| NVIDIA GPU Operator | `gpu-operator-certified.v26.7.2` | `v26.7` | certified-operators | `nvidia-gpu-operator` | Automatic | ✅ |
+| Cluster Observability | `cluster-observability-operator.v1.5.3` | `stable` | redhat-operators | `openshift-cluster-observability-operator` | Automatic | ✅ |
+| Compliance Operator | `compliance-operator.v1.10.0` | `stable` | redhat-operators | `openshift-compliance` | Automatic | ✅ |
+| Kernel Module Management Hub | `kernel-module-management-hub.v2.7.1` | `stable` | redhat-operators | `openshift-kmm-hub` | Automatic | ❌ |
+| Cluster Logging | `cluster-logging.v6.6.1` | `stable-6.6` | redhat-operators | `openshift-logging` | Automatic | ✅ |
+| Node Feature Discovery | `nfd.4.22.0-202610231407` | `stable` | redhat-operators | `openshift-nfd` | Automatic | ✅ |
+| Loki Operator | `loki-operator.v6.6.1` | `stable-6.6` | redhat-operators | `openshift-operators-redhat` | Automatic | ✅ |
+| Red Hat OpenShift AI | `rhods-operator.3.5.2` | `stable-3.x` | redhat-operators | `redhat-ods-operator` | Automatic | ✅ |
+| RHACS | `rhacs-operator.v4.11.6` | `stable` | redhat-operators | `stackrox` | Automatic | ✅ |
+| OpenShift Virtualization | `kubevirt-hyperconverged-operator.v4.22.12` | `stable` | redhat-operators | `openshift-cnv` | Automatic | ✅ |
+| Network Observability | `network-observability-operator.v2.0.0` | `stable` | redhat-operators | `netobserv` | Automatic | ✅ |
+| **Service Mesh 3 (Sail)** | `servicemeshoperator3.v3.4.3` | `stable` | redhat-operators | `openshift-operators` | Automatic | ✅ |
+| **Connectivity Link (Kuadrant)** | `rhcl-operator.v1.4.3` | `stable` | redhat-operators | `openshift-operators` | Automatic | ✅ |
+| **Kueue** | `kueue-operator.v1.5.0` | `stable-v1.5` | redhat-operators | `openshift-kueue-operator` | Automatic | ✅ |
 | **Leader Worker Set** | *(latest in channel)* | `stable-v1.0` | redhat-operators | `openshift-lws-operator` | Automatic | ✅ |
-| **OpenTelemetry** | `opentelemetry-operator.v0.152.0-1` | `stable` | redhat-operators | `openshift-opentelemetry-operator` | Automatic | ✅ |
-| **Tempo** | `tempo-operator.v0.21.0-3` | `stable` | redhat-operators | `openshift-tempo-operator` | Automatic | ✅ |
-| OpenShift GitOps | `openshift-gitops-operator.v1.21.1` | `latest` | redhat-operators | `openshift-gitops-operator` | Automatic | ❌ |
-| **cert-manager** | `cert-manager-operator.v1.20.0` | `stable-v1` | redhat-operators | `cert-manager-operator` | Automatic | ❌ |
-| **OpenShift Lightspeed** | `lightspeed-operator.v1.1.1` | `stable` | redhat-operators | `openshift-lightspeed` | Manual | ❌ |
-| **Red Hat Quay** | `quay-operator.v3.17.3` | `stable-3.17` | redhat-operators | `openshift-operators` | Manual | ❌ |
-| DevWorkspace Operator | `devworkspace-operator.v0.41.0` | `fast` | redhat-operators | `openshift-operators` | Manual | ❌ |
+| **OpenTelemetry** | `opentelemetry-operator.v0.158.0-202610221301` | `stable` | redhat-operators | `openshift-opentelemetry-operator` | Automatic | ✅ |
+| **Tempo** | `tempo-operator.v0.22.0-4` | `stable` | redhat-operators | `openshift-tempo-operator` | Automatic | ✅ |
+| OpenShift GitOps | `openshift-gitops-operator.v1.22.2` | `latest` | redhat-operators | `openshift-gitops-operator` | Automatic | ❌ |
+| **cert-manager** | `cert-manager-operator.v1.20.1` | `stable-v1` | redhat-operators | `cert-manager-operator` | Automatic | ❌ |
+| **OpenShift Lightspeed** | `lightspeed-operator.v2.0.0` | `stable` | redhat-operators | `openshift-lightspeed` | Manual | ❌ |
+| **Red Hat Quay** | `quay-operator.v3.18.2` | `stable-3.18` | redhat-operators | `openshift-operators` | Manual | ❌ |
+| DevWorkspace Operator | `devworkspace-operator.v1.0.0` | `fast` | redhat-operators | `openshift-operators` | Manual | ❌ |
 
 **Bold** rows were added in the 2026-08-04 cluster capture.
+
+Floors and channels were re-based on 2026-10-29 for OCP 4.22: each is the head of the
+package's default (or newest stable) channel in the `v4.22` catalog indexes
+(`redhat-operator-index`, `certified-operator-index`, `community-operator-index`).
 
 ### Pulled in by OLM, deliberately not declared
 
@@ -47,9 +51,9 @@ they are left alone:
 
 | Operator | Version |
 |----------|---------|
-| Authorino | `1.4.2` |
-| Limitador | `1.4.1` |
-| Kuadrant DNS | `1.4.1` |
+| Authorino | `1.4.3` |
+| Limitador | `1.4.2` |
+| Kuadrant DNS | `1.4.2` |
 
 ### Why the six disabled entries are still listed
 

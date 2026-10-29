@@ -1,0 +1,19 @@
+annotations:
+  artifacthub.io/category: security
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://github.com/GoogleCloudPlatform/k8s-aibom#readme
+    - name: Design docs
+      url: https://github.com/GoogleCloudPlatform/k8s-aibom/tree/main/docs/design
+    - name: Ships in NVIDIA AI Cluster Runtime
+      url: https://github.com/NVIDIA/aicr/releases/tag/v0.20.0
+  artifacthub.io/signKey: |
+    fingerprint: see release attestations
+    url: https://github.com/GoogleCloudPlatform/k8s-aibom/releases
+apiVersion: v2
+appVersion: v1.5.1
+description: Kubernetes AI-BOM Controller
+name: k8s-aibom
+type: application
+version: 1.5.1

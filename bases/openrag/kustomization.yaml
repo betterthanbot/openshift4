@@ -1,0 +1,32 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ./openrag.yaml
+
+namespace: openrag
+
+patches:
+# EBS volumes are ReadWriteOnce: a RollingUpdate surge pod scheduled on another
+# node would hang on Multi-Attach. Recreate the PVC-backed Deployments instead.
+- target:
+    kind: Deployment
+    name: openrag-(openrag|minio)
+  patch: |-
+    - op: replace
+      path: /spec/strategy
+      value:
+        type: Recreate
+# The reranker shares openrag-model-weights with the app upstream (RWX). On RWO
+# that pins both pods to one node — give the reranker its own throwaway HF cache.
+- target:
+    kind: Deployment
+    name: openrag-reranker
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/volumes/0
+      value:
+        name: hf-cache
+        emptyDir:
+          sizeLimit: 5Gi

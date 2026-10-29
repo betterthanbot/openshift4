@@ -13,4 +13,4 @@ spec:
   source: "redhat-operators"
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
-  startingCSV: "rhacs-operator.v4.11.2"
+  startingCSV: "rhacs-operator.v4.11.6"

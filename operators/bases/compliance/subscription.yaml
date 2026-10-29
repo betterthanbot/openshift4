@@ -13,4 +13,4 @@ spec:
   source: "redhat-operators"
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
-  startingCSV: "compliance-operator.v1.9.1"
+  startingCSV: "compliance-operator.v1.10.0"

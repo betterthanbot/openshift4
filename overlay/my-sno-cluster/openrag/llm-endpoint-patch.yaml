@@ -1,0 +1,24 @@
+---
+# Chat LLM for OpenRAG — any OpenAI-compatible endpoint. Not applied until the
+# `patches:` block in kustomization.yaml is uncommented.
+#
+# BASE_URL must end in /v1/ (OpenRAG appends chat/completions). MODEL is the
+# served model name, i.e. the LLMInferenceService's spec.model.name.
+#
+# Example below: the MaaS-published Qwen2.5-1.5B (maas-demo/qwen25-15b-instruct).
+# It is currently stopped — start it with
+#   oc annotate llminferenceservice -n maas-demo qwen25-15b-instruct serving.kserve.io/stop-
+# and put a MaaS token in openrag-env-secrets under API_KEY.
+#
+# For another RHOAI model, swap in its URL (`oc get llminferenceservice -A`, or
+# `oc get inferenceservice -A` for classic serving) plus "/v1/", and its name.
+# To skip the MaaS gateway, the model's own predictor Service also works once the
+# model is running — find it with `oc get svc -n <model-namespace>`.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openrag-env
+  namespace: openrag
+data:
+  BASE_URL: "https://maas.apps.cluster-68qgz.68qgz.sandbox2261.opentlc.com/maas-demo/qwen25-15b-instruct/v1/"
+  MODEL: "qwen25-15b-instruct"

@@ -1,0 +1,15 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../bases/openrag/
+  - namespace.yaml
+  - scc-nonroot.yaml
+  - route.yaml
+
+# Chat LLM endpoint — off until you point it at your own RHOAI model.
+# Edit llm-endpoint-patch.yaml, put the endpoint's token in openrag-env-secrets
+# (key API_KEY), then uncomment. See README.md.
+# patches:
+#   - path: llm-endpoint-patch.yaml

@@ -7,9 +7,9 @@
 # (declaring them would fight OLM's generated Subscriptions, which are named
 # "<pkg>-<channel>-<source>-openshift-marketplace"):
 #
-#   authorino-operator   (authorino-operator.v1.4.2)  — AuthConfig / Authorino
-#   limitador-operator   (limitador-operator.v1.4.1)  — rate limit counters
-#   dns-operator         (dns-operator.v1.4.1)        — Kuadrant DNSPolicy
+#   authorino-operator   (authorino-operator.v1.4.3)  — AuthConfig / Authorino
+#   limitador-operator   (limitador-operator.v1.4.2)  — rate limit counters
+#   dns-operator         (dns-operator.v1.4.2)        — Kuadrant DNSPolicy
 #
 # The Kuadrant CR itself is in this app too (kuadrant.yaml, kuadrant-system namespace).
 # Installs into openshift-operators (global-operators OG), so no OperatorGroup here.
@@ -28,4 +28,4 @@ spec:
   source: "redhat-operators"
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
-  startingCSV: "rhcl-operator.v1.4.2"
+  startingCSV: "rhcl-operator.v1.4.3"

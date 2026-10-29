@@ -13,4 +13,4 @@ spec:
   source: "community-operators"
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
-  startingCSV: "grafana-operator.v5.24.0"
+  startingCSV: "grafana-operator.v5.25.0"

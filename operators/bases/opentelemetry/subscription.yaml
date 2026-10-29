@@ -18,4 +18,4 @@ spec:
   source: "redhat-operators"
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
-  startingCSV: "opentelemetry-operator.v0.152.0-1"
+  startingCSV: "opentelemetry-operator.v0.158.0-202610221301"
