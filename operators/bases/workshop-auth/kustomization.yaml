@@ -1,0 +1,16 @@
+# ==============================================================================
+# operators/bases/workshop-auth — Workshop HTPasswd identity provider
+#
+# Adds an HTPasswd identity provider to OAuth/cluster so workshop attendees can log
+# in. Disabled by default. OAuth/cluster is a cluster singleton: this app fully owns
+# its identityProviders list, so anything added by hand will be reverted on sync.
+#
+# ArgoCD app:  operators-workshop-auth   (argocd/appset-operators.yaml)
+# Status:      DISABLED — excluded in argocd/appset-operators.yaml
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - htpasswd-secret.yaml
+  - oauth.yaml

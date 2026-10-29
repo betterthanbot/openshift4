@@ -1,0 +1,16 @@
+# Node Feature Discovery (Red Hat) — OLM Subscription (sync wave -1).
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: nfd
+  namespace: openshift-nfd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "stable"
+  name: "nfd"
+  source: "redhat-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  startingCSV: "nfd.4.22.0-202610231407"

@@ -1,0 +1,20 @@
+# Leader Worker Set (Red Hat) — OLM Subscription (sync wave -1).
+#
+# Required for multi-node / disaggregated (prefill + decode) LLM serving — the llm-d
+# style LLMInferenceService worker topologies. Installed, but no
+# LeaderWorkerSetOperator CR existed on the source cluster, so there is no operand.
+# startingCSV is deliberately omitted: this tracks the head of the channel.
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: leader-worker-set
+  namespace: openshift-lws-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "stable-v1.0"
+  name: "leader-worker-set"
+  source: "redhat-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic

@@ -1,0 +1,26 @@
+# cert-manager for Red Hat OpenShift — OLM Subscription (sync wave -1).
+#
+# DISABLED BY DEFAULT (excluded in argocd/appset-operators.yaml): the RHPDS/OPENTLC
+# sandbox this platform was captured from ships cert-manager pre-installed
+# (Subscription created at cluster provisioning time, before GitOps bootstrap)
+# along with a `letsencrypt-production-ec2` ClusterIssuer holding sandbox-specific
+# Route53 credentials. That ClusterIssuer is intentionally NOT in this repo.
+#
+# Enable this if your cluster does NOT already ship cert-manager — the Kueue
+# operator requires it, and the MaaS gateway's TLS listener consumes a
+# `cert-manager-ingress-cert` Secret in openshift-ingress.
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: openshift-cert-manager-operator
+  namespace: cert-manager-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "stable-v1"
+  name: "openshift-cert-manager-operator"
+  source: "redhat-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  startingCSV: "cert-manager-operator.v1.20.1"

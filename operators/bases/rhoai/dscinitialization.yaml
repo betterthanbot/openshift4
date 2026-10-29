@@ -1,0 +1,40 @@
+# DSCInitialization — must be created before the DataScienceCluster.
+#
+# The monitoring block is what makes RHOAI stand up its own observability stack in
+# redhat-ods-monitoring, and it is the reason the OpenTelemetry and Tempo operators
+# exist in this repo (the opentelemetry and tempo apps):
+#   metrics -> OpenTelemetryCollector "data-science-collector"
+#              + a Thanos querier at
+#                thanos-querier-data-science-thanos-querier.redhat-ods-monitoring.svc:10902
+#              (scraped by the "Prometheus (Data Science)" Grafana datasource
+#               and by every MaaS dashboard in bases/grafana)
+#   traces  -> TempoMonolithic "data-science-tempomonolithic"
+# Both operands are created by the RHOAI operator, NOT by this app.
+
+apiVersion: dscinitialization.opendatahub.io/v2
+kind: DSCInitialization
+metadata:
+  name: default-dsci
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  applicationsNamespace: redhat-ods-applications
+  monitoring:
+    alerting: {}
+    managementState: Managed
+    metrics:
+      exporters: {}
+      replicas: 1
+      storage:
+        retention: 90d
+        size: 50Gi
+    namespace: redhat-ods-monitoring
+    traces:
+      exporters: {}
+      sampleRatio: "0.1"
+      storage:
+        backend: pv
+        retention: 2160h
+  trustedCABundle:
+    customCABundle: ""
+    managementState: Managed

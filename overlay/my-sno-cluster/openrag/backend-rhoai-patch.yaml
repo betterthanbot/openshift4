@@ -1,0 +1,41 @@
+---
+# Wires the backend to RHOAI. The chart's .env template has no RHOAI keys, but the backend
+# loads .env without overriding real environment variables, so container env is the clean way.
+#
+#   chat       -> your MaaS-published model (maas-demo/qwen25-15b-instruct) via the MaaS gateway
+#   embeddings -> the in-namespace vLLM in embedder.yaml (the MaaS gateway intermittently returns
+#                 empty bodies for non-streaming calls, which embeddings always are)
+#   API key    -> Secret `openrag-rhoai` (key api-key): a MaaS key minted by a maas-team-a member
+#
+# These are read only on the backend's FIRST boot (the stored config wins afterwards), so the
+# Secret must exist before the pod first starts — which it must anyway, or the pod won't start.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openrag-backend
+  namespace: openrag
+spec:
+  template:
+    spec:
+      containers:
+        - name: backend
+          env:
+            - name: OPENRAG_MODEL_PROVIDERS_CONFIG
+              value: /app/provider-config/model_providers.yaml
+            - name: RHOAI_ENDPOINT
+              value: https://maas.apps.cluster-68qgz.68qgz.sandbox2261.opentlc.com/maas-demo/qwen25-15b-instruct/v1
+            - name: RHOAI_EMBEDDINGS_ENDPOINT
+              value: http://openrag-embedder:8000/v1
+            - name: RHOAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openrag-rhoai
+                  key: api-key
+          volumeMounts:
+            - name: model-providers
+              mountPath: /app/provider-config
+              readOnly: true
+      volumes:
+        - name: model-providers
+          configMap:
+            name: openrag-model-providers

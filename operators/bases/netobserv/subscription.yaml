@@ -1,0 +1,16 @@
+# Network Observability (Red Hat) — OLM Subscription (sync wave -1).
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: netobserv-operator
+  namespace: netobserv
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "stable"
+  name: "netobserv-operator"
+  source: "redhat-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  startingCSV: "network-observability-operator.v2.0.0"

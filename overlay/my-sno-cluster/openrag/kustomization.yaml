@@ -1,0 +1,15 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../bases/openrag/
+  - namespace.yaml
+  - scc-nonroot.yaml
+  - route.yaml
+  - embedder.yaml
+  - model-providers.yaml
+
+# Chat + embeddings through the RHOAI provider (endpoints, key Secret, provider allow-list).
+patches:
+  - path: backend-rhoai-patch.yaml

@@ -1,0 +1,20 @@
+# OpenShift GitOps (Red Hat) — OLM Subscription (sync wave -1).
+#
+# DISABLED BY DEFAULT (excluded in argocd/appset-operators.yaml): OpenShift GitOps
+# must already be installed for the bootstrap Application to exist at all, so this
+# cluster-provided operator is not managed from here.
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: openshift-gitops-operator
+  namespace: openshift-gitops-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "latest"
+  name: "openshift-gitops-operator"
+  source: "redhat-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  startingCSV: "openshift-gitops-operator.v1.22.2"

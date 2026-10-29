@@ -1,0 +1,14 @@
+# ==============================================================================
+# OpenShift GitOps (operator + ArgoCD customisation) — my-sno-cluster overlay
+#
+# Discovered by argocd/appset-operators.yaml (git directory generator over
+# operators/overlay/my-sno-cluster/*) -> ArgoCD Application "operators-gitops".
+#
+# DISABLED: this directory is listed with `exclude: true` in
+# argocd/appset-operators.yaml. Delete that entry to enable the app.
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../bases/gitops

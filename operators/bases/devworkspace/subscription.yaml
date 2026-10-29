@@ -1,0 +1,26 @@
+# DevWorkspace Operator (Red Hat) — OLM Subscription (sync wave -1).
+#
+# Installs into openshift-operators, which already exists in OCP and already has the
+# "global-operators" OperatorGroup — so this app has no Namespace/OperatorGroup of
+# its own, only the Subscription.
+#
+# installPlanApproval is Manual: the first InstallPlan has to be approved by hand
+#   oc get installplan -n openshift-operators
+#   oc patch installplan <name> -n openshift-operators --type merge -p '{"spec":{"approved":true}}'
+# and ArgoCD's built-in Subscription health check holds this app's later sync waves
+# (anything that needs the operator's CRDs) until that happens.
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: devworkspace-operator
+  namespace: openshift-operators
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "fast"
+  name: "devworkspace-operator"
+  source: "redhat-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Manual
+  startingCSV: "devworkspace-operator.v1.0.0"

@@ -1,0 +1,160 @@
+# NVIDIA GPU Operator — ClusterPolicy
+# Manages driver, toolkit, device-plugin, DCGM, GFD daemonsets on GPU nodes.
+#
+# This spec is the operator's OWN DEFAULT for gpu-operator-certified v26.3.x,
+# captured verbatim from a cluster where the ClusterPolicy reached
+# state: ready. The previous hand-written spec was replaced wholesale on
+# that cluster rather than patched, so treat this file as "the v26.3 default"
+# and re-capture it after a major operator bump rather than hand-editing.
+#
+# Notable deltas from the old hand-written spec (for anyone diffing history):
+#
+#   * driver.useNvidiaDriverCRD: true -> false
+#       When true, the driver is managed by a separate NVIDIADriver CR instead
+#       of this ClusterPolicy's driver stanza. This repo never shipped an
+#       NVIDIADriver CR, and none existed on the cluster — verified with
+#       `oc get nvidiadrivers -A`. false is what actually works here.
+#   * migManager.enabled:            true -> false
+#   * daemonsets.rollingUpdate.maxUnavailable: "0" -> "1"
+#   * validator.plugin.env WITH_WORKLOAD="true" -> [] (empty)
+#   * operator.defaultRuntime: crio  -> dropped (still a valid CRD field; just
+#                                       not part of the default spec)
+#   * many stanzas that were previously absent are now spelled out explicitly
+#     (ccManager, cdi, gdrcopy, gds, kataManager, mig, sandboxDevicePlugin,
+#      vfioManager, tolerations, upgradePolicy, ...)
+#
+# The NVIDIA operator is sensitive to partially-specified ClusterPolicies —
+# prefer capturing the whole default over hand-picking fields.
+
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  ccManager:
+    enabled: true
+  cdi:
+    default: false
+    enabled: true
+    nriPluginEnabled: false
+  # No `tolerations` here on purpose. The operator injects its own
+  # nvidia.com/gpu:NoSchedule toleration into every daemonset it owns; the
+  # PreferNoSchedule entry this used to carry did not even match the real
+  # node taint (nvidia.com/gpu=true:NoSchedule) and was doing nothing.
+  daemonsets:
+    rollingUpdate:
+      maxUnavailable: "1"
+    updateStrategy: RollingUpdate
+  dcgm:
+    enabled: true
+  dcgmExporter:
+    config:
+      name: ""
+    enabled: true
+    serviceMonitor:
+      enabled: true
+  devicePlugin:
+    config:
+      default: ""
+      name: ""
+    enabled: true
+    mps:
+      root: /run/nvidia/mps
+  driver:
+    certConfig:
+      name: ""
+    enabled: true
+    kernelModuleConfig:
+      name: ""
+    kernelModuleType: auto
+    licensingConfig:
+      nlsEnabled: true
+      secretName: ""
+    repoConfig:
+      configMapName: ""
+    upgradePolicy:
+      autoUpgrade: true
+      drain:
+        deleteEmptyDir: false
+        enable: false
+        force: false
+        timeoutSeconds: 300
+      maxParallelUpgrades: 1
+      maxUnavailable: 25%
+      podDeletion:
+        deleteEmptyDir: false
+        force: false
+        timeoutSeconds: 300
+      waitForCompletion:
+        timeoutSeconds: 0
+    useNvidiaDriverCRD: false
+    virtualTopology:
+      config: ""
+  gdrcopy:
+    enabled: false
+  gds:
+    enabled: false
+  gfd:
+    enabled: true
+  # kataManager intentionally omitted — the operator supplies its own
+  # artifactsDir default, and pinning it here served no purpose.
+  kataSandboxDevicePlugin:
+    enabled: true
+  # strategy: none + migManager: false is intentional, not the operator
+  # default. This cluster went all-in on DRA/dynamic MIG (see
+  # nvidia/values.yaml, nvidia-dra-driver-gpu, DynamicMIG: true) — the DRA
+  # kubelet-plugin creates/destroys MIG instances on demand per
+  # ResourceClaim. The classic mig-manager does static, ConfigMap-driven
+  # partitioning and would fight the DRA driver over the same GPUs if
+  # enabled. Side effect: with MIG mode active on every GPU + strategy
+  # none, the operator deliberately withholds the classic device-plugin
+  # (nvidia.com/gpu capacity reads 0), so nothing on this node can consume
+  # a GPU via a plain `nvidia.com/gpu: 1` request anymore — only DRA
+  # ResourceClaims (gpu.nvidia.com / mig.nvidia.com DeviceClasses). GenAI
+  # Studio's Playground needs classic GPU visibility, so it won't see
+  # GPUs while this holds, unless/until it's reconfigured to request GPUs
+  # via DRA instead.
+  mig:
+    strategy: none
+  # No `config.default` — falls through to the operator's own
+  # default-mig-parted-config ConfigMap rather than pinning a profile here.
+  migManager:
+    enabled: false
+  nodeStatusExporter:
+    enabled: true
+  operator:
+    runtimeClass: nvidia
+    use_ocp_driver_toolkit: true
+  sandboxDevicePlugin:
+    enabled: true
+  sandboxWorkloads:
+    defaultWorkload: container
+    enabled: false
+    mode: kubevirt
+  toolkit:
+    enabled: true
+    installDir: /usr/local/nvidia
+  validator:
+    # DRA (nvidia-dra-driver-gpu, DynamicMIG) creates/destroys MIG
+    # instances on demand per-claim, so every GPU sits in MIG mode with
+    # zero instances most of the time. The default cuda-validation init
+    # container runs an actual vectorAdd workload expecting a plain
+    # compute context, which fails with "no CUDA-capable device is
+    # detected" in that state — not a real problem, just an assumption
+    # the classic validator makes that doesn't hold under DRA-managed
+    # MIG. WITH_WORKLOAD=false limits it to a driver/library presence
+    # check instead.
+    cuda:
+      env:
+        - name: WITH_WORKLOAD
+          value: "false"
+    plugin:
+      env: []
+  vfioManager:
+    enabled: true
+  vgpuDeviceManager:
+    enabled: true
+  vgpuManager:
+    enabled: false

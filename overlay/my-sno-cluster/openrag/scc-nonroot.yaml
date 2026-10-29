@@ -1,0 +1,18 @@
+---
+# The chart's pods (frontend/backend/langflow) and OpenSearch pin UID/GID 1000, which falls
+# outside the namespace's restricted-v2 range. nonroot-v2 admits any non-zero UID and still
+# forbids root; pods that don't pin a UID (docling-serve, the embedder) keep getting
+# restricted-v2.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: openrag-scc-nonroot-v2
+  namespace: openrag
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:nonroot-v2
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:serviceaccounts:openrag

@@ -1,0 +1,36 @@
+# LokiStack — the log store behind the ClusterLogForwarder (clusterlogforwarder.yaml).
+#
+# Prerequisite: an S3-compatible Secret named logging-loki-s3 must exist in
+# openshift-logging before this is applied. lokistack-s3-secret.yaml creates a
+# placeholder — fill it in (docs/tutorials/lokistack-s3-setup.md).
+# CHANGE ME: storage.secret.name, storageClassName, and schemas.effectiveDate.
+#
+# The LokiStack CRD comes from the Loki operator (the `loki` app) — sync that first.
+
+apiVersion: loki.grafana.com/v1
+kind: LokiStack
+metadata:
+  name: logging-loki
+  namespace: openshift-logging
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  limits:
+    global:
+      retention:
+        days: 14
+  managementState: Managed
+  # Supported size options for production instances of Loki are 1x.extra-small,
+  # 1x.small, or 1x.medium. Additionally, 1x.pico is available for testing and
+  # development purposes only.
+  size: 1x.demo
+  storage:
+    schemas:
+      - effectiveDate: "2024-01-01"
+        version: v13
+    secret:
+      name: logging-loki-s3
+      type: s3
+  storageClassName: gp3-csi
+  tenants:
+    mode: openshift-logging

@@ -1,0 +1,13 @@
+# Normally created by the RHOAI maas-controller once the DSC's kserve.modelsAsService
+# component goes Managed. Declared here anyway so the Tenant / MaaSSubscription /
+# MaaSAuthPolicy CRs never race a missing namespace on a cold bootstrap. Only
+# metadata.name is set — the controller owns the rest of the labels.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: models-as-a-service
+  labels:
+    kubernetes.io/metadata.name: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"

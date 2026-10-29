@@ -1,0 +1,337 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gatus
+---
+apiVersion: v1
+data:
+  config.yaml: |
+    ui:
+      title: "Platform Status Dashboard"
+      header: "API, Route & Internal Probe Health"
+      description: "Real-time health status of OpenShift services and internal microservices"
+      logo: "https://upload.wikimedia.org/wikipedia/commons/3/3a/OpenShift-LogoType.svg"
+      theme: "dark"
+
+    storage:
+      type: sqlite
+      path: /data/gatus.db
+
+    endpoints:
+
+      # ---------------------------------------------------------------------------
+      # Platform Endpoints
+      # ---------------------------------------------------------------------------
+
+      - name: "OpenShift Console"
+        group: "Platform Endpoints"
+        url: "https://console-openshift-console.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "OpenShift Downloads"
+        group: "Platform Endpoints"
+        url: "https://downloads-openshift-console.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "OAuth"
+        group: "Platform Endpoints"
+        url: "https://oauth-openshift.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "OpenShift GitOps"
+        group: "Platform Endpoints"
+        url: "https://openshift-gitops-server-openshift-gitops.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Ingress Canary"
+        group: "Platform Endpoints"
+        url: "https://canary-openshift-ingress-canary.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Data Science Gateway"
+        group: "Platform Endpoints"
+        url: "https://data-science-gateway.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "RHOAI Dashboard"
+        group: "Platform Endpoints"
+        url: "https://rhods-dashboard-redhat-ods-applications.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "MaaS Gateway"
+        group: "Platform Endpoints"
+        url: "https://maas.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com/maas-api/health"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Grafana"
+        group: "Platform Endpoints"
+        url: "https://grafana-a-route-grafana.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Gatus"
+        group: "Platform Endpoints"
+        url: "https://gatus-gatus.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      # ---------------------------------------------------------------------------
+      # Logging
+      # ---------------------------------------------------------------------------
+
+      - name: "Loki Gateway"
+        group: "Logging"
+        url: "https://logging-loki-openshift-logging.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      # ---------------------------------------------------------------------------
+      # Monitoring
+      # ---------------------------------------------------------------------------
+
+      - name: "Alertmanager"
+        group: "Monitoring"
+        url: "https://alertmanager-main-openshift-monitoring.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com/api"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Prometheus"
+        group: "Monitoring"
+        url: "https://prometheus-k8s-openshift-monitoring.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com/api"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Prometheus Federate"
+        group: "Monitoring"
+        url: "https://prometheus-k8s-federate-openshift-monitoring.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com/federate"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      - name: "Thanos Querier"
+        group: "Monitoring"
+        url: "https://thanos-querier-openshift-monitoring.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com/api"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+
+      # ---------------------------------------------------------------------------
+      # Security
+      # ---------------------------------------------------------------------------
+
+      - name: "StackRox Central"
+        group: "Security"
+        url: "https://central-stackrox.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        interval: 1m
+        client:
+          insecure: true
+        conditions:
+          - "[STATUS] >= 200"
+          - "[STATUS] <= 499"
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/version: latest
+    helm.sh/chart: gatus-1.0.4
+  name: gatus-config
+  namespace: gatus
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/version: latest
+    helm.sh/chart: gatus-1.0.4
+  name: gatus
+  namespace: gatus
+spec:
+  ports:
+  - name: http
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/name: gatus
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/version: latest
+    helm.sh/chart: gatus-1.0.4
+  name: gatus-data
+  namespace: gatus
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/version: latest
+    helm.sh/chart: gatus-1.0.4
+  name: gatus
+  namespace: gatus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: gatus
+      app.kubernetes.io/name: gatus
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: gatus
+        app.kubernetes.io/name: gatus
+    spec:
+      containers:
+      - image: quay.io/rhn-support-gong/gatus:1.0.4
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 30
+        name: gatus
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        volumeMounts:
+        - mountPath: /config/config.yaml
+          name: config-volume
+          subPath: config.yaml
+        - mountPath: /data
+          name: data-volume
+      volumes:
+      - configMap:
+          name: gatus-config
+        name: config-volume
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: gatus-data
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  labels:
+    app.kubernetes.io/instance: gatus
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: gatus
+    app.kubernetes.io/version: latest
+    helm.sh/chart: gatus-1.0.4
+  name: gatus
+  namespace: gatus
+spec:
+  port:
+    targetPort: http
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: gatus
+    weight: 100
+  wildcardPolicy: None

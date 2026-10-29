@@ -1,14 +1,33 @@
 # ==============================================================================
 # ApplicationSet: openshift4-operators
 #
-# Manages the two-layer OLM operator installation as separate ArgoCD Applications:
+# One ArgoCD Application per directory under operators/overlay/my-sno-cluster/, so
+# every operator — and every operator-adjacent platform piece — is its own app in the
+# ArgoCD UI:
 #
-#   operators-layer1  (sync-wave 1) — Namespaces, OperatorGroups, Subscriptions
-#   operators-layer2  (sync-wave 2) — Operands / Custom Resources
+#   operators-grafana-operator   operators-gpu-operator   operators-rhoai
+#   operators-cluster-logging    operators-maas           operators-nfd   ...
 #
-# Sync-wave ordering ensures layer1 (operators) reaches healthy state before
-# layer2 (operands) attempts to create CRs that depend on the operator CRDs.
+# Each app is a Kustomize overlay (operators/overlay/my-sno-cluster/<name>) over a
+# base (operators/bases/<name>), and each base BUNDLES the operator's install
+# (Namespace, OperatorGroup, Subscription) with its operands (the CRs that configure
+# it). This replaces the old two-app split: operators-layer1 (every Subscription) and
+# operators-layer2 (every operand).
 #
+# Adding an operator:   create operators/bases/<name> and
+#                       operators/overlay/my-sno-cluster/<name> — nothing to edit here.
+# Disabling one:        add it to the exclude list below (see operators/README.md).
+#
+# ORDERING
+#   * Inside one app, sync waves order the sync: Namespace (-3) -> OperatorGroup (-2)
+#     -> Subscription (-1) -> operands (0 and up). ArgoCD ships a health check for OLM
+#     Subscriptions (Healthy once status.state is AtLatestKnown), so wave 0 does not
+#     start until the operator has been installed and its CRDs registered.
+#   * Between apps there is no ordering. Sync waves only order the resources of one
+#     Application; these Applications are created directly by the ApplicationSet
+#     controller, so nothing syncs the Application objects themselves in waves. An app
+#     that needs another app's CRDs (operators/README.md has the table) simply retries
+#     until they exist — see syncPolicy.retry below.
 # ==============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -16,67 +35,126 @@ metadata:
   name: openshift4-operators
   namespace: openshift-gitops
 spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+
   syncPolicy:
-    preserveResourcesOnDeletion: false
+    # DO NOT set this to false without reading this.
+    #
+    # With the default (false) the ApplicationSet controller puts the
+    # resources-finalizer.argocd.argoproj.io finalizer on every Application it generates,
+    # so removing an Application — deleting its directory, adding an `exclude` entry below,
+    # or deleting this ApplicationSet — CASCADE-DELETES everything it manages: the
+    # Subscription, the operands (LokiStack, DataScienceCluster, Central, ...) and the
+    # Namespace with every PVC in it.
+    #
+    # true = the finalizer is never added, so removing an app only stops managing the
+    # resources and leaves them running. To really uninstall something, delete its app
+    # with cascade (`argocd app delete operators-<name> --cascade`) BEFORE excluding it.
+    preserveResourcesOnDeletion: true
 
   generators:
-    - list:
-        elements:
-          # ------------------------------------------------------------------
-          # Layer 1: Namespaces + OperatorGroups + Subscriptions
-          # ------------------------------------------------------------------
-          - name: operators-layer1
-            path: operators/layer1-install
-            wave: "1"
-            destNamespace: openshift-operators-helm
-
-          # ------------------------------------------------------------------
-          # Layer 2: Operands (CRs)
-          # ------------------------------------------------------------------
-          - name: operators-layer2
-            path: operators/layer2-operands
-            wave: "2"
-            destNamespace: openshift-operators-helm
+    - git:
+        repoURL: https://github.com/betterthanbot/openshift4.git
+        revision: argocd/demo
+        directories:
+          # Every subdirectory here becomes one Application, named operators-<directory>.
+          - path: operators/overlay/my-sno-cluster/*
+          # ---- Disabled: the directory stays in git, no Application is created. ----
+          # Delete an entry to enable that component. (If the cluster already runs the
+          # component, the resources are left in place — preserveResourcesOnDeletion.)
+          - path: operators/overlay/my-sno-cluster/cert-manager     # sandbox ships it pre-installed
+            exclude: true
+          - path: operators/overlay/my-sno-cluster/devworkspace     # not present on the cluster
+            exclude: true
+          - path: operators/overlay/my-sno-cluster/gitops           # cluster-provided; also has its own AppProjects (see appProject.yaml)
+            exclude: true
+          - path: operators/overlay/my-sno-cluster/kmm-hub          # turned off in e44e81f
+            exclude: true
+          - path: operators/overlay/my-sno-cluster/lightspeed       # installed on the source cluster, never configured
+            exclude: true
+          - path: operators/overlay/my-sno-cluster/quay             # installed on the source cluster, never configured
+            exclude: true
+          - path: operators/overlay/my-sno-cluster/workshop-auth    # replaces OAuth/cluster — workshop clusters only
+            exclude: true
 
   template:
     metadata:
-      name: "{{name}}"
+      name: "operators-{{ .path.basename }}"
       namespace: openshift-gitops
-      annotations:
-        argocd.argoproj.io/sync-wave: "{{wave}}"
+      labels:
+        # Handy for `argocd app sync -l app.kubernetes.io/part-of=openshift4-operators`
+        # and for filtering the UI.
+        app.kubernetes.io/part-of: openshift4-operators
     spec:
       project: openshift4-community
 
       source:
         repoURL: https://github.com/betterthanbot/openshift4.git
-        targetRevision: main
-        path: "{{path}}"
-        helm:
-          valueFiles:
-            - values.yaml
+        targetRevision: argocd/demo
+        path: "{{ .path.path }}"
 
       destination:
         server: https://kubernetes.default.svc
-        namespace: "{{destNamespace}}"
+        # Fallback only: every namespaced resource in these bases sets its own namespace
+        # (checked when the bases were generated).
+        namespace: openshift-gitops
 
       syncPolicy:
-        automated:
-          prune: false       # never auto-delete operator namespaces or CRDs
-          selfHeal: true
+        # automated:
+        #   prune: false       # never auto-delete operator namespaces or CRDs
+        #   selfHeal: true
         allowEmpty: true
         syncOptions:
-          - CreateNamespace=true
           - ServerSideApply=true          # required for large ArgoCD / operator CRs
           - RespectIgnoreDifferences=true
           - ApplyOutOfSyncOnly=true
+          # ------------------------------------------------------------------
+          # SkipDryRunOnMissingResource=true — DO NOT REMOVE.
+          #
+          # Before running any sync task, ArgoCD resolves every rendered resource's
+          # GVK against the cluster's discovery API. If even ONE kind is unknown,
+          # gitops-engine fails the whole operation with "one or more synchronization
+          # tasks are not valid" and applies NOTHING. The failure is atomic, not
+          # per-resource (techdebt.md #14).
+          #
+          # Bundling makes that the normal case, not an edge case: on a cold bootstrap
+          # an app's Subscription and its operand CRs are rendered together, and the
+          # operand CRDs do not exist until OLM has installed the operator that this
+          # same sync is about to create. Without the option the Subscription itself
+          # would never be applied — a deadlock.
+          #
+          # IMPORTANT — this app-level entry is NOT sufficient on its own. Tested on
+          # OpenShift GitOps 1.21.1 (cluster-dgs2z, 2026-08-06): with only this option set,
+          # the sync still failed with 0 resources synced. It is honoured per resource,
+          # via
+          #   argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+          # on the object itself. Every operand CR in operators/bases/* carries that
+          # annotation (operators/README.md, "Adding an operator"); this entry is kept as
+          # belt-and-braces for ArgoCD versions that do respect it.
+          #
+          # What it buys you: unknown kinds are marked skipDryRun instead of invalidating
+          # the sync, so the wave -3..-1 install resources apply, ArgoCD waits for the
+          # Subscription to go Healthy, and the operands follow. A CR that is still
+          # waiting on a CRD fails only its own apply and is picked up by the retry below.
+          # ------------------------------------------------------------------
+          - SkipDryRunOnMissingResource=true
         retry:
-          limit: 5
+          # Sized for a cold bootstrap: RHOAI needs ~10-15 min to install its operator,
+          # reconcile the DSC and register the MaaS/KServe CRDs, and the maas app waits on
+          # that. Nothing here is `automated`, so if retries run out the app just sits
+          # Failed until someone syncs it by hand.
+          # 30s + 60s + 120s + 180s x7 ≈ 24 min of retrying.
+          limit: 10
           backoff:
             duration: 30s
             factor: 2
-            maxDuration: 5m
+            maxDuration: 3m
 
-      # Ignore fields that operators / OCP manage themselves after creation
+      # Ignore fields that operators / OCP manage themselves after creation.
+      # This list is shared by every generated app; an entry that matches nothing in a
+      # given app is simply a no-op there.
       ignoreDifferences:
         # OLM updates status and adds annotations after subscription creation
         - group: operators.coreos.com
@@ -136,3 +214,70 @@ spec:
           kind: GrafanaDatasource
           jsonPointers:
             - /spec/datasource/secureJsonData
+        # MaaS metrics DB + Grafana Postgres credentials — placeholders are
+        # committed; real passwords are set manually.
+        - group: ""
+          kind: Secret
+          name: maas-postgres
+          namespace: redhat-ods-applications
+          jsonPointers:
+            - /data
+        - group: ""
+          kind: Secret
+          name: maas-postgres-grafana-auth
+          namespace: grafana
+          jsonPointers:
+            - /data
+        # maas-db-config holds DB_CONNECTION_URL with the same password embedded
+        # in it — placeholder committed, real value set manually.
+        - group: ""
+          kind: Secret
+          name: maas-db-config
+          namespace: redhat-ods-applications
+          jsonPointers:
+            - /data
+        # thanos-querier-serving-ca is committed empty; service-ca-operator
+        # injects service-ca.crt into it (techdebt.md #4). Ignore data so ArgoCD
+        # does not keep blanking it back out.
+        - group: ""
+          kind: ConfigMap
+          name: thanos-querier-serving-ca
+          namespace: redhat-ods-monitoring
+          jsonPointers:
+            - /data
+        # cluster-monitoring-config is shared with OCP (retention, storage,
+        # alertmanager). We ServerSideApply only enableUserWorkload into it, so
+        # ignore any other keys the cluster or an admin adds.
+        - group: ""
+          kind: ConfigMap
+          name: cluster-monitoring-config
+          namespace: openshift-monitoring
+          jsonPointers:
+            - /data
+        # RHOAI owns OdhDashboardConfig; we patch a subset of fields via
+        # ServerSideApply and let the operator manage the rest.
+        - group: opendatahub.io
+          kind: OdhDashboardConfig
+          jsonPointers:
+            - /status
+        # NVIDIA ClusterPolicy was parked here (ignoring /spec) while the policy
+        # was tuned by hand on-cluster. The tested spec now lives in
+        # operators/bases/gpu-operator/clusterpolicy.yaml, so git is authoritative
+        # again and only /status is ignored.
+        - group: nvidia.com
+          kind: ClusterPolicy
+          jsonPointers:
+            - /status
+        # MaaS/KServe/Kuadrant operands are heavily status-driven.
+        - group: maas.opendatahub.io
+          kind: MaaSSubscription
+          jsonPointers:
+            - /status
+        - group: kuadrant.io
+          kind: Kuadrant
+          jsonPointers:
+            - /status
+        - group: gateway.networking.k8s.io
+          kind: Gateway
+          jsonPointers:
+            - /status

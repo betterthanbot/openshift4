@@ -1,0 +1,16 @@
+# NVIDIA GPU Operator (certified) — OLM Subscription (sync wave -1).
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: gpu-operator-certified
+  namespace: nvidia-gpu-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "v26.7"
+  name: "gpu-operator-certified"
+  source: "certified-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  startingCSV: "gpu-operator-certified.v26.7.2"

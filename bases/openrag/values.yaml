@@ -1,0 +1,59 @@
+# OpenRAG (langflow-ai/openrag) — values for the upstream chart, pinned in the Makefile
+# (OPENRAG_REF, currently v0.8.0 / images 0.8.0). Re-render after editing:  make
+#
+# What the chart does NOT deploy, and where it lives instead:
+#   - OpenSearch      -> opensearch.yaml  (this base; the project's own image + security config)
+#   - docling-serve   -> docling.yaml     (this base)
+#   - embedding model -> overlay/my-sno-cluster/openrag/embedder.yaml (needs a GPU)
+#   - chat LLM        -> your RHOAI/MaaS model, wired in by the overlay's RHOAI patch
+#
+# No credentials in here. Secrets are created out of band with `make secrets` and
+# `oc create secret generic openrag-rhoai` — see overlay/my-sno-cluster/openrag/README.md.
+
+global:
+  imageTag: "0.8.0"                  # images are tagged 0.8.0 (no "v") on Docker Hub
+  opensearch:
+    host: openrag-opensearch.openrag.svc.cluster.local
+    port: 9200
+    scheme: https
+    username: admin
+    indexName: documents
+  docling:
+    host: docling-serve.openrag.svc.cluster.local
+    port: 5001
+    scheme: http
+    verifySsl: false
+
+# OpenShift exposes the UI with a Route (overlay/route.yaml), not an nginx Ingress.
+ingress:
+  enabled: false
+
+frontend:
+  replicaCount: 1
+
+backend:
+  persistence:
+    shared:
+      # Upstream wants ReadWriteMany. This cluster only has EBS (RWO), so backend and
+      # langflow must share a node — see the podAffinity patch in kustomization.yaml.
+      accessMode: ReadWriteOnce
+      size: 10Gi
+    documents:
+      git:
+        hash: a1d691b9ef6ef9154d83c8a3565c23d185c06f8e   # v0.8.0, instead of floating `main`
+
+langflow:
+  flows:
+    git:
+      hash: a1d691b9ef6ef9154d83c8a3565c23d185c06f8e     # v0.8.0, instead of floating `main`
+
+# Provider defaults are applied ONCE, on the backend's first boot, then the stored config
+# wins (change them afterwards in the UI's Settings). `rhoai` is hidden unless the overlay's
+# model_providers.yaml enables it, and its endpoints/key come from the overlay's RHOAI patch.
+appConfig:
+  agent:
+    llmProvider: rhoai
+    llmModel: qwen25-15b-instruct
+  knowledge:
+    embeddingProvider: rhoai
+    embeddingModel: Qwen/Qwen3-Embedding-0.6B

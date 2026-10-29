@@ -1,0 +1,19 @@
+# ==============================================================================
+# operators/bases/lightspeed — OpenShift Lightspeed
+#
+# Installs OpenShift Lightspeed (Manual approval). Disabled: no OLSConfig operand is defined.
+#
+# ArgoCD app:  operators-lightspeed   (argocd/appset-operators.yaml)
+# Installs:    lightspeed-operator (channel stable, redhat-operators, Manual approval) into openshift-lightspeed
+# Status:      DISABLED — excluded in argocd/appset-operators.yaml
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml

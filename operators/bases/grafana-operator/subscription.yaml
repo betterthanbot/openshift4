@@ -1,0 +1,16 @@
+# Grafana Operator (community, v5) — OLM Subscription (sync wave -1).
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: grafana-operator
+  namespace: grafana
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "v5"
+  name: "grafana-operator"
+  source: "community-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  startingCSV: "grafana-operator.v5.25.0"
