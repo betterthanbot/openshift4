@@ -25,7 +25,7 @@ data:
 
       - name: "OpenShift Console"
         group: "Platform Endpoints"
-        url: "https://console-openshift-console.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        url: "https://console-openshift-console.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com"
         interval: 1m
         client:
           insecure: true
@@ -35,7 +35,7 @@ data:
 
       - name: "OpenShift Downloads"
         group: "Platform Endpoints"
-        url: "https://downloads-openshift-console.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        url: "https://downloads-openshift-console.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com"
         interval: 1m
         client:
           insecure: true
@@ -45,7 +45,7 @@ data:
 
       - name: "OAuth"
         group: "Platform Endpoints"
-        url: "https://oauth-openshift.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        url: "https://oauth-openshift.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com"
         interval: 1m
         client:
           insecure: true
@@ -55,7 +55,7 @@ data:
 
       - name: "OpenShift GitOps"
         group: "Platform Endpoints"
-        url: "https://openshift-gitops-server-openshift-gitops.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        url: "https://openshift-gitops-server-openshift-gitops.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com"
         interval: 1m
         client:
           insecure: true
@@ -65,7 +65,7 @@ data:
 
       - name: "Ingress Canary"
         group: "Platform Endpoints"
-        url: "https://canary-openshift-ingress-canary.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        url: "https://canary-openshift-ingress-canary.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com"
         interval: 1m
         client:
           insecure: true
@@ -75,7 +75,7 @@ data:
 
       - name: "Data Science Gateway"
         group: "Platform Endpoints"
-        url: "https://data-science-gateway.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        url: "https://data-science-gateway.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com"
         interval: 1m
         client:
           insecure: true
@@ -85,7 +85,7 @@ data:
 
       - name: "RHOAI Dashboard"
         group: "Platform Endpoints"
-        url: "https://rhods-dashboard-redhat-ods-applications.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        url: "https://rhods-dashboard-redhat-ods-applications.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com"
         interval: 1m
         client:
           insecure: true
@@ -95,7 +95,7 @@ data:
 
       - name: "MaaS Gateway"
         group: "Platform Endpoints"
-        url: "https://maas.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com/maas-api/health"
+        url: "https://maas.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com/maas-api/health"
         interval: 1m
         client:
           insecure: true
@@ -105,7 +105,7 @@ data:
 
       - name: "Grafana"
         group: "Platform Endpoints"
-        url: "https://grafana-a-route-grafana.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        url: "https://grafana-a-route-grafana.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com"
         interval: 1m
         client:
           insecure: true
@@ -115,7 +115,7 @@ data:
 
       - name: "Gatus"
         group: "Platform Endpoints"
-        url: "https://gatus-gatus.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        url: "https://gatus-gatus.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com"
         interval: 1m
         client:
           insecure: true
@@ -129,7 +129,7 @@ data:
 
       - name: "Loki Gateway"
         group: "Logging"
-        url: "https://logging-loki-openshift-logging.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        url: "https://logging-loki-openshift-logging.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com"
         interval: 1m
         client:
           insecure: true
@@ -143,7 +143,7 @@ data:
 
       - name: "Alertmanager"
         group: "Monitoring"
-        url: "https://alertmanager-main-openshift-monitoring.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com/api"
+        url: "https://alertmanager-main-openshift-monitoring.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com/api"
         interval: 1m
         client:
           insecure: true
@@ -153,7 +153,7 @@ data:
 
       - name: "Prometheus"
         group: "Monitoring"
-        url: "https://prometheus-k8s-openshift-monitoring.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com/api"
+        url: "https://prometheus-k8s-openshift-monitoring.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com/api"
         interval: 1m
         client:
           insecure: true
@@ -163,7 +163,7 @@ data:
 
       - name: "Prometheus Federate"
         group: "Monitoring"
-        url: "https://prometheus-k8s-federate-openshift-monitoring.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com/federate"
+        url: "https://prometheus-k8s-federate-openshift-monitoring.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com/federate"
         interval: 1m
         client:
           insecure: true
@@ -173,7 +173,7 @@ data:
 
       - name: "Thanos Querier"
         group: "Monitoring"
-        url: "https://thanos-querier-openshift-monitoring.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com/api"
+        url: "https://thanos-querier-openshift-monitoring.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com/api"
         interval: 1m
         client:
           insecure: true
@@ -187,7 +187,7 @@ data:
 
       - name: "StackRox Central"
         group: "Security"
-        url: "https://central-stackrox.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com"
+        url: "https://central-stackrox.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com"
         interval: 1m
         client:
           insecure: true

@@ -1,57 +1,12 @@
-# OpenShift Groups referenced by the subscriptions.
+# RHOAI access groups (empty shells).
 #
-# Group membership is NOT managed here — `users` is left empty on purpose so ArgoCD
-# does not wipe real members out from under you. Populate them with your identity
-# provider, or for a workshop with bases/get-a-username/label-ns.sh + the workshop-auth
-# htpasswd IDP.
+# rhods-admins / rhods-users are the default admin / user groups of the RHOAI dashboard.
+# Membership is NOT managed here — `users` is left empty on purpose so ArgoCD never wipes
+# real members. kube:admin does not need either.
 #
-# team-Charlie / team-Delta are not RFC 1123 names; ignore any linter that says so —
-# that rule is for DNS-subdomain names, and user.openshift.io Groups are not subject to
-# it. Both names are live on the cluster and `oc apply --dry-run=server` accepts them.
-# Lower-casing them here would silently detach the subscriptions from their real groups.
-
-# Group shell only. `users` is deliberately omitted so ArgoCD never prunes real
-# membership — populate from your IDP, or with bases/get-a-username.
-apiVersion: user.openshift.io/v1
-kind: Group
-metadata:
-  name: "team-alpha"
-  annotations:
-    argocd.argoproj.io/sync-wave: "3"
-    argocd.argoproj.io/compare-options: IgnoreExtraneous
----
-# Group shell only. `users` is deliberately omitted so ArgoCD never prunes real
-# membership — populate from your IDP, or with bases/get-a-username.
-apiVersion: user.openshift.io/v1
-kind: Group
-metadata:
-  name: "team-bravo"
-  annotations:
-    argocd.argoproj.io/sync-wave: "3"
-    argocd.argoproj.io/compare-options: IgnoreExtraneous
----
-# Group shell only. `users` is deliberately omitted so ArgoCD never prunes real
-# membership — populate from your IDP, or with bases/get-a-username.
-apiVersion: user.openshift.io/v1
-kind: Group
-metadata:
-  name: "team-Charlie"
-  annotations:
-    argocd.argoproj.io/sync-wave: "3"
-    argocd.argoproj.io/compare-options: IgnoreExtraneous
----
-# Group shell only. `users` is deliberately omitted so ArgoCD never prunes real
-# membership — populate from your IDP, or with bases/get-a-username.
-apiVersion: user.openshift.io/v1
-kind: Group
-metadata:
-  name: "team-Delta"
-  annotations:
-    argocd.argoproj.io/sync-wave: "3"
-    argocd.argoproj.io/compare-options: IgnoreExtraneous
----
-# Group shell only. `users` is deliberately omitted so ArgoCD never prunes real
-# membership — populate from your IDP, or with bases/get-a-username.
+# The old team-alpha/-bravo/-Charlie/-Delta groups were removed together with their
+# MaaSSubscriptions / MaaSAuthPolicies: this sandbox starts from a clean slate and you
+# create groups, subscriptions and API keys yourself.
 apiVersion: user.openshift.io/v1
 kind: Group
 metadata:
@@ -60,8 +15,6 @@ metadata:
     argocd.argoproj.io/sync-wave: "3"
     argocd.argoproj.io/compare-options: IgnoreExtraneous
 ---
-# Group shell only. `users` is deliberately omitted so ArgoCD never prunes real
-# membership — populate from your IDP, or with bases/get-a-username.
 apiVersion: user.openshift.io/v1
 kind: Group
 metadata:

@@ -9,7 +9,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "3"
     # The maas.opendatahub.io CRDs are registered by the DataScienceCluster
-    # (kserve.modelsAsService), which lives in the rhoai app. Until it has
+    # (aigateway.modelsAsAService), which lives in the rhoai app. Until it has
     # reconciled this kind does not exist when ArgoCD validates the sync, and
     # without this annotation ArgoCD rejects the ENTIRE sync of this app up
     # front and applies nothing. See techdebt.md #14.

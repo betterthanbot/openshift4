@@ -2,8 +2,9 @@
 # operators/bases/rhoai — Red Hat OpenShift AI (RHODS)
 #
 # Installs the RHODS operator, then DSCInitialization, the DataScienceCluster and the
-# OdhDashboardConfig feature flags. Turning on kserve.modelsAsService here is what
-# registers the maas.opendatahub.io CRDs used by the `maas` app.
+# OdhDashboardConfig feature flags. Turning on aigateway.modelsAsAService here (it was
+# kserve.modelsAsService before RHOAI 3.5) is what registers the maas.opendatahub.io
+# CRDs used by the `maas` app.
 #
 # The overlay also creates the vllm-project namespace the demo models are served from.
 #

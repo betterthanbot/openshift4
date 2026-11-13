@@ -113,14 +113,14 @@ Key operands deployed by the bases in `operators/bases/`.
 |---------|---------|-------|
 | LokiStack (logging) | `6.4.6` (via Loki Operator) | `1x.demo` size, AWS S3, 14-day retention |
 | LokiStack (netobserv) | `6.4.6` (via Loki Operator) | `1x.pico` size, AWS S3, `openshift-network` tenant mode |
-| OpenShift AI DSC/DSCI | `3.4.2` (via RHODS Operator) | API version `v2`; dashboard, aipipelines, workbenches, kserve (+ modelsAsService, NIM), llamastack, trustyai. `kueue` is **Removed** — the standalone Kueue operator owns it |
+| OpenShift AI DSC/DSCI | `3.5.2` (via RHODS Operator) | API version `v2`, checked against the 3.5.2 CRDs (3.5.3 identical); dashboard, aipipelines, workbenches, kserve (+ NIM), aigateway (MaaS), ogx, trustyai. `kserve.modelsAsService` is deprecated → `aigateway.modelsAsAService`; `llamastackoperator` → `ogx`. `kueue` is **Removed** — the standalone Kueue operator owns it |
 | OdhDashboardConfig | via RHOAI 3.4.2 | MaaS + Gen AI Studio feature flags; patched with ServerSideApply so the operator keeps ownership |
 | RHACS Central + SecuredCluster | `4.11.2` (via RHACS Operator) | Central route enabled; needs a manual init bundle — see [README](README.md#4-configure-rhacs-post-install) |
 | Grafana | `13.0.1` (via Grafana Operator) | 9 dashboards from [bases/grafana/generated/](bases/grafana/generated/); 6 datasources (Thanos, 3× Loki, RHOAI Thanos, MaaS Postgres) |
 | NVIDIA ClusterPolicy | via GPU Operator `26.3.3` | Operator defaults, captured verbatim — see the long comment in [clusterpolicy.yaml](operators/bases/gpu-operator/clusterpolicy.yaml) |
 | Kuadrant | `1.4.2` (via RHCL Operator) | Creates Authorino + Limitador in `kuadrant-system`; observability on |
 | Kueue | `1.3.1` (via Kueue Operator) | Cluster-scoped `Kueue/cluster`; Deployment/Pod/PyTorchJob/Ray/StatefulSet/TrainJob integrations |
-| MaaS Tenant + 4 Subscriptions | via RHOAI 3.4.2 | `default-tenant` on `maas-default-gateway`; team-alpha/bravo/Charlie/Delta tiers |
+| MaaS Tenant | via RHOAI 3.5.2 | `default-tenant` on `maas-default-gateway`; clean slate — no subscriptions, auth policies or models are deployed, you create them by hand |
 | RHOAI monitoring | OTel `0.152.1`, Tempo `2.10.5` | `data-science-collector` + `data-science-tempomonolithic`, created by the DSCI, not by this chart |
 | User workload monitoring | built into OCP | `enableUserWorkload: true` patched into `cluster-monitoring-config` via ServerSideApply — stands up `prometheus-user-workload` ×2 + `thanos-ruler-user-workload` ×2 |
 | RHOAI monitoring workarounds | n/a | NetworkPolicy opening the Thanos gRPC sidecar port (techdebt #3) + Perses `cluster-monitoring-view` binding and CA ConfigMap (techdebt #4) |

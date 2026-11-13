@@ -1,5 +1,7 @@
-# Authorino listener TLS — the other modelsAsService prerequisite (the first is
-# db-config.yaml).
+# Authorino listener TLS — the other MaaS prerequisite (the first is the database Secret
+# in db-secrets.yaml). Re-checked against the maas-controller shipped in
+# rhods-operator 3.5.2: it still refuses to start without "an Authorino instance with
+# spec.listener.tls.enabled=true and a certSecretRef".
 #
 # `spec` of the Authorino object below is dumps/authorino.yaml verbatim, i.e. the state
 # the source cluster ran with. Everything except listener.tls is what the kuadrant

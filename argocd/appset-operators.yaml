@@ -214,28 +214,8 @@ spec:
           kind: GrafanaDatasource
           jsonPointers:
             - /spec/datasource/secureJsonData
-        # MaaS metrics DB + Grafana Postgres credentials — placeholders are
-        # committed; real passwords are set manually.
-        - group: ""
-          kind: Secret
-          name: maas-postgres
-          namespace: redhat-ods-applications
-          jsonPointers:
-            - /data
-        - group: ""
-          kind: Secret
-          name: maas-postgres-grafana-auth
-          namespace: grafana
-          jsonPointers:
-            - /data
-        # maas-db-config holds DB_CONNECTION_URL with the same password embedded
-        # in it — placeholder committed, real value set manually.
-        - group: ""
-          kind: Secret
-          name: maas-db-config
-          namespace: redhat-ods-applications
-          jsonPointers:
-            - /data
+        # (The MaaS Postgres Secrets are committed with fixed sandbox passwords, so
+        # they need no ignoreDifferences — see bases/maas/db-secrets.yaml.)
         # thanos-querier-serving-ca is committed empty; service-ca-operator
         # injects service-ca.crt into it (techdebt.md #4). Ignore data so ArgoCD
         # does not keep blanking it back out.

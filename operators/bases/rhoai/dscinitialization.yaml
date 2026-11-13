@@ -10,6 +10,18 @@
 #               and by every MaaS dashboard in bases/grafana)
 #   traces  -> TempoMonolithic "data-science-tempomonolithic"
 # Both operands are created by the RHOAI operator, NOT by this app.
+#
+# Checked against the v2 CRD in the rhods-operator.3.5.2 bundle: the DSCI schema is
+# identical to 3.4.2 (and 3.5.3), so nothing here needed to change for 3.5. Optional
+# fields that exist but are deliberately left unset:
+#   monitoring.collectorReplicas   OTel collector replicas; unset -> 1 on SNO, 2 multi-node
+#                                  (needs metrics.storage or traces configured, and must be > 0)
+#   monitoring.traces.tls          {enabled, caConfigMap, certificateSecret} for Tempo gRPC
+#   monitoring.traces.storage      size (pv backend only); secret (required for s3/gcs)
+#   monitoring.metrics.exporters   extra exporters; the names `prometheus` and `otlp/tempo`
+#                                  are reserved, max 10
+#   devFlags.logLevel              dev-only, not for production
+# applicationsNamespace, monitoring.namespace are immutable once created.
 
 apiVersion: dscinitialization.opendatahub.io/v2
 kind: DSCInitialization

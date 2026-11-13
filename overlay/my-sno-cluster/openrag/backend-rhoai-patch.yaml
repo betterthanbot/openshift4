@@ -23,7 +23,7 @@ spec:
             - name: OPENRAG_MODEL_PROVIDERS_CONFIG
               value: /app/provider-config/model_providers.yaml
             - name: RHOAI_ENDPOINT
-              value: https://maas.apps.cluster-68qgz.68qgz.sandbox2261.opentlc.com/maas-demo/qwen25-15b-instruct/v1
+              value: https://maas.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com/maas-demo/qwen25-15b-instruct/v1
             - name: RHOAI_EMBEDDINGS_ENDPOINT
               value: http://openrag-embedder:8000/v1
             - name: RHOAI_API_KEY

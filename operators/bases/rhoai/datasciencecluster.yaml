@@ -1,26 +1,50 @@
 # DataScienceCluster
 #
-# Deltas from the previous version of this file, all captured live:
-#   kserve.modelsAsService: Managed    — the MaaS platform itself (maas-api +
-#                                        maas-controller in
-#                                        redhat-ods-applications, the
-#                                        maas.opendatahub.io CRDs, and the
-#                                        models-as-a-service namespace)
-#   kserve.nim: Managed, airGapped:false
-#   kueue: Managed -> Removed          — the standalone Red Hat Kueue operator owns
-#                                        the Kueue instance instead; see the
-#                                        `kueue` app
-#   trustyai: Removed -> Managed       — guardrails / LM-Eval / detectors
-#   trainer, trainingoperator, ray, mlflowoperator: Removed (unchanged)
-#   llamastackoperator: Managed -> Removed
-#     RHOAI 3.5 deprecated the standalone LlamaStackOperator component in
-#     favor of the new `ogx` module (the GenAI Studio backend). The operator
-#     refuses to provision ogx's CRDs/controller while llamastackoperator is
-#     still Managed ("LlamaStackOperator is set to Managed; it has been
-#     deprecated, set it to Removed before enabling OGX"), which is why
-#     GenAI Studio > Playground failed API discovery for ogx.io/v1beta1 —
-#     the CRDs were never installed. No LlamaStackDistribution instance is
-#     deployed anywhere in this repo, so nothing depends on it.
+# Checked field-by-field against the v2 CRD in the rhods-operator.3.5.2 bundle
+# (3.5.3 has an identical schema). Deltas from the previous (3.4.2) version of
+# this file:
+#
+#   aigateway: Managed (NEW component)
+#     modelsAsAService: Managed   — the MaaS platform itself (maas-api +
+#                                   maas-controller in redhat-ods-applications,
+#                                   the maas.opendatahub.io CRDs, and the
+#                                   models-as-a-service namespace). This REPLACES
+#                                   kserve.modelsAsService, which 3.5 deprecates
+#                                   (kept "at least through 3.6"). Note the spelling:
+#                                   "AsA", not "AsS" — it matches the ai-gateway
+#                                   operator's own CRD field.
+#     batchGateway: Removed       — llm-d batch gateway; not used here
+#   kserve.modelsAsService: Managed -> Removed
+#     One-way door: a CEL rule on the CRD blocks Removed -> Managed on an existing
+#     DSC. A fresh create is fine. Never set this back to Managed — use aigateway.
+#   ogx: Managed (NEW component)
+#     The GenAI Studio / Playground backend; replaces llamastackoperator, which
+#     3.5 deprecates. See llamastackoperator below.
+#   mcplifecycleoperator, sparkoperator: Removed (NEW components, not used here)
+#   kueue: Managed -> Removed (unchanged in this file; see the comment on it)
+#   kserve.nim, trustyai, trainer, trainingoperator, ray, mlflowoperator: unchanged
+#
+# Fields 3.5 added that are deliberately left unset (all default to off/upstream
+# behaviour) — set them under the matching component if you need them:
+#   kserve.modelCache                          Removed; if Managed it REQUIRES cacheSize
+#                                              plus exactly one of nodeNames/nodeSelector
+#   kserve.wva.managementState                 Removed (workload-variant-autoscaler)
+#   kserve.enableLLMInferenceServiceTLS        unset -> KServe default (TLS on)
+#   kserve.enableLLMInferenceServiceConsoleDashboards   unset -> on
+#   kserve.oauthProxy.resources                unset -> operator-shipped limits/requests
+#   aipipelines.argoWorkflowsControllers       Managed (bundled Argo Workflows controllers)
+#   kueue.autoCreateQueues                     false (admins own queues via GitOps)
+#   mlflowoperator.{gateway.domain,gatewayName,sectionTitle}   only meaningful when Managed
+#
+# Why llamastackoperator is Removed:
+#   RHOAI 3.5 deprecated the standalone LlamaStackOperator component in favor of
+#   the `ogx` module (the GenAI Studio backend). The operator refuses to
+#   provision ogx's CRDs/controller while llamastackoperator is still Managed
+#   ("LlamaStackOperator is set to Managed; it has been deprecated, set it to
+#   Removed before enabling OGX"), which is why GenAI Studio > Playground failed
+#   API discovery for ogx.io/v1beta1 — the CRDs were never installed. No
+#   LlamaStackDistribution instance is deployed anywhere in this repo, so nothing
+#   depends on it.
 
 apiVersion: datasciencecluster.opendatahub.io/v2
 kind: DataScienceCluster
@@ -30,6 +54,17 @@ metadata:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   components:
+    aigateway:
+      batchGateway:
+        managementState: Removed
+      managementState: Managed
+      # Needs the maas-db-config Secret and Authorino listener TLS before it goes
+      # Ready — both come from the `maas` app (operators/bases/maas): a sync-hook
+      # Job generates the Secret (+ the postgres it points at), authorino-tls.yaml
+      # does the TLS. Until that app syncs the DSC just reports
+      # PrerequisitesNotMet; it converges by itself afterwards.
+      modelsAsAService:
+        managementState: Managed
     aipipelines:
       managementState: Managed
     dashboard:
@@ -37,8 +72,10 @@ spec:
     feastoperator: {}
     kserve:
       managementState: Managed
+      # Deprecated in 3.5 — MaaS moved to aigateway.modelsAsAService above.
+      # Leave this Removed: Removed -> Managed is rejected on an existing DSC.
       modelsAsService:
-        managementState: Managed
+        managementState: Removed
       nim:
         airGapped: false
         managementState: Managed
@@ -47,16 +84,24 @@ spec:
       defaultClusterQueueName: default
       defaultLocalQueueName: default
       # Removed here on purpose — the openshift-kueue-operator manages the
-      # Kueue instance (see the `kueue` app). Setting this back to
-      # Managed makes the two controllers fight over the same CRDs.
+      # Kueue instance (see the `kueue` app). The 3.5 operator rejects Managed
+      # outright; "Unmanaged" (operator deploys nothing but may still write
+      # supporting config) is the other valid value if Removed ever gets in the way.
+      # The two queue names above are only used when autoCreateQueues is true.
       managementState: Removed
     llamastackoperator:
+      managementState: Removed
+    mcplifecycleoperator:
       managementState: Removed
     mlflowoperator:
       managementState: Removed
     modelregistry:
       registriesNamespace: rhoai-model-registries
+    ogx:
+      managementState: Managed
     ray:
+      managementState: Removed
+    sparkoperator:
       managementState: Removed
     trainer:
       managementState: Removed

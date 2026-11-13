@@ -653,7 +653,7 @@ Exactly four kinds were unresolvable, all added in the 2026-08-04 capture (#12):
 
 | Kind | CRD comes from |
 |------|----------------|
-| `maas.opendatahub.io/v1alpha1` `Tenant`, `MaaSSubscription`, `MaaSAuthPolicy` | the DataScienceCluster, once `kserve.modelsAsService: Managed` reconciles |
+| `maas.opendatahub.io/v1alpha1` `Tenant`, `MaaSSubscription`, `MaaSAuthPolicy` | the DataScienceCluster, once `aigateway.modelsAsAService: Managed` reconciles (`kserve.modelsAsService` before RHOAI 3.5) |
 | `opendatahub.io/v1alpha` `OdhDashboardConfig` | the DataScienceCluster's dashboard component |
 
 Which makes it a **hard deadlock**, not a slow start:

@@ -1,4 +1,4 @@
-# Normally created by the RHOAI maas-controller once the DSC's kserve.modelsAsService
+# Normally created by the RHOAI maas-controller once the DSC's aigateway.modelsAsAService
 # component goes Managed. Declared here anyway so the Tenant / MaaSSubscription /
 # MaaSAuthPolicy CRs never race a missing namespace on a cold bootstrap. Only
 # metadata.name is set — the controller owns the rest of the labels.

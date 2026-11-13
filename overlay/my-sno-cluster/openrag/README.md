@@ -111,4 +111,4 @@ IBM-Cloud StorageClass (`filter-render.py`).
 ## Cluster domain
 
 The Route host in `route.yaml` and the MaaS URL in `backend-rhoai-patch.yaml` pin
-`apps.cluster-68qgz.68qgz.sandbox2261.opentlc.com`. Update both when the cluster changes.
+`apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com`. Update both when the cluster changes.

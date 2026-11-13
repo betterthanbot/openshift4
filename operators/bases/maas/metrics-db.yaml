@@ -1,47 +1,31 @@
-# MaaS metrics database.
+# MaaS database.
 #
-# A small PostgreSQL used as the long-term store behind the "MaaS Postgres" Grafana
-# datasource (see the grafana-operator app) and the MaaS stakeholder / chargeback
-# dashboards in bases/grafana. Kuadrant + the RHOAI Thanos only keep short-window
-# counters; this is where rolled-up usage lands.
+# One small PostgreSQL serving two jobs:
+#   1. the API-key store behind maas-api — without it MaaS does not start and no API keys
+#      can be minted or validated (see db-secrets.yaml for how maas-api finds it);
+#   2. the long-term usage store behind the "MaaS Postgres" Grafana datasource (see the
+#      grafana-operator app) and the MaaS stakeholder / chargeback dashboards in
+#      bases/grafana. Kuadrant + the RHOAI Thanos only keep short-window counters; this is
+#      where rolled-up usage lands. Nothing in this repo writes usage rows here — only
+#      maas-api's own tables are populated automatically.
 #
-# On the source cluster this was stood up ad hoc from the OpenShift
-# `postgresql-persistent` template (as a DeploymentConfig). It is re-expressed here as a
-# plain Deployment — DeploymentConfig is deprecated in OCP 4.14+.
+# Credentials: the maas-postgres Secret this Deployment reads (and maas-db-config for
+# maas-api) are fixed sandbox values in db-secrets.yaml, applied at wave 1 before this
+# Deployment (wave 2) starts.
 #
-# NOTE: nothing in this repo writes to this database. On the source cluster it was
-# populated out-of-band. Treat it as the store, not the pipeline.
+# IMAGE: registry.redhat.io/rhel9/postgresql-16 — the same image RHOAI itself ships
+# (RELATED_IMAGE_POSTGRESQL_16_IMAGE in the rhods-operator 3.5.2 CSV), pulled with the
+# cluster's global pull secret. It replaces the `openshift/postgresql:15-el9` imagestream
+# tag, which the samples operator does not provide on OCP 4.22 (only 10-el8, 12-el8,
+# 13-el8, 13-el9, latest) — the Deployment would sit in ImagePullBackOff and maas-api
+# would have no database. Same sclorg image family: same POSTGRESQL_* env vars, same
+# /var/lib/pgsql/data and /usr/libexec/check-container, so nothing else changed.
+# Pinning: swap `:latest` for a digest if you need reproducible pulls. A PVC already
+# holding PostgreSQL 15 data cannot be opened by 16 as-is: set POSTGRESQL_UPGRADE=copy
+# for one start, or recreate the PVC (a fresh cluster has neither problem).
 #
-# The image is the built-in OpenShift postgresql imagestream — no registry auth needed.
 # CHANGE ME: storageClassName must name an Immediate-binding class (see the
 # storageclass app).
-
-# Placeholder credentials. Prune=false + IgnoreExtraneous keep ArgoCD from
-# reverting the real password once you set it. Replace it, then restart the
-# deployment:
-#   oc create secret generic maas-postgres -n redhat-ods-applications \
-#     --from-literal=database-name=maas \
-#     --from-literal=database-user=maas \
-#     --from-literal=database-password='<pick-one>' \
-#     --dry-run=client -o yaml | oc apply -f -
-#   oc rollout restart deploy/maas-postgres -n redhat-ods-applications
-# The same password goes into the maas-postgres-grafana-auth Secret in the
-# grafana namespace (see the grafana-operator app, maas-postgres-auth-secret.yaml).
-apiVersion: v1
-kind: Secret
-metadata:
-  name: maas-postgres
-  namespace: redhat-ods-applications
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-    argocd.argoproj.io/sync-options: Prune=false
-    argocd.argoproj.io/compare-options: IgnoreExtraneous
-type: Opaque
-stringData:
-  database-name: "maas"
-  database-user: "maas"
-  database-password: "CHANGE_ME"
----
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -101,7 +85,7 @@ spec:
     spec:
       containers:
         - name: postgresql
-          image: image-registry.openshift-image-registry.svc:5000/openshift/postgresql:15-el9
+          image: registry.redhat.io/rhel9/postgresql-16:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432

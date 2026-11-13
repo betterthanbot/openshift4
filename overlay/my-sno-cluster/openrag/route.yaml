@@ -15,7 +15,7 @@ metadata:
     # Chat/agent replies can sit silent longer than the 30s router default.
     haproxy.router.openshift.io/timeout: 5m
 spec:
-  host: openrag.apps.cluster-68qgz.68qgz.sandbox2261.opentlc.com
+  host: openrag.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com
   to:
     kind: Service
     name: openrag-frontend

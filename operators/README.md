@@ -56,7 +56,7 @@ ApplicationSet; the two never overlap.
 | `operators-rhoai` | [`bases/rhoai`](bases/rhoai) | RHODS operator + `DSCInitialization`, `DataScienceCluster`, `OdhDashboardConfig` | `redhat-ods-operator` | service-mesh, connectivity-link, opentelemetry, tempo |
 | `operators-storageclass` | [`bases/storageclass`](bases/storageclass) | `gp3-csi-immediate` StorageClass | — (cluster-scoped) | — |
 | `operators-cluster-monitoring` | [`bases/cluster-monitoring`](bases/cluster-monitoring) | user-workload monitoring + RHOAI monitoring workarounds | `openshift-monitoring`, `redhat-ods-monitoring` | rhoai |
-| `operators-maas` | [`bases/maas`](bases/maas) | Gateway, `Tenant`, subscriptions, auth + rate-limit policies, metrics DB | `models-as-a-service` (writes into `openshift-ingress`, `redhat-ods-applications`, `kuadrant-system`) | rhoai; connectivity-link; service-mesh; storageclass; a TLS Secret `cert-manager-ingress-cert` in openshift-ingress (not in this repo) |
+| `operators-maas` | [`bases/maas`](bases/maas) | Gateway, `Tenant`, subscriptions, auth + rate-limit policies, PostgreSQL for the API keys + a Job that generates its credentials | `models-as-a-service` (writes into `openshift-ingress`, `redhat-ods-applications`, `kuadrant-system`) | rhoai; connectivity-link; service-mesh; storageclass; a TLS Secret `cert-manager-ingress-cert` in openshift-ingress (not in this repo) |
 
 ### Disabled (7)
 

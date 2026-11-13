@@ -236,7 +236,7 @@ namespaces. Committing them would just fight the controller.
 |-------|-------|-----|
 | Gateway `hostname` | [operators/overlay/my-sno-cluster/maas/](operators/overlay/my-sno-cluster/maas/kustomization.yaml) | Cluster-specific — `maas.apps.<your-cluster-domain>` |
 | `https` listener TLS Secret | [operators/bases/maas/gateway.yaml](operators/bases/maas/gateway.yaml) | Must name a real TLS Secret in `openshift-ingress` covering that hostname |
-| subscription `group`s | [operators/bases/maas/subscriptions.yaml](operators/bases/maas/subscriptions.yaml) | Must match real OpenShift Group names — **case-sensitive** |
+| DB password | [operators/bases/maas/db-secrets.yaml](operators/bases/maas/db-secrets.yaml) | Fixed sandbox value; must match `maas-postgres-grafana-auth` in the grafana-operator base |
 | metrics DB `storageClassName` | [operators/bases/maas/metrics-db.yaml](operators/bases/maas/metrics-db.yaml) | Match your cluster's storage class |
 
 ---
@@ -303,8 +303,9 @@ oc get kuadrant -n kuadrant-system
 # Gateway must be Programmed and have an address
 oc get gateway maas-default-gateway -n openshift-ingress
 
-# Tenant Reconciled, subscriptions Active
-oc get tenant,maassubscription,maasauthpolicy -n models-as-a-service
+# Tenant Reconciled (no subscriptions/policies are deployed — you create those; see bases/maas/kustomization.yaml)
+oc get tenant -n models-as-a-service
+oc get pods -n redhat-ai-gateway-infra   # maas-api
 
 # The controller-generated policies these produce
 oc get authpolicy,ratelimitpolicy,tokenratelimitpolicy -A

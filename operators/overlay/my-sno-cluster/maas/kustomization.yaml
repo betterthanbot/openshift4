@@ -9,7 +9,11 @@
 # at (cert-manager-ingress-cert in openshift-ingress). It last changed in commit
 # 58e897e when the sandbox changed (cluster-dgs2z -> cluster-sdpvb): a stale hostname
 # breaks the RHOAI dashboard's API Keys page. Moving to a new cluster means editing
-# this one value.
+# this one value. Now cluster-b9r9v (2026-11-13). Get it with:
+#   echo "maas.$(oc get ingresses.config cluster -o jsonpath='{.spec.domain}')"
+# and check the cert covers it (the sandbox cert is a wildcard for *.apps.<domain>):
+#   oc get secret cert-manager-ingress-cert -n openshift-ingress -o jsonpath='{.data.tls\.crt}' \
+#     | base64 -d | openssl x509 -noout -ext subjectAltName
 # ==============================================================================
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -26,7 +30,7 @@ patches:
     patch: |-
       - op: replace
         path: /spec/listeners/0/hostname
-        value: maas.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com
+        value: maas.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com
       - op: replace
         path: /spec/listeners/1/hostname
-        value: maas.apps.cluster-sdpvb.sdpvb.sandbox1464.opentlc.com
+        value: maas.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com

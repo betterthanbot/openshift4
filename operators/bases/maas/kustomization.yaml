@@ -4,9 +4,25 @@
 # Sits on top of two things that must already be in place:
 #   1. connectivity-link  -> rhcl-operator (Kuadrant) + the Kuadrant CR
 #      service-mesh       -> servicemeshoperator3
-#   2. rhoai: the DSC's kserve.modelsAsService = Managed
+#   2. rhoai: the DSC's aigateway.modelsAsAService = Managed
+#      (RHOAI 3.5 moved this from the deprecated kserve.modelsAsService)
 #      (creates maas-api + maas-controller and the maas.opendatahub.io CRDs)
 # and provides the Gateway the models attach to (gateway.yaml, in this app).
+#
+# What this app supplies so MaaS can come up (all verified against the 3.5.2 images):
+#   * PostgreSQL for the API keys      metrics-db.yaml  (postgresql-16, PVC on gp3-csi-immediate)
+#   * its credentials (fixed, sandbox) db-secrets.yaml  (maas-postgres + maas-db-config)
+#   * Authorino listener TLS           authorino-tls.yaml
+#   * the Gateway + its TLS hostname   gateway.yaml     (hostname patched in the overlay)
+#   * the Tenant, gateway telemetry, empty rhods-* groups
+# RHOAI 3.5 runs maas-api in its own namespace (redhat-ai-gateway-infra) and the controller
+# copies maas-db-config there from redhat-ods-applications — see db-secrets.yaml for the
+# post-sync checks.
+#
+# CLEAN SLATE ON PURPOSE: no models, MaaSSubscriptions, MaaSAuthPolicies, team groups or
+# per-tier rate limits are deployed. Once the app is Synced you create those yourself
+# (RHOAI dashboard > Models-as-a-Service, or `oc apply` MaaSSubscription / MaaSAuthPolicy
+# in models-as-a-service) and mint your own API keys on the dashboard's API Keys page.
 #
 # Request path:
 #   client -> maas-default-gateway (Gateway API, openshift-default class)
@@ -41,11 +57,9 @@ resources:
   - namespace.yaml
   # Operands
   - metrics-db.yaml
-  - db-config.yaml
+  - db-secrets.yaml
   - authorino-tls.yaml
   - gateway.yaml
   - tenant.yaml
-  - subscriptions.yaml
-  - authpolicies.yaml
   - groups.yaml
-  - gateway-policies.yaml
+  - telemetry.yaml
