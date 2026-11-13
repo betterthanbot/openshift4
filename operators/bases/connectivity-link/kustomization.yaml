@@ -19,3 +19,5 @@ resources:
   - subscription.yaml
   # Operands
   - kuadrant.yaml
+  # Turns on the Kuadrant UI plugin (RHCL's only console plugin) in the OpenShift console
+  - console-plugin.yaml
