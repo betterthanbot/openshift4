@@ -1,0 +1,27 @@
+# Wave 2: GrafanaDatasource CR. secureJsonData is intentionally omitted here —
+# the grafana-auth-job (wave 3) patches it directly after creating the token.
+# ArgoCD ignoreDifferences on /spec/datasource/secureJsonData prevents syncs
+# from clearing the patched value.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: thanos-prometheus
+  namespace: grafana
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana-a
+  datasource:
+    name: Prometheus
+    type: prometheus
+    access: proxy
+    # Internal Thanos service — works on every OpenShift cluster without changes
+    url: https://thanos-querier.openshift-monitoring.svc:9091
+    isDefault: true
+    jsonData:
+      timeInterval: 5s
+      tlsSkipVerify: true
+      httpHeaderName1: "Authorization"

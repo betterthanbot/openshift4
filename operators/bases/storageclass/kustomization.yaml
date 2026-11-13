@@ -1,0 +1,13 @@
+# ==============================================================================
+# operators/bases/storageclass — Cluster StorageClasses (gp3-csi-immediate)
+#
+# Creates gp3-csi-immediate: gp3-csi with volumeBindingMode: Immediate. Needed so a PVC
+# applied in an earlier sync wave than its consumer does not deadlock the sync.
+#
+# ArgoCD app:  operators-storageclass   (argocd/appset-operators.yaml)
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - gp3-csi-immediate.yaml

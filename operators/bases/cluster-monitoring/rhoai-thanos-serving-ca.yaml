@@ -1,0 +1,15 @@
+# techdebt.md #4 — CA bundle for the global Thanos Querier's serving cert.
+#
+# Left empty on purpose: the inject-cabundle annotation makes
+# service-ca-operator populate `data["service-ca.crt"]`. ArgoCD must not fight
+# that, hence the ignore annotations below (and there is a matching
+# ignoreDifferences entry in argocd/appset-operators.yaml).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: thanos-querier-serving-ca
+  namespace: redhat-ods-monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    service.beta.openshift.io/inject-cabundle: "true"

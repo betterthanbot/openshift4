@@ -1,0 +1,29 @@
+# ==============================================================================
+# operators/bases/cluster-logging — Cluster Logging (Vector collector -> LokiStack)
+#
+# Installs the OpenShift Logging operator into openshift-logging, then the whole log
+# pipeline: a LokiStack to store logs, the collector ServiceAccount + RBAC, and the
+# ClusterLogForwarder that ships application, infrastructure and audit logs into it.
+#
+# The LokiStack and its S3 Secret live here (not in the `loki` app) because they sit
+# in this app's namespace, openshift-logging. The CRD comes from the Loki operator.
+#
+# ArgoCD app:  operators-cluster-logging   (argocd/appset-operators.yaml)
+# Installs:    cluster-logging (channel stable-6.6, redhat-operators) into openshift-logging
+# Needs:       loki  (LokiStack CRD)
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml
+  # Operands
+  - collector-rbac.yaml
+  - lokistack-s3-secret.yaml
+  - lokistack.yaml
+  - clusterlogforwarder.yaml

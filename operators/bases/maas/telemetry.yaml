@@ -1,0 +1,37 @@
+# Gateway telemetry.
+#
+# Adds identity + subscription labels to the gateway's request metrics. These label names
+# are what the MaaS Grafana dashboards in bases/grafana group by — change one here and the
+# corresponding dashboard panel goes blank. Subscription-agnostic: it works for whatever
+# subscriptions you create by hand.
+# `model` is read out of the response body, which is why it needs the body-based routing
+# path to work.
+#
+# The per-tier RateLimitPolicy / TokenRateLimitPolicy that used to sit next to this
+# (team-alpha / team-bravo ceilings) were removed with the team subscriptions. Limits now
+# come only from the token limits you put on the MaaSSubscriptions you create.
+apiVersion: extensions.kuadrant.io/v1alpha1
+kind: TelemetryPolicy
+metadata:
+  name: maas-telemetry
+  namespace: openshift-ingress
+  labels:
+    app.kubernetes.io/part-of: maas-observability
+    maas.opendatahub.io/tenant-name: default-tenant
+    maas.opendatahub.io/tenant-namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: maas-default-gateway
+  metrics:
+    default:
+      labels:
+        cost_center: "auth.identity.subscription_info.costCenter"
+        model: "responseBodyJSON(\"/model\")"
+        organization_id: "auth.identity.subscription_info.organizationId"
+        subscription: "auth.identity.selected_subscription"
+        user: "auth.identity.userid"

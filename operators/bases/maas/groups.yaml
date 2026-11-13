@@ -1,0 +1,24 @@
+# RHOAI access groups (empty shells).
+#
+# rhods-admins / rhods-users are the default admin / user groups of the RHOAI dashboard.
+# Membership is NOT managed here — `users` is left empty on purpose so ArgoCD never wipes
+# real members. kube:admin does not need either.
+#
+# The old team-alpha/-bravo/-Charlie/-Delta groups were removed together with their
+# MaaSSubscriptions / MaaSAuthPolicies: this sandbox starts from a clean slate and you
+# create groups, subscriptions and API keys yourself.
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: "rhods-admins"
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+---
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: "rhods-users"
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous

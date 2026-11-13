@@ -227,7 +227,7 @@ data:
 
       - name: "8mxg2 Demo OCP Cluster"
         group: "External Cluster"
-        url: "https://console-openshift-console.apps.cluster-8mxg2.8mxg2.sandbox1240.opentlc.com"
+        url: "https://console-openshift-console.apps.cluster-b9r9v.b9r9v.sandbox3268.opentlc.com"
         interval: 1m
         client:
           insecure: true

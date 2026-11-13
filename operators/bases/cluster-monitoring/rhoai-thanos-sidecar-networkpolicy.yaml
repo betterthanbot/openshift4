@@ -1,0 +1,44 @@
+# RHOAI monitoring workarounds — techdebt.md items 3 and 4.
+#
+# Everything named rhoai-* in this directory is additive: it adds to what the
+# rhods-operator generates and never edits an operator-owned object, so an operator
+# resync cannot clobber it (unlike the Perses CR in techdebt item 7, which has been
+# reset once).
+#
+# Keep these in sync with techdebt.md — if either upstream bug is fixed, these become
+# dead weight and should be removed together with the techdebt entry.
+
+# techdebt.md #3 — supplementary, additive NetworkPolicy.
+#
+# The rhods-operator generates NetworkPolicy/data-science-prometheus-instance-ingress
+# in this namespace, which opens only port 9090 from two proxy pods. It never
+# opens 10901 (the Thanos gRPC sidecar port),
+# so thanos-querier-data-science resolves the sidecar but every gRPC connection
+# times out and /api/v1/stores stays empty.
+#
+# NetworkPolicies are OR'd together, so this one grants the missing port without
+# touching (or being overwritten by) the operator-owned policy.
+#
+# Wave 5 — the namespace and the MonitoringStack pods must exist first.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: thanos-querier-data-science-to-prometheus-sidecar
+  namespace: redhat-ods-monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  policyTypes:
+    - Ingress
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: data-science-monitoringstack
+      app.kubernetes.io/name: prometheus
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: thanos-querier-data-science-thanos-querier
+      ports:
+        - protocol: TCP
+          port: 10901

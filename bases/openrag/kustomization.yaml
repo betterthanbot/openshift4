@@ -1,0 +1,105 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ./openrag.yaml     # upstream chart, rendered by `make` (no Secrets — see Makefile)
+- ./opensearch.yaml  # not in the chart
+- ./docling.yaml     # not in the chart
+
+namespace: openrag
+
+patches:
+# backend and langflow both mount the openrag-shared volume. Upstream asks for ReadWriteMany;
+# this cluster only has EBS (ReadWriteOnce), which two pods can share only on the SAME node.
+# Pin the backend to wherever langflow runs (langflow has no such constraint, so no deadlock).
+- target:
+    kind: Deployment
+    name: openrag-backend
+  patch: |-
+    - op: add
+      path: /spec/template/spec/affinity
+      value:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: openrag
+                  app.kubernetes.io/component: langflow
+# Kubernetes injects docker-link style env vars for every Service (OPENRAG_BACKEND_PORT=
+# tcp://10.x:8000, ...). The Service `openrag-backend` therefore overwrites the frontend's own
+# OPENRAG_BACKEND_PORT setting, and its proxy builds http://openrag-backend:tcp://10.x:8000/...
+# (ERR_INVALID_URL -> every /api call returns 500 "Failed to proxy request"). Turn them off.
+- target:
+    kind: Deployment
+    name: openrag-(frontend|backend|langflow)
+  patch: |-
+    - op: add
+      path: /spec/template/spec/enableServiceLinks
+      value: false
+# Single-node OpenSearch. The chart's .env has none of these, so the backend falls back to its
+# multi-node production defaults: it waits for several nodes before reporting ready (and is
+# killed by its liveness probe first, exit 137) and creates indices with 2 shards / 2 replicas.
+# Same values the project's own .env.example and docker-compose.yml use for one node.
+- target:
+    kind: Deployment
+    name: openrag-backend
+  patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: openrag-backend
+    spec:
+      template:
+        spec:
+          containers:
+            - name: backend
+              env:
+                - name: OPENSEARCH_NODE_COUNT_CHECK_ENABLED
+                  value: "false"
+                - name: OPENRAG_OPENSEARCH_NUMBER_OF_SHARDS
+                  value: "1"
+                - name: OPENRAG_OPENSEARCH_NUMBER_OF_REPLICAS
+                  value: "0"
+                - name: OPENRAG_ENSURE_INDEX_REPLICAS_ON_STARTUP
+                  value: "false"
+# The chart's init containers (curlimages/curl, busybox) set no numeric user, but the pod
+# requires runAsNonRoot, so the kubelet refuses to start them ("image has non-numeric user
+# (curl_user)"). Give them the same UID as the app containers.
+- target:
+    kind: Deployment
+    name: openrag-backend
+  patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: openrag-backend
+    spec:
+      template:
+        spec:
+          initContainers:
+            - name: load-default-documents
+              securityContext:
+                runAsUser: 1000
+                runAsGroup: 1000
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+            - name: load-default-flows
+              securityContext:
+                runAsUser: 1000
+                runAsGroup: 1000
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+            - name: wait-for-langflow
+              securityContext:
+                runAsUser: 1000
+                runAsGroup: 1000
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL

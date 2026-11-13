@@ -1,0 +1,24 @@
+# ==============================================================================
+# operators/bases/gitops — OpenShift GitOps (operator + ArgoCD customisation)
+#
+# Installs the OpenShift GitOps operator and customises the openshift-gitops ArgoCD
+# instance and AppProjects. Disabled: GitOps is a prerequisite of this whole repo and
+# is provided by the cluster, not managed from within itself.
+#
+# ArgoCD app:  operators-gitops   (argocd/appset-operators.yaml)
+# Installs:    openshift-gitops-operator (channel latest, redhat-operators) into openshift-gitops-operator
+# Status:      DISABLED — excluded in argocd/appset-operators.yaml
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml
+  # Operands
+  - argocd.yaml
+  - appprojects.yaml

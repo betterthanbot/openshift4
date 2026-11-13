@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: netobserv
+  labels:
+    kubernetes.io/metadata.name: netobserv
+    openshift.io/cluster-monitoring: "true"
+    security.openshift.io/scc.podSecurityLabelSync: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"

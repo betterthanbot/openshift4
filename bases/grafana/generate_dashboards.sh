@@ -27,6 +27,9 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana-a
+  datasources:
+    - inputName: "DS_PROMETHEUS"
+      datasourceName: "Prometheus"
   json: |
 EOF
 

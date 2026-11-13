@@ -1,0 +1,20 @@
+# ==============================================================================
+# operators/bases/cert-manager — cert-manager
+#
+# Installs cert-manager for Red Hat OpenShift. Disabled by default: the sandbox this
+# platform was captured from ships it pre-installed.
+#
+# ArgoCD app:  operators-cert-manager   (argocd/appset-operators.yaml)
+# Installs:    openshift-cert-manager-operator (channel stable-v1, redhat-operators) into cert-manager-operator
+# Status:      DISABLED — excluded in argocd/appset-operators.yaml
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml

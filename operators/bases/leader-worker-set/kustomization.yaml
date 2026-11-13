@@ -1,0 +1,19 @@
+# ==============================================================================
+# operators/bases/leader-worker-set — Leader Worker Set
+#
+# Installs the Leader Worker Set operator (multi-node / disaggregated LLM serving).
+# No operands are defined.
+#
+# ArgoCD app:  operators-leader-worker-set   (argocd/appset-operators.yaml)
+# Installs:    leader-worker-set (channel stable-v1.0, redhat-operators) into openshift-lws-operator
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml

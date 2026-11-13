@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-lightspeed
+  labels:
+    kubernetes.io/metadata.name: openshift-lightspeed
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"

@@ -1,0 +1,19 @@
+# ==============================================================================
+# operators/bases/cluster-monitoring — Cluster monitoring (user-workload monitoring + RHOAI workarounds)
+#
+# Not an operator: patches the built-in monitoring stack. Turns on
+# user-workload monitoring and carries the additive RHOAI monitoring workarounds
+# (techdebt.md #3 and #4).
+#
+# ArgoCD app:  operators-cluster-monitoring   (argocd/appset-operators.yaml)
+# Needs:       rhoai  (creates the redhat-ods-monitoring namespace the rhoai-* objects live in)
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - user-workload-monitoring.yaml
+  - rhoai-thanos-sidecar-networkpolicy.yaml
+  - rhoai-perses-cluster-monitoring-view.yaml
+  - rhoai-thanos-serving-ca.yaml
+  # - rhoai-perses-prometheus-datasource.yaml   # disabled — see the file header

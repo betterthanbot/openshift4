@@ -1,0 +1,31 @@
+# ==============================================================================
+# operators/bases/grafana-operator — Grafana Operator + Grafana instance
+#
+# Installs the community Grafana Operator, the `grafana-a` instance, its
+# ServiceAccount/RBAC, the token-minting Job and all GrafanaDatasources (Thanos, RHOAI
+# Thanos, MaaS Postgres, and the three Loki tenants). Dashboards are deployed by the
+# separate `grafana` workload (overlay/my-sno-cluster/grafana).
+#
+# ArgoCD app:  operators-grafana-operator   (argocd/appset-operators.yaml)
+# Installs:    grafana-operator (channel v5, community-operators) into grafana
+# Needs:       cluster-logging, rhoai, maas  (runtime only: the Loki / Prometheus (Data Science) /
+#              MaaS Postgres datasources stay empty until those exist)
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml
+  # Operands
+  - grafana.yaml
+  - serviceaccount-rbac.yaml
+  - datasource-thanos.yaml
+  - datasources-extra.yaml
+  - maas-postgres-auth-secret.yaml
+  - datasources-loki.yaml
+  - auth-job.yaml

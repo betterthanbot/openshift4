@@ -1,0 +1,44 @@
+# AppProjects.
+#
+# NOTE: argocd/appProject.yaml (applied by the bootstrap Application) already defines
+# `openshift4-community`. Syncing this file as well gives that AppProject two owners.
+# Enable only if you stop managing it from argocd/.
+# CHANGE ME: point sourceRepos at your fork / mirror.
+
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: default
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  destinations:
+    - namespace: '*'
+      server: '*'
+  sourceRepos:
+    - '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: openshift4-community
+  namespace: openshift-gitops
+  annotations:
+    description: "Open community GitOps project for shared OpenShift enablement assets"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
+  sourceRepos:
+    - https://github.com/betterthanbot/openshift4.git

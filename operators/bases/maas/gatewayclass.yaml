@@ -1,0 +1,24 @@
+# The GatewayClass the MaaS Gateway (gateway.yaml) is built from.
+#
+# `openshift-default` is NOT created by OpenShift or RHOAI on a fresh cluster. Gateway API
+# classes are cluster admin objects, and the only class RHOAI makes is
+# `data-science-gateway-class` (for its own data-science-gateway, which is RHOAI-managed).
+# Without this object the maas-default-gateway sits at "Waiting for controller" forever, no
+# Service is ever created for it, and maas-api exits at startup with
+#
+#   failed to register handlers: gateway service not found for
+#   openshift-ingress/maas-default-gateway: model access probes require a resolvable gateway
+#   internal host
+#
+# The controllerName below is the OpenShift ingress operator's built-in Gateway API
+# controller (the same one data-science-gateway-class uses); it installs and configures
+# Service Mesh 3 / Istio for any GatewayClass that names it.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: openshift-default
+  annotations:
+    # Before the Gateway (wave 2) that references it.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  controllerName: openshift.io/gateway-controller/v1

@@ -1,0 +1,682 @@
+---
+# Source: openrag/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openrag
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: false
+---
+# Source: openrag/templates/configmaps/app-config-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openrag-app-config
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+data:
+  config.yaml: |
+    agent:
+      llm_model: "qwen25-15b-instruct"
+      llm_provider: "rhoai"
+    edited: false
+    knowledge:
+      chunk_overlap: 200
+      chunk_size: 1000
+      embedding_model: "Qwen/Qwen3-Embedding-0.6B"
+      embedding_provider: "rhoai"
+      ocr: false
+      picture_descriptions: false
+      table_structure: true
+    providers:
+      anthropic:
+        configured: false
+      ollama:
+        configured: false
+      openai:
+        configured: false
+      watsonx:
+        configured: false
+        endpoint: "https://us-south.ml.cloud.ibm.com"
+---
+# Source: openrag/templates/configmaps/flow-ids-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openrag-flow-ids
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+data:
+  chat-flow-id: "1098eea1-6649-4e1d-aed1-b77249fb8dd0"
+  ingest-flow-id: "5488df7c-b93f-4f87-a446-b67028bc0813"
+  url-ingest-flow-id: "72c3d17c-2dac-4a73-b48a-6518473d7830"
+  nudges-flow-id: "ebc01d31-1976-46ce-a385-b0240327226c"
+---
+# Source: openrag/templates/storage/data-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openrag-data
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: backend
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Source: openrag/templates/storage/langflow-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openrag-langflow
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: langflow
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Source: openrag/templates/storage/shared-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openrag-shared
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: backend
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Source: openrag/templates/backend/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: openrag-backend
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/component: backend
+---
+# Source: openrag/templates/frontend/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: openrag-frontend
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: frontend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/component: frontend
+---
+# Source: openrag/templates/langflow/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: openrag-langflow
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: langflow
+spec:
+  type: ClusterIP
+  ports:
+    - port: 7860
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/component: langflow
+---
+# Source: openrag/templates/backend/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openrag-backend
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 1  # Single pod for vertical scaling
+  strategy:
+    type: Recreate  # Required for RWO PVCs
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openrag
+      app.kubernetes.io/instance: openrag
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openrag
+        app.kubernetes.io/instance: openrag
+        app.kubernetes.io/component: backend
+      annotations:
+        checksum/secret-opensearch: b062e8775d678cdad819ddb6c8f6bb07e1707abdc213751689b0d8728abd4d5e
+        checksum/secret-langflow: 122b69a0784d5d8e260f8e8eaefbaf985ecbc58fa988b2c8ac457df63b1ad414
+        checksum/config-flows: e7f093f3764a86d758bcea4831a2cc07374161bdbe38111c55b87cfda93f6523
+        checksum/config-app: 09bfd635cb3a63710203d2e20f3d7adb507a44dc6e7b690c7f8f2a30f855e7b1
+        checksum/secret-backend: c92357bc747a5ad4f060f85ff7d258c821cd455d52959cb79c68442444e27abc
+        checksum/secret-dotenv: a8d54a32907634ed6bde897794aee3974cc1feed6ad92efd025211e929f6e688
+    spec:
+      serviceAccountName: openrag
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+      initContainers:
+        - name: load-default-documents
+          image: curlimages/curl:8.5.0
+          resources:
+            limits:
+              ephemeral-storage: 500Mi
+            requests:
+              ephemeral-storage: 500Mi
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+
+              DOCS_DIR="/shared/openrag-documents"
+
+              OWNER="langflow-ai"
+              REPO="openrag"
+              BRANCH="main"
+              GIT_REF="a1d691b9ef6ef9154d83c8a3565c23d185c06f8e"
+              REPO_PATH="openrag-documents"
+
+              # Raw base URL: https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>
+              GITHUB_RAW_URL="https://raw.githubusercontent.com/${OWNER}/${REPO}/${GIT_REF}/${REPO_PATH}"
+
+              mkdir -p "$DOCS_DIR"
+
+              if [ -z "$(ls -A "$DOCS_DIR" 2>/dev/null)" ]; then
+                echo "Loading default documents from ${OWNER}/${REPO}@${GIT_REF}/${REPO_PATH} ..."
+
+                download_with_retry() {
+                  file="$1"
+                  url="${GITHUB_RAW_URL}/${file}"
+                  dest="${DOCS_DIR}/${file}"
+                  max_retries=3
+                  timeout=60
+                  retry=0
+
+                  while [ "$retry" -lt "$max_retries" ]; do
+                    echo "Downloading ${file} (attempt $((retry + 1))/${max_retries})..."
+                    if curl -f -L -m "$timeout" -o "$dest" "$url"; then
+                      echo "OK: ${file}"
+                      return 0
+                    fi
+                    retry=$((retry + 1))
+                    if [ "$retry" -lt "$max_retries" ]; then
+                      echo "Retrying ${file}..."
+                      sleep 2
+                    fi
+                  done
+
+                  echo "ERROR: Failed to download ${file} from ${url}"
+                  return 1
+                }
+
+                failed=0
+                if ! download_with_retry "docling.pdf"; then failed=1; fi
+                if ! download_with_retry "ibm_anthropic.pdf"; then failed=1; fi
+                if ! download_with_retry "openrag-documentation.pdf"; then failed=1; fi
+                if ! download_with_retry "warmup_ocr.pdf"; then failed=1; fi
+
+                if [ "$failed" -eq 1 ]; then
+                  echo "ERROR: One or more documents failed to download"
+                  exit 1
+                fi
+
+                echo "Documents loaded: $(ls "$DOCS_DIR")"
+              else
+                echo "Documents already exist in $DOCS_DIR, skipping download."
+              fi
+          volumeMounts:
+            - name: shared
+              mountPath: "/shared"
+        - name: load-default-flows
+          image: curlimages/curl:8.5.0
+          resources:
+            limits:
+              ephemeral-storage: 500Mi
+            requests:
+              ephemeral-storage: 500Mi
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+
+              FLOWS_DIR="/shared/flows"
+
+              OWNER="langflow-ai"
+              REPO="openrag"
+              BRANCH="main"
+              GIT_REF="a1d691b9ef6ef9154d83c8a3565c23d185c06f8e"
+              REPO_PATH="flows"
+
+              # Raw base URL: https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>
+              GITHUB_RAW_URL="https://raw.githubusercontent.com/${OWNER}/${REPO}/${GIT_REF}/${REPO_PATH}"
+
+              mkdir -p "$FLOWS_DIR"
+
+              if [ -z "$(ls -A "$FLOWS_DIR" 2>/dev/null)" ]; then
+                echo "Loading default flows from ${OWNER}/${REPO}@${GIT_REF}/${REPO_PATH} ..."
+
+                download_with_retry() {
+                  file="$1"
+                  url="${GITHUB_RAW_URL}/${file}"
+                  dest="${FLOWS_DIR}/${file}"
+                  max_retries=3
+                  timeout=60
+                  retry=0
+
+                  while [ "$retry" -lt "$max_retries" ]; do
+                    echo "Downloading ${file} (attempt $((retry + 1))/${max_retries})..."
+                    if curl -f -L -m "$timeout" -o "$dest" "$url"; then
+                      echo "OK: ${file}"
+                      return 0
+                    fi
+                    retry=$((retry + 1))
+                    if [ "$retry" -lt "$max_retries" ]; then
+                      echo "Retrying ${file}..."
+                      sleep 2
+                    fi
+                  done
+
+                  echo "ERROR: Failed to download ${file} from ${url}"
+                  return 1
+                }
+
+                failed=0
+                if ! download_with_retry "ingestion_flow.json"; then failed=1; fi
+                if ! download_with_retry "openrag_agent.json"; then failed=1; fi
+                if ! download_with_retry "openrag_nudges.json"; then failed=1; fi
+                if ! download_with_retry "openrag_url_mcp.json"; then failed=1; fi
+
+                if [ "$failed" -eq 1 ]; then
+                  echo "ERROR: One or more flows failed to download"
+                  exit 1
+                fi
+
+                echo "Flows loaded: $(ls "$FLOWS_DIR")"
+              else
+                echo "Flows already exist in $FLOWS_DIR, skipping download."
+              fi
+          volumeMounts:
+            - name: shared
+              mountPath: "/shared"
+        - name: wait-for-langflow
+          image: busybox:1.36
+          resources:
+            limits:
+              ephemeral-storage: 10Mi
+            requests:
+              ephemeral-storage: 10Mi
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Langflow to be ready..."
+              until nc -z openrag-langflow 7860; do
+                echo "Langflow not ready, sleeping 5s..."
+                sleep 5
+              done
+              echo "Langflow is ready!"
+      containers:
+        - name: backend
+          image: "langflowai/openrag-backend:0.8.0"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsUser: 1000
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          volumeMounts:
+            - name: openrag-dotenv
+              mountPath: /app/.env
+              subPath: .env
+              readOnly: true
+            - name: data
+              mountPath: "/data"
+            - name: shared
+              mountPath: "/shared"
+              readOnly: true
+          resources:
+            limits:
+              cpu: "4"
+              ephemeral-storage: 2Gi
+              memory: 16Gi
+            requests:
+              cpu: 500m
+              ephemeral-storage: 1Gi
+              memory: 2Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  FAILED=0
+
+                  # Langflow health
+                  echo "Checking Langflow..."
+                  if ! curl -sf "http://openrag-langflow:7860/health" >/dev/null 2>&1; then
+                    echo "ERROR: Langflow health check failed at http://openrag-langflow:7860/health"
+                    FAILED=1
+                  else
+                    echo "Langflow: OK"
+                  fi
+
+                  echo "All health checks passed"
+                  exit 0
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: openrag-dotenv
+          secret:
+            secretName: openrag-dotenv
+            defaultMode: 0400
+            items:
+              - key: .env
+                path: .env
+        - name: data
+          persistentVolumeClaim:
+            claimName: openrag-data
+        - name: shared
+          persistentVolumeClaim:
+            claimName: openrag-shared
+---
+# Source: openrag/templates/frontend/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openrag-frontend
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openrag
+      app.kubernetes.io/instance: openrag
+      app.kubernetes.io/component: frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openrag
+        app.kubernetes.io/instance: openrag
+        app.kubernetes.io/component: frontend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: openrag
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+      containers:
+        - name: frontend
+          image: "langflowai/openrag-frontend:0.8.0"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsUser: 1000
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          env:
+            # Backend connection (uses internal service name)
+            - name: OPENRAG_BACKEND_HOST
+              value: "openrag-backend"
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+# Source: openrag/templates/langflow/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openrag-langflow
+  namespace: openrag
+  labels:
+    helm.sh/chart: openrag-0.2.0
+    app.kubernetes.io/name: openrag
+    app.kubernetes.io/instance: openrag
+    app.kubernetes.io/version: "0.1.52"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: langflow
+spec:
+  replicas: 1  # Always 1 for SQLite-based Langflow
+  strategy:
+    type: Recreate  # Required for RWO PVC
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openrag
+      app.kubernetes.io/instance: openrag
+      app.kubernetes.io/component: langflow
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openrag
+        app.kubernetes.io/instance: openrag
+        app.kubernetes.io/component: langflow
+      annotations:
+        checksum/secret: 122b69a0784d5d8e260f8e8eaefbaf985ecbc58fa988b2c8ac457df63b1ad414
+        checksum/config: e7f093f3764a86d758bcea4831a2cc07374161bdbe38111c55b87cfda93f6523
+        checksum/dotenv: 260beec30dc024de710c5485c05df7eea3ff6022766afd08b3fbdd88e2edaf07
+    spec:
+      serviceAccountName: openrag
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+
+
+      containers:
+        - name: langflow
+          image: "langflowai/openrag-langflow:0.8.0"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsUser: 1000
+
+          ports:
+            - name: http
+              containerPort: 7860
+              protocol: TCP
+
+          command: ["langflow", "run", "--env-file", "/app/.env"]
+
+          volumeMounts:
+            - name: openrag-langflow-dotenv
+              mountPath: /app/.env
+              subPath: .env
+              readOnly: true
+            - name: langflow-data
+              mountPath: /app/data
+            - name: shared
+              mountPath: "/shared"
+              readOnly: true
+
+          resources:
+            limits:
+              cpu: "4"
+              ephemeral-storage: 2Gi
+              memory: 8Gi
+            requests:
+              cpu: 500m
+              ephemeral-storage: 1Gi
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+      volumes:
+        - name: openrag-langflow-dotenv
+          secret:
+            secretName: openrag-langflow-dotenv
+            defaultMode: 0400
+            items:
+              - key: .env
+                path: .env
+        - name: langflow-data
+          persistentVolumeClaim:
+            claimName: openrag-langflow
+        - name: shared
+          persistentVolumeClaim:
+            claimName: openrag-shared
+---
+# Source: openrag/templates/postgres/deployment.yaml
+# Made with Bob
+---
+# Source: openrag/templates/postgres/service.yaml
+# Made with Bob
+---
+# Source: openrag/templates/secrets/postgres-secret.yaml
+# Made with Bob
+---
+# Source: openrag/templates/storage/postgres-pvc.yaml
+# Made with Bob

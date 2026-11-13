@@ -1,0 +1,11 @@
+# ==============================================================================
+# Grafana Operator + Grafana instance — my-sno-cluster overlay
+#
+# Discovered by argocd/appset-operators.yaml (git directory generator over
+# operators/overlay/my-sno-cluster/*) -> ArgoCD Application "operators-grafana-operator".
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../bases/grafana-operator

@@ -1,0 +1,22 @@
+# ==============================================================================
+# operators/bases/cluster-observability — Cluster Observability Operator (COO)
+#
+# Installs COO and the UIPlugin that adds the Logs tab under Observe > Logs in the
+# console. COO also ships the Perses operator referred to in techdebt.md #2 and #4.
+#
+# ArgoCD app:  operators-cluster-observability   (argocd/appset-operators.yaml)
+# Installs:    cluster-observability-operator (channel stable, redhat-operators) into openshift-cluster-observability-operator
+# Needs:       cluster-logging  (runtime only: the UIPlugin points at its LokiStack)
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml
+  # Operands
+  - uiplugin-logging.yaml

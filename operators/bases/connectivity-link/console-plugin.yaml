@@ -1,0 +1,104 @@
+# Enable the Connectivity Link (Kuadrant) console plugin.
+#
+# rhcl-operator ships exactly ONE UI plugin: "kuadrant-console-plugin" (declared in its CSV
+# annotation console.openshift.io/plugins and created as a ConsolePlugin object in
+# openshift-operators). OLM never turns plugins on — they only show up in the console once
+# they are listed in consoles.operator.openshift.io/cluster spec.plugins. This adds it.
+#
+# Why a Job and not a Console manifest in git: that object is cluster-wide and shared by
+# every operator (gitops-plugin, monitoring-plugin, netobserv-plugin, ...). Applying a full
+# manifest would overwrite their entries. The Job only APPENDS ours and is a no-op when it
+# is already listed, so it is safe to re-run on every sync.
+#
+# After the first sync the console rolls out new pods; refresh the browser when you see the
+# "Web console update is available" banner.
+#
+# Check:  oc get consoles.operator.openshift.io cluster -o jsonpath='{.spec.plugins}'
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: console-plugin-enabler
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: console-plugin-enabler
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+rules:
+  - apiGroups: ["operator.openshift.io"]
+    resources: ["consoles"]
+    resourceNames: ["cluster"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["console.openshift.io"]
+    resources: ["consoleplugins"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: console-plugin-enabler
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: console-plugin-enabler
+subjects:
+  - kind: ServiceAccount
+    name: console-plugin-enabler
+    namespace: kuadrant-system
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: enable-kuadrant-console-plugin
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  backoffLimit: 5
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      serviceAccountName: console-plugin-enabler
+      restartPolicy: OnFailure
+      containers:
+        - name: enabler
+          # Built-in OpenShift CLI image — available on every cluster without registry auth
+          image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              PLUGIN=kuadrant-console-plugin
+
+              # The ConsolePlugin object appears once the rhcl-operator CSV is Succeeded.
+              # Enabling a plugin that does not exist leaves the console with a broken entry.
+              for i in $(seq 1 60); do
+                oc get consoleplugin "$PLUGIN" >/dev/null 2>&1 && break
+                echo "waiting for ConsolePlugin/$PLUGIN ($i/60)"; sleep 10
+              done
+              oc get consoleplugin "$PLUGIN" >/dev/null
+
+              CURRENT=$(oc get consoles.operator.openshift.io cluster -o jsonpath='{.spec.plugins}')
+              case "$CURRENT" in
+                *"\"$PLUGIN\""*) echo "$PLUGIN already enabled: $CURRENT"; exit 0 ;;
+              esac
+
+              if [ -z "$CURRENT" ]; then
+                # spec.plugins not set yet: create the list
+                oc patch consoles.operator.openshift.io cluster --type=json \
+                  -p "[{\"op\":\"add\",\"path\":\"/spec/plugins\",\"value\":[\"$PLUGIN\"]}]"
+              else
+                # JSON-patch append: keeps every plugin other operators already registered
+                oc patch consoles.operator.openshift.io cluster --type=json \
+                  -p "[{\"op\":\"add\",\"path\":\"/spec/plugins/-\",\"value\":\"$PLUGIN\"}]"
+              fi
+              echo "enabled $PLUGIN"

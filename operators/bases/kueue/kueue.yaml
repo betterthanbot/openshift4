@@ -1,0 +1,35 @@
+# Cluster-scoped Kueue instance, owned by the standalone Red Hat Kueue operator
+# (this app's subscription.yaml).
+#
+# Do NOT also set components.kueue.managementState to Managed in the
+# DataScienceCluster (rhoai app) — RHOAI would then create its own Kueue and the
+# two controllers race over the same kueue.x-k8s.io CRDs.
+#
+# cert-manager must be available: the operator issues its webhook, metrics and
+# visibility-server certificates through it and reports CertManagerAvailable in
+# this CR's status.
+#
+# ResourceFlavors (default-flavor, nvidia-gpu-flavor) and ClusterQueues are NOT created
+# here — RHOAI seeded the flavors, and no ClusterQueue/LocalQueue existed on the source
+# cluster, so nothing was actually being queued yet.
+apiVersion: kueue.openshift.io/v1
+kind: Kueue
+metadata:
+  name: cluster
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  config:
+    integrations:
+      frameworks:
+        - Deployment
+        - Pod
+        - PyTorchJob
+        - RayCluster
+        - RayJob
+        - StatefulSet
+        - TrainJob
+  logLevel: Normal
+  managementState: Managed
+  operatorLogLevel: Normal

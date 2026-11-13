@@ -1,0 +1,26 @@
+---
+# Turns on the "Red Hat OpenShift AI" provider. OpenRAG hides it in every run mode as shipped
+# (src/config/model_providers.yaml); this file replaces that list for this deployment and is
+# mounted into the backend by backend-rhoai-patch.yaml. It is not hot-reloaded: restart the
+# backend after editing. Only rhoai is listed, so only rhoai is offered in the UI.
+#
+# `models` / `embedding_models` are only a fallback shown while the endpoints are unreachable;
+# OpenRAG normally asks each endpoint's /v1/models. The ids are vLLM --served-model-name values.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openrag-model-providers
+  namespace: openrag
+data:
+  model_providers.yaml: |
+    providers:
+      - name: rhoai
+        display_name: Red Hat OpenShift AI
+        modes:
+          oss: true
+          on_prem: false
+          saas: false
+        models:
+          - qwen25-15b-instruct
+        embedding_models:
+          - Qwen/Qwen3-Embedding-0.6B

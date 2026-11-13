@@ -1,0 +1,25 @@
+# ==============================================================================
+# operators/bases/rhacs — Red Hat Advanced Cluster Security (RHACS)
+#
+# Installs the RHACS operator, Central (console + API) and the SecuredCluster that
+# registers this cluster with it.
+#
+# SecuredCluster cannot register on a cold bootstrap: it needs a cluster
+# registration secret issued by Central. See the header of securedcluster.yaml.
+#
+# ArgoCD app:  operators-rhacs   (argocd/appset-operators.yaml)
+# Installs:    rhacs-operator (channel stable, redhat-operators) into stackrox
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml
+  # Operands
+  - central.yaml
+  - securedcluster.yaml

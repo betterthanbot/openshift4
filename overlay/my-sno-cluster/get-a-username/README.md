@@ -37,7 +37,7 @@ by hand — it's now just another GitOps-managed workload.
 
 Creating `User` objects (e.g. via `bases/get-a-username/label-ns.sh`) is not enough — OpenShift
 needs an identity provider before anyone can authenticate as `user1`..`userN`. This repo manages
-one via `operators/layer2-operands/templates/workshop-htpasswd.yaml` (an `HTPasswd` entry on
+one via `operators/bases/workshop-auth/` (the disabled-by-default `operators-workshop-auth` app: an `HTPasswd` entry on
 `OAuth/cluster`), backed by a Secret (`workshop-htpasswd`, in `openshift-config`) that — same as
 above — is committed only as an empty placeholder and never holds real password hashes in git.
 

@@ -1,0 +1,33 @@
+# ==============================================================================
+# OpenShift Virtualization (CNV) — my-sno-cluster overlay
+#
+# Discovered by argocd/appset-operators.yaml (git directory generator over
+# operators/overlay/my-sno-cluster/*) -> ArgoCD Application "operators-cnv".
+#
+# IMPORTANT: this cluster's nodes (m6a.4xlarge on AWS) do not expose hardware
+# virtualization extensions (no /dev/kvm, no vmx/svm CPU flags) — AWS only passes
+# through VT-x/AMD-V on `.metal` instance types. The
+# kubevirt.kubevirt.io/jsonpatch annotation below forces KubeVirt's
+# developerConfiguration.useEmulation to true, which is what's already live on the
+# cluster's existing HyperConverged CR (confirmed nodes report
+# kubevirt.io/schedulable=true). This is NOT supported by Red Hat for production and
+# VMs run 10-50x slower than with KVM acceleration — fine for templates/testing, not
+# for real workloads. To get real performance, move VM workloads to bare-metal
+# (.metal) worker nodes and delete the patch below.
+# See docs/tutorials/openshift-virtualization-on-ec2.md.
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../bases/cnv
+
+patches:
+  - patch: |-
+      apiVersion: hco.kubevirt.io/v1beta1
+      kind: HyperConverged
+      metadata:
+        name: kubevirt-hyperconverged
+        namespace: openshift-cnv
+        annotations:
+          kubevirt.kubevirt.io/jsonpatch: '[{"op":"add","path":"/spec/configuration/developerConfiguration","value":{"useEmulation":true}}]'

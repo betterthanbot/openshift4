@@ -1,0 +1,93 @@
+# FlowCollector — cluster-scoped singleton; name must be "cluster".
+# The operator deploys eBPF agents, a flow processor, and the console plugin
+# into the namespace specified in spec.namespace.
+apiVersion: flows.netobserv.io/v1beta2
+kind: FlowCollector
+metadata:
+  name: cluster
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  agent:
+    ebpf:
+      cacheActiveTimeout: 15s
+      cacheMaxFlows: 120000
+      features:
+        - PacketDrop
+        - DNSTracking
+        - FlowRTT
+        - TLSTracking
+        - PacketTranslation
+        - UDNMapping
+        - IPSec
+      privileged: true
+      resources:
+        limits:
+          memory: 800Mi
+        requests:
+          cpu: 100m
+          memory: 50Mi
+      sampling: 50
+    type: eBPF
+  consolePlugin:
+    enable: true
+    portNaming:
+      enable: true
+    quickFilters:
+      - default: true
+        filter:
+          flow_layer: '"app"'
+        name: Applications
+      - filter:
+          flow_layer: '"infra"'
+        name: Infrastructure
+      - default: true
+        filter:
+          dst_kind: '"Pod"'
+          src_kind: '"Pod"'
+        name: Pods network
+      - filter:
+          dst_kind: '"Service"'
+        name: Services network
+      - filter:
+          src_subnet_label: '"",EXT:'
+        name: External ingress
+      - filter:
+          dst_subnet_label: '"",EXT:'
+        name: External egress
+    replicas: 1
+    resources:
+      limits:
+        memory: 100Mi
+      requests:
+        cpu: 100m
+        memory: 50Mi
+  deploymentModel: Service
+  loki:
+    enable: true
+    lokiStack:
+      name: netobserv-loki # CHANGE ME: must match lokistack.yaml metadata.name
+      namespace: netobserv # CHANGE ME: must match lokistack.yaml metadata.namespace
+    mode: LokiStack
+    readTimeout: 30s
+    writeBatchSize: 10485760
+    writeBatchWait: 1s
+    writeTimeout: 10s
+  namespace: netobserv
+  networkPolicy:
+    enable: true
+  processor:
+    consumerReplicas: 3
+    logLevel: info
+    logTypes: Flows
+    resources:
+      limits:
+        memory: 800Mi
+      requests:
+        cpu: 100m
+        memory: 100Mi
+  prometheus:
+    querier:
+      enable: true
+      mode: Auto
+      timeout: 30s

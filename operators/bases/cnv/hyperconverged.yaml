@@ -1,0 +1,18 @@
+# HyperConverged — the OpenShift Virtualization (CNV) instance.
+#
+# Common boot-source templates (Fedora, CentOS Stream, RHEL 8/9/10) are deployed
+# automatically by the SSP operand once this CR reconciles — no extra config needed
+# for "basic templates".
+#
+# Software emulation (needed on non-bare-metal AWS nodes) is NOT set here — it is a
+# property of the cluster's hardware, so the overlay adds it. See
+# operators/overlay/my-sno-cluster/cnv.
+
+apiVersion: hco.kubevirt.io/v1beta1
+kind: HyperConverged
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec: {}

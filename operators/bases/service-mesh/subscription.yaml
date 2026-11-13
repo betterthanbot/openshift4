@@ -1,0 +1,26 @@
+# OpenShift Service Mesh 3 / Sail (Red Hat) — OLM Subscription (sync wave -1).
+#
+# Hard dependency of RHOAI 3.x KServe: the DSCInitialization creates a GatewayConfig
+# which in turn creates an `Istio` (sailoperator.io) CR named `openshift-gateway` and
+# the `data-science-gateway-class` GatewayClass. Without this operator the
+# data-science gateway never programs and every LLMInferenceService stays unreachable.
+#
+# Installs into openshift-operators (built-in NS, global-operators OG), so this app
+# has no Namespace/OperatorGroup of its own.
+# NOTE: the source cluster had installPlanApproval: Manual. Automatic + a pinned
+# startingCSV is used here so a fresh bootstrap completes unattended.
+
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: servicemeshoperator3
+  namespace: openshift-operators
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  channel: "stable"
+  name: "servicemeshoperator3"
+  source: "redhat-operators"
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  startingCSV: "servicemeshoperator3.v3.4.3"

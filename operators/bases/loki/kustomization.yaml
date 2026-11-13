@@ -1,0 +1,20 @@
+# ==============================================================================
+# operators/bases/loki — Loki Operator
+#
+# Installs the Loki Operator, which provides the LokiStack CRD. The LokiStacks
+# themselves live with the things that use them: logging-loki in `cluster-logging`,
+# netobserv-loki in `netobserv`.
+#
+# ArgoCD app:  operators-loki   (argocd/appset-operators.yaml)
+# Installs:    loki-operator (channel stable-6.6, redhat-operators) into openshift-operators-redhat
+# ==============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Operator install — sync waves -3 (Namespace), -2 (OperatorGroup), -1 (Subscription).
+  # ArgoCD waits for the Subscription to report AtLatestKnown before it moves on, so
+  # everything below (wave 0 and up) is applied once the operator's CRDs exist.
+  - namespace.yaml
+  - operatorgroup.yaml
+  - subscription.yaml
