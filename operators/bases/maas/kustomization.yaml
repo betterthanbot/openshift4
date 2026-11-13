@@ -59,6 +59,7 @@ resources:
   - metrics-db.yaml
   - db-secrets.yaml
   - authorino-tls.yaml
+  - gatewayclass.yaml
   - gateway.yaml
   - tenant.yaml
   - groups.yaml

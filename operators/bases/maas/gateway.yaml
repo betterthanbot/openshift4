@@ -7,7 +7,8 @@
 # with the certificate issued by cert-manager from a sandbox-provided Let's Encrypt
 # ClusterIssuer.
 #
-# NOTE this deliberately uses the built-in `openshift-default` GatewayClass, NOT the
+# NOTE this deliberately uses the `openshift-default` GatewayClass (defined in
+# gatewayclass.yaml in this app — it is not created for you), NOT the
 # `data-science-gateway-class` that RHOAI's GatewayConfig creates. The data-science
 # gateway is managed by RHOAI (GatewayConfig/default-gateway) and carries
 # opendatahub.io/managed=true; this one is ours to own.
