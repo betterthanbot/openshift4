@@ -1,0 +1,111 @@
+# The platform/* namespace labels decide a namespace's tenant, who may reach
+# into it and whether it can be deleted. Only cluster-admins (and Argo CD, which
+# is bound to cluster-admin) may set or change them.
+#
+# OpenShift's default `admin` and `edit` roles cannot modify Namespace objects,
+# so this only matters for identities that were granted extra rights — which is
+# exactly when a mistake would move a namespace into someone else's tenant.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: tenant-protect-namespace-labels
+  annotations:
+    policies.kyverno.io/title: Protect Tenant Labels on Namespaces
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Namespace
+    policies.kyverno.io/description: >-
+      Blocks anyone except cluster-admins from adding, changing or removing the
+      platform/tenant, platform/tenant-access and platform/deletion-protection
+      labels on a namespace.
+spec:
+  # clusterRoles and request.oldObject only exist at admission time.
+  background: false
+  rules:
+  - name: platform-labels-are-immutable
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          operations:
+          - UPDATE
+    exclude:
+      any:
+      - clusterRoles:
+        - cluster-admin
+    validate:
+      failureAction: Enforce
+      message: >-
+        The platform/* labels on a namespace can only be changed by a cluster
+        administrator.
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.metadata.labels.\"platform/tenant\" || '' }}"
+            operator: NotEquals
+            value: "{{ request.oldObject.metadata.labels.\"platform/tenant\" || '' }}"
+          - key: "{{ request.object.metadata.labels.\"platform/tenant-access\" || '' }}"
+            operator: NotEquals
+            value: "{{ request.oldObject.metadata.labels.\"platform/tenant-access\" || '' }}"
+          - key: "{{ request.object.metadata.labels.\"platform/deletion-protection\" || '' }}"
+            operator: NotEquals
+            value: "{{ request.oldObject.metadata.labels.\"platform/deletion-protection\" || '' }}"
+
+  # A non-admin who creates a Namespace directly may not pick a tenant: the only
+  # value accepted is the one tenant-assign-namespace-label derives (the
+  # namespace's own name).
+  - name: tenant-label-on-create
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          operations:
+          - CREATE
+    exclude:
+      any:
+      - clusterRoles:
+        - cluster-admin
+    validate:
+      failureAction: Enforce
+      message: >-
+        Only a cluster administrator can place a namespace in a shared tenant.
+        Remove the platform/tenant label and the namespace is created as a
+        tenant of its own.
+      deny:
+        conditions:
+          all:
+          - key: "{{ request.object.metadata.labels.\"platform/tenant\" || '' }}"
+            operator: NotEquals
+            value: ""
+          - key: "{{ request.object.metadata.labels.\"platform/tenant\" || '' }}"
+            operator: NotEquals
+            value: "{{ request.object.metadata.name }}"
+
+  - name: reserved-labels-on-create
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          operations:
+          - CREATE
+    exclude:
+      any:
+      - clusterRoles:
+        - cluster-admin
+    validate:
+      failureAction: Enforce
+      message: >-
+        The platform/tenant-access and platform/deletion-protection labels can
+        only be set by a cluster administrator.
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.metadata.labels.\"platform/tenant-access\" || '' }}"
+            operator: NotEquals
+            value: ""
+          - key: "{{ request.object.metadata.labels.\"platform/deletion-protection\" || '' }}"
+            operator: NotEquals
+            value: ""

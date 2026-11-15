@@ -1,0 +1,46 @@
+# Without a readiness probe a Service (and so the Route) sends traffic to a pod
+# the moment its container starts, ready or not; without a liveness probe a
+# hung process is never restarted. Reports long-running workloads where a
+# container has no probe of any kind. Audit only.
+#
+# Jobs and CronJobs are not checked: they run to completion.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-probes
+  annotations:
+    policies.kyverno.io/title: Require Health Probes
+    policies.kyverno.io/category: Workload Best Practices
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/subject: Deployment, StatefulSet, DaemonSet
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/description: >-
+      Reports Deployments, StatefulSets and DaemonSets in tenant namespaces
+      that have a container with no readiness, liveness or startup probe.
+spec:
+  background: true
+  emitWarning: true
+  rules:
+  - name: containers-have-a-probe
+    match:
+      any:
+      - resources:
+          kinds:
+          - Deployment
+          - StatefulSet
+          - DaemonSet
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Audit
+      message: >-
+        Every container should define a readinessProbe, livenessProbe or
+        startupProbe.
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.spec.template.spec.containers[?!readinessProbe && !livenessProbe && !startupProbe] | length(@) }}"
+            operator: GreaterThan
+            value: 0

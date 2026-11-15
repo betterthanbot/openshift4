@@ -1,0 +1,55 @@
+# A PodDisruptionBudget that allows zero disruptions blocks every node drain
+# that touches its pods. On OpenShift that means a tenant can stall a cluster
+# upgrade or a node replacement for everyone: the Machine Config Operator waits
+# on the drain and the node pool goes Degraded.
+#
+# Blocks the two spellings that can never be satisfied:
+#   maxUnavailable: 0  (or "0%")
+#   minAvailable: "100%"
+#
+# Not caught: minAvailable given as a number equal to the replica count (for
+# example minAvailable: 1 on a single-replica Deployment). That needs a lookup
+# of the workload and is left to review.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-pdb-zero-disruption
+  annotations:
+    policies.kyverno.io/title: Disallow PodDisruptionBudgets That Block Node Drains
+    policies.kyverno.io/category: Workload Best Practices
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: PodDisruptionBudget
+    policies.kyverno.io/description: >-
+      Blocks PodDisruptionBudgets in tenant namespaces that allow no voluntary
+      disruption at all, which would stall node drains and cluster upgrades.
+spec:
+  background: true
+  rules:
+  - name: pdb-must-allow-a-disruption
+    match:
+      any:
+      - resources:
+          kinds:
+          - PodDisruptionBudget
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Enforce
+      message: >-
+        A PodDisruptionBudget must allow at least one pod to be disrupted:
+        maxUnavailable may not be 0 and minAvailable may not be 100%.
+      deny:
+        conditions:
+          any:
+          # to_string so that the number 0 and the strings "0" / "0%" compare alike
+          - key: "{{ to_string(request.object.spec.maxUnavailable) }}"
+            operator: AnyIn
+            value:
+            - "0"
+            - "0%"
+          - key: "{{ to_string(request.object.spec.minAvailable) }}"
+            operator: AnyIn
+            value:
+            - "100%"

@@ -1,0 +1,37 @@
+# A read-only root filesystem stops a compromised process from dropping tools
+# or modifying binaries inside the container. Many images need a writable /tmp
+# or cache directory (mount an emptyDir there), so this is Audit only.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-ro-rootfs
+  annotations:
+    policies.kyverno.io/title: Require Read-Only Root Filesystem
+    policies.kyverno.io/category: Workload Best Practices
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Reports containers in tenant namespaces that do not set
+      securityContext.readOnlyRootFilesystem to true.
+spec:
+  background: true
+  emitWarning: true
+  rules:
+  - name: validate-readonly-rootfs
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Audit
+      message: Set securityContext.readOnlyRootFilesystem to true on every container.
+      pattern:
+        spec:
+          containers:
+          - securityContext:
+              readOnlyRootFilesystem: true

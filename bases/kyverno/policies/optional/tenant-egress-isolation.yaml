@@ -1,0 +1,207 @@
+# ==============================================================================
+# OPTIONAL — not enabled. To turn it on, uncomment its line in
+# ../kustomization.yaml.
+#
+# tenancy/network-isolation.yaml restricts INGRESS only. That already keeps
+# tenants apart. This adds default-deny EGRESS on top, so a tenant pod can only
+# open connections to:
+#
+#   tenant-allow-egress-dns              cluster DNS
+#   tenant-allow-egress-same-tenant      namespaces of the same tenant
+#   tenant-allow-egress-outside-cluster  anything that is not a pod: the internet,
+#                                        node IPs and therefore the Kubernetes API
+#   tenant-allow-egress-platform-shared  platform namespaces labelled
+#                                        platform/tenant-access=true
+#
+# What it adds: tenant pods can no longer reach platform namespaces that have
+# no NetworkPolicy of their own (grafana, gatus, RHOAI, ...), and a compromised
+# pod has fewer places to go.
+#
+# Why it is not on by default — it WILL break things until the platform
+# namespaces tenants legitimately call are labelled platform/tenant-access=true:
+#   openshift-image-registry    builds push their image there
+#   openshift-monitoring        workloads that query Thanos / Alertmanager
+#   istio-system, shared gateways, tracing / logging collectors, RHOAI ...
+#
+# CLUSTER-SPECIFIC VALUE: the pod network below (10.128.0.0/14) was read from
+# this cluster:  oc get network.config cluster -o jsonpath='{.status.clusterNetwork}'
+# On OVN-Kubernetes an ipBlock also matches pod IPs, so the pod network must be
+# carved out of 0.0.0.0/0 or this rule would allow every pod in the cluster.
+# ==============================================================================
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: tenant-egress-isolation
+  annotations:
+    policies.kyverno.io/title: Tenant Egress Isolation (optional)
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: NetworkPolicy
+    policies.kyverno.io/description: >-
+      Generates default-deny egress in every tenant namespace plus allow rules
+      for DNS, the same tenant, destinations outside the cluster network and
+      platform namespaces labelled platform/tenant-access=true.
+spec:
+  rules:
+  - name: default-deny-egress
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    generate:
+      generateExisting: true
+      synchronize: true
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      name: tenant-default-deny-egress
+      namespace: "{{ request.object.metadata.name }}"
+      data:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: tenant-guardrails
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Egress
+
+  - name: allow-egress-dns
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    generate:
+      generateExisting: true
+      synchronize: true
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      name: tenant-allow-egress-dns
+      namespace: "{{ request.object.metadata.name }}"
+      data:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: tenant-guardrails
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Egress
+          egress:
+          - to:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: openshift-dns
+            ports:
+            # The dns-default Service listens on 53 and forwards to 5353 on the
+            # pods; OVN-Kubernetes evaluates the policy against the pod port.
+            - protocol: UDP
+              port: 53
+            - protocol: TCP
+              port: 53
+            - protocol: UDP
+              port: 5353
+            - protocol: TCP
+              port: 5353
+
+  - name: allow-egress-same-tenant
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    generate:
+      generateExisting: true
+      synchronize: true
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      name: tenant-allow-egress-same-tenant
+      namespace: "{{ request.object.metadata.name }}"
+      data:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: tenant-guardrails
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Egress
+          egress:
+          - to:
+            - namespaceSelector:
+                matchLabels:
+                  platform/tenant: "{{ request.object.metadata.labels.\"platform/tenant\" }}"
+
+  - name: allow-egress-outside-cluster
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    generate:
+      generateExisting: true
+      synchronize: true
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      name: tenant-allow-egress-outside-cluster
+      namespace: "{{ request.object.metadata.name }}"
+      data:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: tenant-guardrails
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Egress
+          egress:
+          - to:
+            - ipBlock:
+                cidr: 0.0.0.0/0
+                except:
+                # CLUSTER-SPECIFIC VALUE: the pod network (see file header)
+                - 10.128.0.0/14
+
+  - name: allow-egress-platform-shared
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    generate:
+      generateExisting: true
+      synchronize: true
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      name: tenant-allow-egress-platform-shared
+      namespace: "{{ request.object.metadata.name }}"
+      data:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: tenant-guardrails
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Egress
+          egress:
+          - to:
+            - namespaceSelector:
+                matchLabels:
+                  platform/tenant-access: "true"

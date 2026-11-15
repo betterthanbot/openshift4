@@ -1,0 +1,58 @@
+# Enforces the Kubernetes Pod Security Standard "baseline" profile in tenant
+# namespaces: no privileged containers, no host network/PID/IPC, no hostPath
+# volumes, no host ports, no added capabilities beyond the safe default set, no
+# custom SELinux user/role, no unsafe sysctls.
+#
+# OpenShift already keeps regular users on the restricted-v2 SCC, so this is a
+# second lock on the same door. The case it catches is the one SCCs do not: a
+# tenant service account being GRANTED a stronger SCC (privileged, hostaccess,
+# hostnetwork, ...). On this cluster namespaces only carry Pod Security
+# Admission audit/warn labels, not enforce, so nothing else would stop it.
+#
+# "baseline" still allows running as root, so a legacy app that was given the
+# anyuid SCC keeps working. pod-security-restricted.yaml reports on the rest.
+#
+# Exemptions: add an entry under `exclude` below (or enable Kyverno
+# PolicyExceptions — they are switched off in this install, see README.md).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: tenant-pod-security-baseline
+  annotations:
+    policies.kyverno.io/title: Pod Security Standard - Baseline
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Blocks pods in tenant namespaces that violate the baseline Pod Security
+      Standard, regardless of which SecurityContextConstraint they were granted.
+spec:
+  # The subject exclusion below only exists at admission time. Existing pods
+  # are covered by the background scan of tenant-pod-security-restricted.
+  background: false
+  rules:
+  - name: baseline
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    exclude:
+      any:
+      # OpenShift build pods (BuildConfig, S2I, Docker strategy) are privileged
+      # by design and are created by this controller. OpenShift's own Pod
+      # Security Admission exempts the same identity. Remove this entry to stop
+      # tenants from running builds on the cluster.
+      - subjects:
+        - kind: ServiceAccount
+          name: build-controller
+          namespace: openshift-infra
+    validate:
+      failureAction: Enforce
+      podSecurity:
+        level: baseline
+        version: latest

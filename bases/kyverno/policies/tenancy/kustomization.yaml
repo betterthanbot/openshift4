@@ -1,0 +1,19 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Tenant model and isolation. assign-tenant-label.yaml is the keystone: the
+# other policies in this repo that are scoped to tenants select on the
+# platform/tenant label it sets. Remove it and they stop applying to new
+# namespaces.
+resources:
+- ./assign-tenant-label.yaml
+- ./validate-namespace-naming.yaml
+- ./protect-namespace-labels.yaml
+- ./network-isolation.yaml
+- ./restrict-networkpolicies.yaml
+- ./default-resourcequota.yaml
+- ./default-limitrange.yaml
+- ./protect-guardrails.yaml
+- ./restrict-kyverno-policies.yaml
+- ./protect-namespace-deletion.yaml

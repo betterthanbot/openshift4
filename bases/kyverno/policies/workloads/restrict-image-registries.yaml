@@ -1,0 +1,48 @@
+# Reports images that do not come from a registry on the allow-list below.
+# Audit only: the list is a starting point, not a decision. Trim it to the
+# registries you trust, watch the PolicyReports, then switch failureAction to
+# Enforce.
+#
+# Images given without a registry ("nginx:1.27") are reported too — which
+# registry they resolve to depends on node configuration.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+  annotations:
+    policies.kyverno.io/title: Restrict Image Registries
+    policies.kyverno.io/category: Workload Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Reports containers in tenant namespaces whose image is not pulled from an
+      approved registry.
+spec:
+  background: true
+  emitWarning: true
+  rules:
+  - name: validate-registries
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Audit
+      message: >-
+        Images should come from an approved registry: the internal OpenShift
+        registry, registry.redhat.io, registry.access.redhat.com, quay.io,
+        ghcr.io, registry.k8s.io, nvcr.io or docker.io.
+      # APPROVED REGISTRIES — keep the three patterns below identical.
+      pattern:
+        spec:
+          =(ephemeralContainers):
+          - image: "image-registry.openshift-image-registry.svc:5000/* | registry.redhat.io/* | registry.access.redhat.com/* | quay.io/* | ghcr.io/* | registry.k8s.io/* | nvcr.io/* | docker.io/*"
+          =(initContainers):
+          - image: "image-registry.openshift-image-registry.svc:5000/* | registry.redhat.io/* | registry.access.redhat.com/* | quay.io/* | ghcr.io/* | registry.k8s.io/* | nvcr.io/* | docker.io/*"
+          containers:
+          - image: "image-registry.openshift-image-registry.svc:5000/* | registry.redhat.io/* | registry.access.redhat.com/* | quay.io/* | ghcr.io/* | registry.k8s.io/* | nvcr.io/* | docker.io/*"

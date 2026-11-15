@@ -1,0 +1,72 @@
+# The generated guardrails (NetworkPolicy, ResourceQuota, LimitRange) are all
+# named tenant-*. This policy reserves that name prefix in tenant namespaces:
+# only cluster-admins and Kyverno itself may create, change or delete them.
+#
+# Kyverno would restore a deleted tenant-* NetworkPolicy on its own
+# (synchronize: true), but only after the fact — for a moment the namespace
+# would have no default-deny. Blocking the delete closes that window and gives
+# the tenant a clear error instead of a silent revert.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: tenant-protect-guardrails
+  annotations:
+    policies.kyverno.io/title: Protect Generated Tenant Guardrails
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: NetworkPolicy, ResourceQuota, LimitRange
+    policies.kyverno.io/description: >-
+      Blocks tenants from creating, modifying or deleting the tenant-*
+      NetworkPolicies, ResourceQuota and LimitRange that the platform generates
+      in their namespaces.
+spec:
+  # clusterRoles and subjects only exist at admission time.
+  background: false
+  rules:
+  - name: tenant-prefix-is-platform-managed
+    match:
+      any:
+      - resources:
+          kinds:
+          - NetworkPolicy
+          - ResourceQuota
+          - LimitRange
+          names:
+          - tenant-*
+          operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    exclude:
+      any:
+      - clusterRoles:
+        - cluster-admin
+      - subjects:
+        # Kyverno generates and synchronizes these objects
+        - kind: Group
+          name: system:serviceaccounts:kyverno
+        # namespace-controller and garbage collector: without this a tenant
+        # namespace could never finish deleting
+        - kind: Group
+          name: system:serviceaccounts:kube-system
+        - kind: Group
+          name: system:masters
+    validate:
+      failureAction: Enforce
+      message: >-
+        Objects named tenant-* in a tenant namespace are platform guardrails and
+        can only be changed by a cluster administrator. Create your own object
+        under a different name.
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.operation }}"
+            operator: AnyIn
+            value:
+            - CREATE
+            - UPDATE
+            - DELETE

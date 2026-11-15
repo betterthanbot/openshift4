@@ -1,0 +1,66 @@
+# Network isolation keeps tenants' pods apart; this keeps their API access
+# apart. A namespace admin can bind a role to ANY service account, including
+# one that lives in another tenant's namespace — handing that tenant's
+# workloads read or write access to this tenant's secrets, configmaps and pods.
+#
+# Blocks RoleBindings whose ServiceAccount subjects live in a namespace of a
+# different tenant. Service accounts from the same tenant and from platform
+# namespaces (openshift-gitops, openshift-monitoring, ...) are fine.
+#
+# Users and Groups are not checked: Kubernetes has no record of which tenant a
+# person belongs to.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-cross-tenant-rolebindings
+  annotations:
+    policies.kyverno.io/title: Disallow RoleBindings to Another Tenant's Service Accounts
+    policies.kyverno.io/category: RBAC
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: RoleBinding
+    policies.kyverno.io/description: >-
+      Blocks RoleBindings in tenant namespaces that grant access to a service
+      account from a namespace belonging to a different tenant.
+spec:
+  # clusterRoles only exist at admission time.
+  background: false
+  rules:
+  - name: subjects-stay-in-tenant
+    match:
+      any:
+      - resources:
+          kinds:
+          - rbac.authorization.k8s.io/v1/RoleBinding
+          operations:
+          - CREATE
+          - UPDATE
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    exclude:
+      any:
+      - clusterRoles:
+        - cluster-admin
+    context:
+    - name: tenant
+      apiCall:
+        urlPath: "/api/v1/namespaces/{{ request.namespace }}"
+        jmesPath: "metadata.labels.\"platform/tenant\" || ''"
+    # names of every namespace that belongs to some OTHER tenant
+    - name: foreignNamespaces
+      apiCall:
+        urlPath: "/api/v1/namespaces?labelSelector=platform/tenant"
+        jmesPath: "items[?metadata.labels.\"platform/tenant\" != '{{ tenant }}'].metadata.name"
+    validate:
+      failureAction: Enforce
+      message: >-
+        RoleBindings in a tenant namespace may not grant access to service
+        accounts from another tenant's namespace. Ask a cluster administrator
+        if two tenants really need to share access.
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.subjects[?kind == 'ServiceAccount'].namespace || `[]` }}"
+            operator: AnyIn
+            value: "{{ foreignNamespaces }}"

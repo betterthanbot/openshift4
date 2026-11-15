@@ -1,0 +1,43 @@
+# A RoleBinding to the cluster-admin ClusterRole inside one namespace looks
+# harmless ("admin of that namespace only") but has a side effect in this
+# policy set: Kyverno treats anyone holding such a binding as having the
+# cluster-admin ClusterRole, and many policies here exempt cluster-admins. One
+# namespaced binding would switch those policies off for that identity in
+# EVERY namespace.
+#
+# Use the `admin` ClusterRole for namespace administrators instead. There is no
+# exemption here, not even for cluster-admins or Argo CD.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-clusteradmin-rolebindings
+  annotations:
+    policies.kyverno.io/title: Disallow cluster-admin RoleBindings in Tenant Namespaces
+    policies.kyverno.io/category: RBAC
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: RoleBinding
+    policies.kyverno.io/description: >-
+      Blocks RoleBindings in tenant namespaces that reference the cluster-admin
+      ClusterRole. Such a binding would also exempt its subjects from the
+      policies in this set that exclude cluster-admins.
+spec:
+  background: true
+  rules:
+  - name: disallow-clusteradmin-rolebinding
+    match:
+      any:
+      - resources:
+          kinds:
+          - rbac.authorization.k8s.io/v1/RoleBinding
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Enforce
+      message: >-
+        Binding the cluster-admin ClusterRole in a tenant namespace is not
+        allowed. Use the admin ClusterRole for namespace administrators.
+      pattern:
+        roleRef:
+          name: "!cluster-admin"

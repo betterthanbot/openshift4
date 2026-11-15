@@ -1,0 +1,44 @@
+# Reports (does not block) pods in tenant namespaces that fall short of the
+# "restricted" Pod Security Standard: must run as non-root, drop ALL
+# capabilities, no privilege escalation, seccomp RuntimeDefault, only safe
+# volume types.
+#
+# Checks Pods only, not Deployments/StatefulSets/... (autogen is switched off).
+# On OpenShift the restricted-v2 SCC fills in runAsNonRoot, the seccomp profile
+# and the dropped capabilities when the POD is admitted, so most workload
+# templates do not contain them. Checking the templates would flag nearly every
+# workload; checking the pods flags exactly the ones that really run with more
+# than "restricted" — typically because of an anyuid or custom SCC grant.
+#
+# To enforce: set failureAction to Enforce once the PolicyReports are clean.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: tenant-pod-security-restricted
+  annotations:
+    policies.kyverno.io/title: Pod Security Standard - Restricted (audit)
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/description: >-
+      Reports pods in tenant namespaces that do not meet the restricted Pod
+      Security Standard after OpenShift's SCC admission has been applied.
+spec:
+  background: true
+  rules:
+  - name: restricted
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Audit
+      podSecurity:
+        level: restricted
+        version: latest

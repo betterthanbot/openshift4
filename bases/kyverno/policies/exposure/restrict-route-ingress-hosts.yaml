@@ -1,0 +1,139 @@
+# The router gives a hostname to whichever namespace claims it first. OpenShift's
+# `admin` role includes routes/custom-host, so a tenant can set any hostname it
+# likes — including one that another tenant's application is about to use, or
+# one that looks like it belongs to someone else (login-<other-team>.apps...).
+#
+# In tenant namespaces a Route or Ingress hostname must therefore belong to the
+# namespace: its first DNS label has to be the namespace name, or end in
+# "-<namespace>". That is exactly the shape OpenShift generates when no host is
+# given (<route-name>-<namespace>.<apps-domain>), so Routes without an explicit
+# host always pass.
+#
+#   namespace acme-prod-api
+#   allowed   web-acme-prod-api.apps.example.com
+#   allowed   acme-prod-api.apps.example.com
+#   blocked   web.apps.example.com
+#   blocked   shop.acme.com            (vanity domain — needs a cluster-admin)
+#
+# Cluster-admins and Argo CD are exempt, so custom domains are still possible
+# through the platform team / GitOps.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-route-ingress-hosts
+  annotations:
+    policies.kyverno.io/title: Restrict Route and Ingress Hostnames to the Namespace
+    policies.kyverno.io/category: Exposure
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Route, Ingress
+    policies.kyverno.io/description: >-
+      Blocks Routes and Ingresses in tenant namespaces whose hostname does not
+      contain the namespace name, and wildcard Routes, to prevent tenants from
+      claiming each other's hostnames.
+spec:
+  # clusterRoles only exist at admission time.
+  background: false
+  rules:
+  - name: route-host-belongs-to-namespace
+    match:
+      any:
+      - resources:
+          kinds:
+          - route.openshift.io/v1/Route
+          operations:
+          - CREATE
+          - UPDATE
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    exclude:
+      any:
+      - clusterRoles:
+        - cluster-admin
+    context:
+    # ^(<anything>-)?<namespace>(\.|$)  — first DNS label is the namespace or ends in -<namespace>
+    - name: hostPattern
+      variable:
+        jmesPath: "join('', ['^([a-z0-9-]+-)?', request.namespace, '([.]|$)'])"
+    validate:
+      failureAction: Enforce
+      message: >-
+        The Route hostname must belong to this namespace: use
+        <name>-{{ request.namespace }}.<apps-domain>, or leave spec.host empty
+        and OpenShift generates it. Other hostnames need a cluster administrator.
+      deny:
+        conditions:
+          any:
+          - key: "{{ (request.object.spec.host || '') != '' && !regex_match(hostPattern, request.object.spec.host || '') }}"
+            operator: Equals
+            value: true
+          # spec.subdomain becomes <subdomain>.<apps-domain>
+          - key: "{{ (request.object.spec.subdomain || '') != '' && !regex_match(hostPattern, request.object.spec.subdomain || '') }}"
+            operator: Equals
+            value: true
+
+  - name: disallow-wildcard-routes
+    match:
+      any:
+      - resources:
+          kinds:
+          - route.openshift.io/v1/Route
+          operations:
+          - CREATE
+          - UPDATE
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    exclude:
+      any:
+      - clusterRoles:
+        - cluster-admin
+    validate:
+      failureAction: Enforce
+      message: Wildcard Routes (spec.wildcardPolicy Subdomain) are not allowed in tenant namespaces.
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.spec.wildcardPolicy || 'None' }}"
+            operator: Equals
+            value: Subdomain
+
+  # OpenShift turns Ingress objects into Routes, so they need the same rule.
+  # An Ingress rule without a host is a catch-all and is blocked as well.
+  - name: ingress-host-belongs-to-namespace
+    match:
+      any:
+      - resources:
+          kinds:
+          - networking.k8s.io/v1/Ingress
+          operations:
+          - CREATE
+          - UPDATE
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    exclude:
+      any:
+      - clusterRoles:
+        - cluster-admin
+    context:
+    - name: hostPattern
+      variable:
+        jmesPath: "join('', ['^([a-z0-9-]+-)?', request.namespace, '([.]|$)'])"
+    validate:
+      failureAction: Enforce
+      message: >-
+        Every Ingress rule needs a host that belongs to this namespace:
+        <name>-{{ request.namespace }}.<apps-domain>. Other hostnames, wildcard
+        hosts and rules without a host need a cluster administrator.
+      foreach:
+      - list: "request.object.spec.rules || `[]`"
+        deny:
+          conditions:
+            any:
+            - key: "{{ regex_match(hostPattern, element.host || '') }}"
+              operator: Equals
+              value: false

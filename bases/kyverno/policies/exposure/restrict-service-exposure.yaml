@@ -1,0 +1,67 @@
+# Tenant workloads are exposed through the OpenShift router (Routes/Ingress),
+# which the generated NetworkPolicies allow and the platform can see.
+#
+# NodePort and LoadBalancer Services go around the router. They open a port on
+# every node (or create a cloud load balancer per Service, at a cost), and the
+# traffic arrives from the node's host network — which the tenant NetworkPolicies
+# let in, because that is how the API server reaches webhooks.
+#
+# externalIPs lets a Service claim an arbitrary IP address and intercept
+# traffic meant for it (CVE-2020-8554). OpenShift rejects them by default
+# (Network.config externalIP policy is empty on this cluster); this keeps them
+# blocked for tenants even if that setting is relaxed later.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-service-exposure
+  annotations:
+    policies.kyverno.io/title: Restrict Service Types and External IPs
+    policies.kyverno.io/category: Exposure
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Service
+    policies.kyverno.io/description: >-
+      Blocks Services of type NodePort or LoadBalancer and Services with
+      externalIPs in tenant namespaces. Workloads are exposed through Routes.
+spec:
+  background: true
+  rules:
+  - name: disallow-nodeport-and-loadbalancer
+    match:
+      any:
+      - resources:
+          kinds:
+          - Service
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Enforce
+      message: >-
+        Services of type NodePort and LoadBalancer are not allowed in tenant
+        namespaces. Use a ClusterIP Service and expose it with a Route.
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.spec.type || 'ClusterIP' }}"
+            operator: AnyIn
+            value:
+            - NodePort
+            - LoadBalancer
+
+  - name: disallow-external-ips
+    match:
+      any:
+      - resources:
+          kinds:
+          - Service
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Enforce
+      message: Services in tenant namespaces may not set spec.externalIPs.
+      pattern:
+        spec:
+          X(externalIPs): "null"

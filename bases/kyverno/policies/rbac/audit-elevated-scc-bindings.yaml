@@ -1,0 +1,56 @@
+# On OpenShift a workload gets more than the restricted-v2 SCC when its service
+# account is bound to a ClusterRole named system:openshift:scc:<name> — which is
+# what `oc adm policy add-scc-to-user` creates. Only cluster-admins can make
+# these bindings, so each one is a deliberate exception.
+#
+# This lists those exceptions in the PolicyReport of each tenant namespace, so
+# "which tenant workloads run with anyuid / privileged / hostaccess?" has one
+# place to look. Audit only.
+#
+# What the grant can actually do is still limited by tenant-pod-security-baseline:
+# anyuid (run as root) passes baseline, privileged and host access do not.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: audit-elevated-scc-bindings
+  annotations:
+    policies.kyverno.io/title: Report Elevated SCC Grants in Tenant Namespaces
+    policies.kyverno.io/category: RBAC
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: RoleBinding
+    policies.kyverno.io/description: >-
+      Reports RoleBindings in tenant namespaces that grant a
+      SecurityContextConstraint stronger than restricted-v2 or nonroot-v2.
+spec:
+  background: true
+  emitWarning: true
+  rules:
+  - name: elevated-scc-rolebinding
+    match:
+      any:
+      - resources:
+          kinds:
+          - rbac.authorization.k8s.io/v1/RoleBinding
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Audit
+      message: >-
+        This RoleBinding grants the SCC role {{ request.object.roleRef.name }}
+        in a tenant namespace. Confirm the workload cannot run under
+        restricted-v2.
+      deny:
+        conditions:
+          all:
+          - key: "{{ regex_match('^system:openshift:scc:', request.object.roleRef.name || '') }}"
+            operator: Equals
+            value: true
+          - key: "{{ request.object.roleRef.name || '' }}"
+            operator: AllNotIn
+            value:
+            - system:openshift:scc:restricted
+            - system:openshift:scc:restricted-v2
+            - system:openshift:scc:nonroot
+            - system:openshift:scc:nonroot-v2

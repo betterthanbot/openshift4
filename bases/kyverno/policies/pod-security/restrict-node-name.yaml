@@ -1,0 +1,42 @@
+# spec.nodeName places a pod on a node directly, bypassing the scheduler and
+# with it taints, node selectors and the checks that keep tenant workloads off
+# the control plane. Controllers do not need it: Deployments, StatefulSets,
+# Jobs and DaemonSets all go through the scheduler.
+#
+# Only checked on CREATE. After scheduling every pod has nodeName set, so
+# checking updates (or scanning in the background) would flag all of them.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-node-name
+  annotations:
+    policies.kyverno.io/title: Disallow Direct Node Assignment
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Blocks pods in tenant namespaces that set spec.nodeName, which bypasses
+      the scheduler and node taints.
+spec:
+  background: false
+  rules:
+  - name: disallow-node-name
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          operations:
+          - CREATE
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Enforce
+      message: >-
+        Setting spec.nodeName is not allowed in tenant namespaces. Use
+        nodeSelector or affinity and let the scheduler place the pod.
+      pattern:
+        spec:
+          X(nodeName): "null"

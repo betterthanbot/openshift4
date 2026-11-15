@@ -1,0 +1,11 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# What tenants may grant inside their namespaces. The two restrict-* policies
+# are enforced; the two audit-* policies only report.
+resources:
+- ./restrict-clusteradmin-rolebindings.yaml
+- ./restrict-cross-tenant-rolebindings.yaml
+- ./audit-risky-roles.yaml
+- ./audit-elevated-scc-bindings.yaml

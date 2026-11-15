@@ -2,5 +2,24 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# See README.md for what each policy does and how the tenant model works.
+# To drop a whole group, delete its line here; to drop one policy, delete its
+# line in that folder's kustomization.yaml.
 resources:
 - ./generate-vpa.yaml
+- ./kyverno-rbac.yaml
+- ./tenancy/
+- ./pod-security/
+- ./workloads/
+- ./exposure/
+- ./rbac/
+# Not enabled — read the file header first:
+# - ./optional/tenant-egress-isolation.yaml
+
+commonAnnotations:
+  # ClusterPolicy is a CRD that the same Argo CD Application installs. Without
+  # this, a first sync fails up front because the kind is not known yet (same
+  # reasoning as the operand CRs in operators/bases/*).
+  argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  # Apply policies after the Kyverno controllers (wave 0) are healthy.
+  argocd.argoproj.io/sync-wave: "1"

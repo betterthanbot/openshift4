@@ -1,0 +1,68 @@
+# Gives every tenant namespace a starting ResourceQuota so one tenant cannot
+# starve the rest of the cluster.
+#
+# synchronize: false — the quota is created once and then left alone, so a
+# cluster-admin can raise it for one namespace:
+#   oc edit resourcequota tenant-default-quota -n <namespace>
+# Tenants cannot edit it (OpenShift's `admin` role is read-only on quotas, and
+# tenant-protect-guardrails blocks it as well). The trade-off: changing the
+# numbers below only affects namespaces created afterwards.
+#
+# The numbers are a starting point for a small shared cluster — adjust them.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: tenant-default-resourcequota
+  annotations:
+    policies.kyverno.io/title: Default ResourceQuota for Tenant Namespaces
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: ResourceQuota
+    policies.kyverno.io/description: >-
+      Generates a default ResourceQuota in every tenant namespace covering CPU
+      and memory requests, memory limits, storage, object counts, GPUs and the
+      Service types that expose workloads outside the router.
+spec:
+  rules:
+  - name: default-quota
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    generate:
+      generateExisting: true
+      synchronize: false
+      apiVersion: v1
+      kind: ResourceQuota
+      name: tenant-default-quota
+      namespace: "{{ request.object.metadata.name }}"
+      data:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: tenant-guardrails
+        spec:
+          hard:
+            # Compute. limits.cpu is deliberately not capped: CPU limits throttle
+            # workloads, and requests.cpu already bounds what a tenant can reserve.
+            requests.cpu: "8"
+            requests.memory: 16Gi
+            limits.memory: 32Gi
+            # Storage
+            requests.storage: 100Gi
+            persistentvolumeclaims: "20"
+            # Object counts
+            pods: "50"
+            services: "25"
+            secrets: "100"
+            configmaps: "100"
+            # Exposure outside the router is off by default (also enforced by
+            # restrict-service-exposure).
+            services.loadbalancers: "0"
+            services.nodeports: "0"
+            # GPUs are scarce and shared: none by default, raise per namespace.
+            requests.nvidia.com/gpu: "0"

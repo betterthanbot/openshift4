@@ -1,0 +1,51 @@
+# Opt-in safety catch against deleting the wrong namespace. A project admin can
+# delete their own project, and with it every workload, secret and PVC inside.
+#
+# Does nothing until a cluster-admin labels a namespace:
+#   oc label namespace <ns> platform/deletion-protection=enabled
+# After that the namespace cannot be deleted by ANYONE until the label is
+# removed again (which only a cluster-admin can do, see
+# protect-namespace-labels.yaml):
+#   oc label namespace <ns> platform/deletion-protection-
+#
+# There is deliberately no cluster-admin exemption. `oc delete project` is
+# executed by the openshift-apiserver service account, which is cluster-admin,
+# so an exemption would let every project admin through.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: protect-namespace-deletion
+  annotations:
+    policies.kyverno.io/title: Protect Labelled Namespaces from Deletion
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Namespace
+    policies.kyverno.io/description: >-
+      Blocks deletion of any namespace labelled
+      platform/deletion-protection=enabled until the label is removed.
+spec:
+  # DELETE requests only exist at admission time.
+  background: false
+  rules:
+  - name: block-delete-of-protected-namespace
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          operations:
+          - DELETE
+          selector:
+            matchLabels:
+              platform/deletion-protection: enabled
+    validate:
+      failureAction: Enforce
+      message: >-
+        This namespace is labelled platform/deletion-protection=enabled and
+        cannot be deleted. A cluster administrator must remove the label first.
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.operation }}"
+            operator: Equals
+            value: DELETE

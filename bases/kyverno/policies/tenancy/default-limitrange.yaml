@@ -1,0 +1,58 @@
+# Companion to default-resourcequota.yaml. A quota on requests.cpu,
+# requests.memory and limits.memory makes Kubernetes REJECT any pod that does
+# not set those values. This LimitRange fills them in for containers that leave
+# them out, so workloads without resource settings still start — with small,
+# predictable defaults instead of unbounded ones.
+#
+# synchronize: false — same reasoning as the quota: a cluster-admin can tune it
+# per namespace (oc edit limitrange tenant-default-limits -n <namespace>).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: tenant-default-limitrange
+  annotations:
+    policies.kyverno.io/title: Default LimitRange for Tenant Namespaces
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: LimitRange
+    policies.kyverno.io/description: >-
+      Generates a LimitRange in every tenant namespace with default CPU and
+      memory requests and a default memory limit for containers, and a maximum
+      size for a single PersistentVolumeClaim.
+spec:
+  rules:
+  - name: default-limits
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    generate:
+      generateExisting: true
+      synchronize: false
+      apiVersion: v1
+      kind: LimitRange
+      name: tenant-default-limits
+      namespace: "{{ request.object.metadata.name }}"
+      data:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: tenant-guardrails
+        spec:
+          limits:
+          - type: Container
+            # applied when a container sets no request
+            defaultRequest:
+              cpu: 100m
+              memory: 128Mi
+            # applied when a container sets no limit (no default CPU limit, see
+            # default-resourcequota.yaml)
+            default:
+              memory: 512Mi
+          - type: PersistentVolumeClaim
+            max:
+              storage: 50Gi

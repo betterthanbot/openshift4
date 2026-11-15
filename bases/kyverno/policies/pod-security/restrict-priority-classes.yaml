@@ -1,0 +1,45 @@
+# Kubernetes lets any pod in any namespace ask for any PriorityClass. A tenant
+# pod with system-node-critical or openshift-user-critical is scheduled ahead
+# of everyone else, can PREEMPT (evict) other tenants' pods to make room for
+# itself, and is the last to be evicted when a node runs out of memory.
+#
+# This reserves the platform classes found on this cluster. A tenant may still
+# use no class at all, or one the platform team creates for tenants.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-priority-classes
+  annotations:
+    policies.kyverno.io/title: Reserve Platform Priority Classes
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Blocks pods in tenant namespaces from using the system-*, openshift-* and
+      kubevirt-* PriorityClasses, which would let them preempt other tenants'
+      and the platform's workloads.
+spec:
+  background: true
+  rules:
+  - name: disallow-platform-priority-classes
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Enforce
+      message: >-
+        PriorityClasses starting with system-, openshift- or kubevirt- are
+        reserved for platform components.
+      deny:
+        conditions:
+          any:
+          # RESERVED PREFIXES — extend the list for other platform classes.
+          - key: "{{ regex_match('^(system|openshift|kubevirt)-', request.object.spec.priorityClassName || '') }}"
+            operator: Equals
+            value: true

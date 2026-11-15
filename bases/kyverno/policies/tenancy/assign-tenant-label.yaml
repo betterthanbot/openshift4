@@ -1,0 +1,222 @@
+# ==============================================================================
+# KEYSTONE POLICY — decides which namespaces are tenant namespaces.
+#
+# It stamps  platform/tenant=<tenant>  on a namespace when the namespace is
+# created. Every other tenant policy in this folder selects on that label and
+# on nothing else, so this file is the one place that defines "who is a tenant".
+#
+#   How the namespace is created                       Tenant it gets
+#   -------------------------------------------------  ---------------------------
+#   cluster-admin user (`oc create ns`), Argo CD, or   first "-" separated segment
+#   kube:admin via `oc new-project`                    of the name: acme-prod-api
+#                                                      -> acme   (rule 1)
+#   regular user, self-service (`oc new-project`,      their username, if the name
+#   console, RHOAI dashboard)                          starts with "<username>-"
+#                                                      (rule 2); otherwise the
+#                                                      namespace is a tenant of its
+#                                                      own (rule 3)
+#   regular user with direct namespace-create rights   a tenant of its own (rule 4)
+#   operator / any other service account               not a tenant (no label)
+#
+# Why self-service projects never join a tenant by name: anyone can run
+# `oc new-project acme-anything`. If the prefix alone decided the tenant, that
+# user would land inside acme's network. Only a platform admin (or Argo CD) can
+# put a namespace into a shared tenant.
+#
+# The label is only added at CREATE and only if absent, so:
+#   * existing namespaces are untouched until someone labels them
+#       oc label namespace <ns> platform/tenant=<tenant>
+#   * a manifest that already sets the label wins over the derived value
+#   * to take a namespace out of tenancy:  oc label namespace <ns> platform/tenant-
+# ==============================================================================
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: tenant-assign-namespace-label
+  annotations:
+    policies.kyverno.io/title: Assign Tenant Label to New Namespaces
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Namespace
+    policies.kyverno.io/description: >-
+      Labels every new namespace with platform/tenant so the tenant guardrails
+      (network isolation, quota, pod security, ...) apply to it. Namespaces
+      created by a platform admin or Argo CD take the tenant from the first
+      segment of their name; self-service projects are isolated per user or per
+      namespace; platform namespaces on the exclusion list are left alone.
+spec:
+  # Uses request.userInfo and clusterRoles, which only exist at admission time.
+  background: false
+  rules:
+  # ---------------------------------------------------------------------------
+  # Rule 1 — created by the platform: tenant = first segment of the name.
+  # ---------------------------------------------------------------------------
+  - name: platform-created-namespace
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          operations:
+          - CREATE
+        clusterRoles:
+        - cluster-admin
+    exclude:
+      any:
+      - resources:
+          # PLATFORM NAMESPACES — never treated as tenants. Wildcards allowed.
+          # Add a name here BEFORE creating a new platform/operator namespace by
+          # hand or through Argo CD, otherwise it is onboarded as a tenant.
+          names:
+          # Kubernetes and OpenShift
+          - default
+          - kube-*
+          - openshift
+          - openshift-*
+          # this policy engine
+          - kyverno
+          # operators and platform services (operators/bases/* and what they create)
+          - ai-tenants
+          - cert-manager
+          - cert-manager-operator
+          - istio-system
+          - kuadrant-system
+          - models-as-a-service
+          - netobserv
+          - netobserv-*
+          - nvidia-gpu-operator
+          - opendatahub-*
+          - redhat-*
+          - rhacs-operator
+          - rhods-*
+          - stackrox
+          # shared applications deployed from this repo (bases/*). Delete a line
+          # to bring that application under the tenant guardrails the next time
+          # its namespace is created.
+          - ctfd
+          - gatus
+          - grafana
+          - guides
+          - openrag
+          - rocket-chat
+          - vllm-project
+    context:
+    # Set by OpenShift on every project created through `oc new-project` or the
+    # console. For those, request.userInfo is the openshift-apiserver service
+    # account (which is cluster-admin), so this annotation is the only way to
+    # tell who really asked for the namespace.
+    - name: requester
+      variable:
+        jmesPath: 'request.object.metadata.annotations."openshift.io/requester"'
+        default: ""
+    preconditions:
+      any:
+      # a human cluster-admin creating the Namespace directly
+      - key: "{{ requester == '' && !starts_with(request.userInfo.username, 'system:serviceaccount:') }}"
+        operator: Equals
+        value: true
+      # Argo CD (the controller is bound to cluster-admin in argocd/rbac-operands.yaml)
+      - key: "{{ requester == '' && request.userInfo.username == 'system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller' }}"
+        operator: Equals
+        value: true
+      # PLATFORM ADMINS who use `oc new-project`. Add your own admin usernames.
+      - key: "{{ requester }}"
+        operator: AnyIn
+        value:
+        - kube:admin
+        - system:admin
+    mutate:
+      patchStrategicMerge:
+        metadata:
+          labels:
+            # NAMING CONVENTION: <tenant>-<ns1>-<service>. Change the separator
+            # or the index here if the convention changes.
+            +(platform/tenant): "{{ split(request.object.metadata.name, '-')[0] }}"
+
+  # ---------------------------------------------------------------------------
+  # Rule 2 — self-service project named "<username>-...": the user's own tenant.
+  # Lets one user spread an application over several namespaces that can talk
+  # to each other (user1-dev-web, user1-dev-db).
+  # ---------------------------------------------------------------------------
+  - name: self-service-username-prefix
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          operations:
+          - CREATE
+    context:
+    - name: requester
+      variable:
+        jmesPath: 'request.object.metadata.annotations."openshift.io/requester"'
+        default: ""
+    preconditions:
+      all:
+      - key: "{{ requester }}"
+        operator: NotEquals
+        value: ""
+      - key: "{{ starts_with(request.object.metadata.name, join('', [requester, '-'])) }}"
+        operator: Equals
+        value: true
+    mutate:
+      patchStrategicMerge:
+        metadata:
+          labels:
+            +(platform/tenant): "{{ requester }}"
+
+  # ---------------------------------------------------------------------------
+  # Rule 3 — any other self-service project: a tenant of its own, isolated from
+  # everything else.
+  # ---------------------------------------------------------------------------
+  - name: self-service-isolated-project
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          operations:
+          - CREATE
+    context:
+    - name: requester
+      variable:
+        jmesPath: 'request.object.metadata.annotations."openshift.io/requester"'
+        default: ""
+    preconditions:
+      all:
+      - key: "{{ requester }}"
+        operator: NotEquals
+        value: ""
+    mutate:
+      patchStrategicMerge:
+        metadata:
+          labels:
+            +(platform/tenant): "{{ request.object.metadata.name }}"
+
+  # ---------------------------------------------------------------------------
+  # Rule 4 — a user who is not cluster-admin but was granted the right to create
+  # Namespace objects directly: a tenant of its own. Service accounts are left
+  # alone on purpose — operators create their namespaces this way.
+  # ---------------------------------------------------------------------------
+  - name: namespace-created-by-regular-user
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          operations:
+          - CREATE
+    exclude:
+      any:
+      - clusterRoles:
+        - cluster-admin
+    preconditions:
+      all:
+      - key: "{{ starts_with(request.userInfo.username, 'system:serviceaccount:') }}"
+        operator: Equals
+        value: false
+    mutate:
+      patchStrategicMerge:
+        metadata:
+          labels:
+            +(platform/tenant): "{{ request.object.metadata.name }}"

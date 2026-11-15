@@ -1,0 +1,76 @@
+# Reports tenant namespaces whose name and tenant label disagree, or that do not
+# follow the <tenant>-<ns1>-<service> convention. Audit only: nothing is blocked,
+# the findings show up in the PolicyReport and as a warning to whoever applies
+# the namespace.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: tenant-namespace-naming
+  annotations:
+    policies.kyverno.io/title: Tenant Namespace Naming Convention
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/subject: Namespace
+    policies.kyverno.io/description: >-
+      A tenant namespace should be named <tenant>-<ns1>-<service> and its
+      platform/tenant label should match the first part of that name. A mismatch
+      usually means a namespace was labelled into the wrong tenant by hand.
+spec:
+  background: true
+  emitWarning: true
+  rules:
+  - name: name-starts-with-tenant
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    context:
+    - name: tenant
+      variable:
+        jmesPath: 'request.object.metadata.labels."platform/tenant"'
+        default: ""
+    validate:
+      failureAction: Audit
+      message: >-
+        Namespace {{ request.object.metadata.name }} is labelled
+        platform/tenant={{ tenant }} but its name does not start with that tenant.
+        It shares a network with every other namespace of tenant {{ tenant }}.
+      deny:
+        conditions:
+          all:
+          # a namespace that is a tenant of its own is named exactly like the tenant
+          - key: "{{ request.object.metadata.name }}"
+            operator: NotEquals
+            value: "{{ tenant }}"
+          - key: "{{ starts_with(request.object.metadata.name, join('', [tenant, '-'])) }}"
+            operator: Equals
+            value: false
+
+  - name: follows-naming-convention
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Audit
+      message: >-
+        Tenant namespaces should be named <tenant>-<ns1>-<service>, for example
+        acme-prod-api: lowercase letters and digits, at least three parts
+        separated by "-".
+      deny:
+        conditions:
+          all:
+          # NAMING CONVENTION: at least three "-" separated parts.
+          - key: "{{ regex_match('^[a-z0-9]+-[a-z0-9]+-[a-z0-9]+(-[a-z0-9]+)*$', request.object.metadata.name) }}"
+            operator: Equals
+            value: false

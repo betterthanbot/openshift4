@@ -1,0 +1,26 @@
+# Extra read access for Kyverno's reports controller.
+#
+# The background scan lists every kind a policy matches. The chart binds the
+# reports controller to the built-in `view` ClusterRole, which covers pods,
+# workloads, services, routes, network policies and PDBs — but not RBAC
+# objects. The rbac/ policies that report on existing Roles and RoleBindings
+# (background: true) need this to produce PolicyReports.
+#
+# The label makes the chart's kyverno:reports-controller ClusterRole pick the
+# rules up through its aggregationRule; no binding is needed.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno:reports-controller:tenant-policies
+  labels:
+    rbac.kyverno.io/aggregate-to-reports-controller: "true"
+rules:
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - get
+  - list
+  - watch

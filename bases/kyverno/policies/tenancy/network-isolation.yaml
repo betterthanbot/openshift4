@@ -1,0 +1,242 @@
+# ==============================================================================
+# Tenant network isolation.
+#
+# Generates a fixed set of NetworkPolicies into every tenant namespace:
+#
+#   tenant-default-deny-ingress        nothing gets in unless a policy below allows it
+#   tenant-allow-same-tenant           namespaces with the SAME platform/tenant value
+#                                      (this includes the namespace itself)
+#   tenant-allow-openshift-ingress     the OpenShift router, so Routes keep working
+#   tenant-allow-openshift-monitoring  platform and user-workload Prometheus
+#   tenant-allow-kube-apiserver        the API server, for admission/conversion
+#                                      webhooks and aggregated APIs
+#   tenant-allow-platform-shared       platform namespaces an admin labelled
+#                                      platform/tenant-access=true
+#
+# Result: acme-prod-api and acme-prod-db can talk to each other; nothing in a
+# globex-* namespace can reach either of them.
+#
+# Only INGRESS is restricted. That is enough to keep tenants apart, because the
+# receiving namespace always refuses the connection, and it leaves outbound
+# traffic (internet, DNS, the internal registry, shared platform services)
+# working without an allow-list. See ../optional/tenant-egress-isolation.yaml
+# for the stricter variant.
+#
+# synchronize: true — Kyverno puts these back if they are edited or deleted, and
+# removes them when the namespace stops being a tenant. Tenants cannot change
+# them (tenant-protect-guardrails) and cannot add policies that open a path to
+# another tenant (tenant-restrict-networkpolicies).
+# ==============================================================================
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: tenant-network-isolation
+  annotations:
+    policies.kyverno.io/title: Tenant Network Isolation
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: NetworkPolicy
+    policies.kyverno.io/description: >-
+      Generates default-deny ingress plus the allow rules a tenant namespace
+      needs: traffic from namespaces of the same tenant, from the OpenShift
+      router, from cluster monitoring, from the API server and from platform
+      namespaces labelled platform/tenant-access=true.
+spec:
+  rules:
+  - name: default-deny-ingress
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    generate:
+      generateExisting: true
+      synchronize: true
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      name: tenant-default-deny-ingress
+      namespace: "{{ request.object.metadata.name }}"
+      data:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: tenant-guardrails
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Ingress
+
+  - name: allow-same-tenant
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    generate:
+      generateExisting: true
+      synchronize: true
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      name: tenant-allow-same-tenant
+      namespace: "{{ request.object.metadata.name }}"
+      data:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: tenant-guardrails
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Ingress
+          ingress:
+          - from:
+            - namespaceSelector:
+                matchLabels:
+                  platform/tenant: "{{ request.object.metadata.labels.\"platform/tenant\" }}"
+
+  - name: allow-openshift-ingress
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    generate:
+      generateExisting: true
+      synchronize: true
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      name: tenant-allow-openshift-ingress
+      namespace: "{{ request.object.metadata.name }}"
+      data:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: tenant-guardrails
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Ingress
+          ingress:
+          - from:
+            - namespaceSelector:
+                matchLabels:
+                  # carried by the openshift-ingress namespace
+                  policy-group.network.openshift.io/ingress: ""
+
+  - name: allow-openshift-monitoring
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    generate:
+      generateExisting: true
+      synchronize: true
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      name: tenant-allow-openshift-monitoring
+      namespace: "{{ request.object.metadata.name }}"
+      data:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: tenant-guardrails
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Ingress
+          ingress:
+          - from:
+            - namespaceSelector:
+                matchLabels:
+                  # openshift-monitoring and openshift-user-workload-monitoring
+                  network.openshift.io/policy-group: monitoring
+
+  # The API server runs on the host network of the control-plane nodes. Without
+  # this, an operator or webhook a tenant installs in its own namespace cannot
+  # be called by the API server. Host-network sources are platform components
+  # only: tenants cannot run host-network pods (SCC + tenant-pod-security-baseline).
+  - name: allow-kube-apiserver
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    generate:
+      generateExisting: true
+      synchronize: true
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      name: tenant-allow-kube-apiserver
+      namespace: "{{ request.object.metadata.name }}"
+      data:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: tenant-guardrails
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Ingress
+          ingress:
+          - from:
+            - namespaceSelector:
+                matchLabels:
+                  # carried by the openshift-host-network namespace
+                  policy-group.network.openshift.io/host-network: ""
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: openshift-kube-apiserver-operator
+              podSelector:
+                matchLabels:
+                  app: kube-apiserver-operator
+
+  # Escape hatch for shared platform services that must call INTO tenant
+  # namespaces (a shared gateway, RHOAI controllers, a service mesh control
+  # plane, ...). Opt a platform namespace in with:
+  #   oc label namespace <platform-ns> platform/tenant-access=true
+  - name: allow-platform-shared
+    match:
+      any:
+      - resources:
+          kinds:
+          - Namespace
+          selector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    generate:
+      generateExisting: true
+      synchronize: true
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      name: tenant-allow-platform-shared
+      namespace: "{{ request.object.metadata.name }}"
+      data:
+        metadata:
+          labels:
+            app.kubernetes.io/part-of: tenant-guardrails
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Ingress
+          ingress:
+          - from:
+            - namespaceSelector:
+                matchLabels:
+                  platform/tenant-access: "true"

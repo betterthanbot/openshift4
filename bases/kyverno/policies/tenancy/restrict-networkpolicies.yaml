@@ -1,0 +1,96 @@
+# NetworkPolicies are additive: a namespace admin cannot weaken the generated
+# default-deny, but they CAN add a policy that allows more. OpenShift's `admin`
+# role includes create/delete on NetworkPolicy, so without this policy a tenant
+# could publish "allow ingress from everywhere" and open itself to every other
+# tenant on the cluster.
+#
+# Tenants may still write their own NetworkPolicies as long as every ingress
+# source stays inside the tenant:
+#   allowed   podSelector only                       (same namespace)
+#   allowed   namespaceSelector with matchLabels platform/tenant: <own tenant>
+#   blocked   an ingress rule with no `from`         (any source)
+#   blocked   any other namespaceSelector, including {} (all namespaces)
+#   blocked   ipBlock                                (on OVN-Kubernetes an ipBlock
+#                                                     also matches pod IPs)
+# Egress rules are not inspected: the receiving tenant refuses the traffic.
+#
+# Need a source outside the tenant (a shared gateway, a mesh control plane)?
+# A cluster-admin either creates that NetworkPolicy, or labels the source
+# namespace platform/tenant-access=true (see network-isolation.yaml).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: tenant-restrict-networkpolicies
+  annotations:
+    policies.kyverno.io/title: Keep Tenant NetworkPolicies Inside the Tenant
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: NetworkPolicy
+    policies.kyverno.io/description: >-
+      Blocks NetworkPolicies in a tenant namespace that would allow ingress from
+      outside the tenant: rules without a source, namespace selectors that are
+      not pinned to the tenant's own platform/tenant label, and ipBlock sources.
+spec:
+  # clusterRoles and subjects only exist at admission time.
+  background: false
+  rules:
+  - name: ingress-sources-stay-in-tenant
+    match:
+      any:
+      - resources:
+          kinds:
+          - NetworkPolicy
+          operations:
+          - CREATE
+          - UPDATE
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    exclude:
+      any:
+      - clusterRoles:
+        - cluster-admin
+      # Kyverno writes the generated tenant-* policies
+      - subjects:
+        - kind: Group
+          name: system:serviceaccounts:kyverno
+    context:
+    - name: tenant
+      apiCall:
+        urlPath: "/api/v1/namespaces/{{ request.namespace }}"
+        jmesPath: "metadata.labels.\"platform/tenant\" || ''"
+    # ingress rules that name no source at all
+    - name: openRules
+      variable:
+        jmesPath: "(request.object.spec.ingress || `[]`)[?!from] | length(@)"
+        default: 0
+    # namespace selectors that do not pin the tenant's own label
+    - name: foreignSelectors
+      variable:
+        jmesPath: "(request.object.spec.ingress || `[]`)[].from[].namespaceSelector | [?matchLabels.\"platform/tenant\" != '{{ tenant }}'] | length(@)"
+        default: 0
+    - name: ipBlocks
+      variable:
+        jmesPath: "(request.object.spec.ingress || `[]`)[].from[].ipBlock | length(@)"
+        default: 0
+    validate:
+      failureAction: Enforce
+      message: >-
+        NetworkPolicies in a tenant namespace may only allow ingress from the
+        same namespace (podSelector) or from namespaces of the same tenant
+        (namespaceSelector.matchLabels with platform/tenant: {{ tenant }}).
+        Rules without a "from", other namespace selectors and ipBlock sources
+        need a cluster administrator.
+      deny:
+        conditions:
+          any:
+          - key: "{{ openRules }}"
+            operator: GreaterThan
+            value: 0
+          - key: "{{ foreignSelectors }}"
+            operator: GreaterThan
+            value: 0
+          - key: "{{ ipBlocks }}"
+            operator: GreaterThan
+            value: 0

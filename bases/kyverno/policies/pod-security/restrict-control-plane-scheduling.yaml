@@ -1,0 +1,47 @@
+# Control-plane and infra nodes are tainted so that only platform components
+# run there. A pod gets around a taint by tolerating it. This blocks tenant
+# pods from tolerating the control-plane / infra taints, and from tolerating
+# every taint at once (a toleration with `operator: Exists` and no key).
+#
+# Tolerations for other taints (GPU nodes, dedicated node pools) are untouched.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-control-plane-scheduling
+  annotations:
+    policies.kyverno.io/title: Keep Tenant Pods Off Control-Plane and Infra Nodes
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Blocks pods in tenant namespaces that tolerate the control-plane, master
+      or infra node taints, or that tolerate all taints.
+spec:
+  background: true
+  rules:
+  - name: disallow-control-plane-tolerations
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Enforce
+      message: >-
+        Tenant pods may not tolerate the node-role.kubernetes.io/master,
+        control-plane or infra taints, and may not use a toleration without a
+        key (which tolerates every taint).
+      deny:
+        conditions:
+          any:
+          # NODE ROLES reserved for the platform.
+          - key: "{{ request.object.spec.tolerations[?key == 'node-role.kubernetes.io/master' || key == 'node-role.kubernetes.io/control-plane' || key == 'node-role.kubernetes.io/infra'] || `[]` | length(@) }}"
+            operator: GreaterThan
+            value: 0
+          - key: "{{ request.object.spec.tolerations[?!key && operator == 'Exists'] || `[]` | length(@) }}"
+            operator: GreaterThan
+            value: 0

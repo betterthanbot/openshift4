@@ -1,0 +1,44 @@
+# The `default` namespace has no tenant label, so none of the tenant guardrails
+# (network isolation, quota, pod security) apply there. Reports workloads that
+# were deployed into it, usually by a forgotten `-n`. Audit only.
+#
+# This is the one policy in the set that is not scoped by the platform/tenant
+# label.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-default-namespace
+  annotations:
+    policies.kyverno.io/title: Disallow Workloads in the Default Namespace
+    policies.kyverno.io/category: Workload Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/description: >-
+      Reports Pods, Deployments, StatefulSets, DaemonSets, Jobs and CronJobs
+      created in the default namespace, where no tenant guardrail applies.
+spec:
+  background: true
+  emitWarning: true
+  rules:
+  - name: workloads-outside-default
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          - Deployment
+          - StatefulSet
+          - DaemonSet
+          - Job
+          - CronJob
+          namespaces:
+          - default
+    validate:
+      failureAction: Audit
+      message: >-
+        Do not deploy workloads into the default namespace. No tenant guardrail
+        applies there.
+      pattern:
+        metadata:
+          namespace: "!default"

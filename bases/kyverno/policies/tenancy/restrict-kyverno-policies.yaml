@@ -1,0 +1,59 @@
+# The Kyverno chart aggregates create/update/delete on the namespaced kinds
+# kyverno.io Policy and CleanupPolicy into OpenShift's `admin` role (ClusterRole
+# kyverno:rbac:admin:policies), so every namespace admin can author them.
+#
+# Those objects are executed by Kyverno's controllers, with Kyverno's
+# permissions rather than the tenant's. A tenant CleanupPolicy could, for
+# example, delete the generated tenant-* NetworkPolicies on a schedule —
+# something tenant-protect-guardrails stops the tenant from doing directly.
+#
+# This policy keeps policy authoring with the platform. Deleting is still
+# allowed, so anything already present can be cleaned up.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: tenant-restrict-kyverno-policies
+  annotations:
+    policies.kyverno.io/title: Restrict Kyverno Policy Authoring in Tenant Namespaces
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Policy, CleanupPolicy
+    policies.kyverno.io/description: >-
+      Blocks tenants from creating or changing namespaced Kyverno Policy and
+      CleanupPolicy objects, which run with Kyverno's privileges and could be
+      used to remove the platform guardrails.
+spec:
+  # clusterRoles only exist at admission time.
+  background: false
+  rules:
+  - name: policies-are-platform-managed
+    match:
+      any:
+      - resources:
+          kinds:
+          - kyverno.io/v1/Policy
+          - kyverno.io/v2/CleanupPolicy
+          operations:
+          - CREATE
+          - UPDATE
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    exclude:
+      any:
+      - clusterRoles:
+        - cluster-admin
+    validate:
+      failureAction: Enforce
+      message: >-
+        Kyverno policies in tenant namespaces are managed by the platform team.
+        Ask a cluster administrator if you need one.
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.operation }}"
+            operator: AnyIn
+            value:
+            - CREATE
+            - UPDATE

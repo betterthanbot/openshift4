@@ -1,0 +1,52 @@
+# OVN-Kubernetes (this cluster's network plugin) has a legacy "external
+# gateway" feature driven by POD annotations. A pod annotated with
+# k8s.ovn.org/routing-namespaces asks OVN to route the outbound traffic of the
+# listed namespaces through itself. Nothing limits which namespaces can be
+# listed, so a tenant pod could name another tenant's namespace and capture or
+# black-hole its egress traffic — outside anything NetworkPolicy controls.
+# The pod needs a secondary network to act as a gateway, and OpenShift's `admin`
+# role lets a namespace admin create one (UserDefinedNetwork).
+#
+# Tenant workloads have no use for these annotations; the supported way to
+# configure an external gateway is the cluster-scoped AdminPolicyBasedExternalRoute,
+# which only cluster-admins can create.
+#
+# Deliberately narrow: other k8s.ovn.org/* pod annotations are written by OVN
+# itself and by OpenShift Virtualization and must not be blocked.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-ovn-gateway-annotations
+  annotations:
+    policies.kyverno.io/title: Disallow OVN External Gateway Annotations
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Blocks pods in tenant namespaces from carrying the OVN-Kubernetes
+      external gateway annotations, which can redirect other namespaces' egress
+      traffic through the pod.
+spec:
+  background: true
+  rules:
+  - name: disallow-external-gateway-annotations
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Enforce
+      message: >-
+        The annotations k8s.ovn.org/routing-namespaces, k8s.ovn.org/routing-network
+        and k8s.ovn.org/bfd-enabled are not allowed on tenant pods.
+      pattern:
+        metadata:
+          =(annotations):
+            X(k8s.ovn.org/routing-namespaces): "null"
+            X(k8s.ovn.org/routing-network): "null"
+            X(k8s.ovn.org/bfd-enabled): "null"
