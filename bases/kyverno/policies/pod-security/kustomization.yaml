@@ -7,6 +7,11 @@ kind: Kustomization
 resources:
 - ./pod-security-baseline.yaml
 - ./pod-security-restricted.yaml
+# Container breakout hardening
+- ./pod-security-restricted-enforce.yaml
+- ./require-user-namespaces.yaml
+- ./restrict-build-strategies.yaml
+# Scheduling and network
 - ./restrict-node-name.yaml
 - ./restrict-control-plane-scheduling.yaml
 - ./restrict-priority-classes.yaml

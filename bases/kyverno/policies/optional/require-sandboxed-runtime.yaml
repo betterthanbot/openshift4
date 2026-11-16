@@ -1,0 +1,67 @@
+# ==============================================================================
+# OPTIONAL — not enabled. To turn it on, uncomment its line in
+# ../kustomization.yaml.
+#
+# Everything in ../pod-security/ hardens containers that still SHARE THE NODE'S
+# KERNEL. That narrows what a tenant can reach, but a kernel vulnerability that
+# is reachable through the allowed syscalls is still a path from one tenant to
+# the node. The only way to take the shared kernel out of the picture is to give
+# each pod its own: a sandboxed runtime, where the pod runs inside a lightweight
+# virtual machine (Kata Containers).
+#
+# This requires every tenant pod to use such a runtime.
+#
+# Prerequisites — without them every tenant pod stays Pending or is rejected:
+#   * the OpenShift sandboxed containers Operator and a KataConfig, which
+#     create the RuntimeClass named `kata`
+#   * nodes that can run virtual machines. On AWS that means bare-metal
+#     instance types, or the operator's "peer pods" mode, which creates the
+#     RuntimeClass `kata-remote` and runs each pod in its own EC2 instance
+#   * workloads that tolerate it: slower start, more memory per pod, and
+#     limits around host devices and GPUs
+#
+# Consider scoping it to the tenants that need it instead of all of them, by
+# adding a namespace label to the namespaceSelector below.
+# ==============================================================================
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-sandboxed-runtime
+  annotations:
+    policies.kyverno.io/title: Require a Sandboxed Runtime (optional)
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Requires pods in tenant namespaces to run under the kata or kata-remote
+      RuntimeClass, so each pod has its own kernel instead of sharing the
+      node's.
+spec:
+  # The subject exclusion below only exists at admission time.
+  background: false
+  rules:
+  - name: require-kata-runtime-class
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    exclude:
+      any:
+      # OpenShift build pods, same reasoning as in pod-security-baseline.yaml.
+      - subjects:
+        - kind: ServiceAccount
+          name: build-controller
+          namespace: openshift-infra
+    validate:
+      failureAction: Enforce
+      message: >-
+        Pods in tenant namespaces must set runtimeClassName to kata (or
+        kata-remote) so they run in a sandbox with their own kernel.
+      pattern:
+        spec:
+          runtimeClassName: "kata | kata-remote"

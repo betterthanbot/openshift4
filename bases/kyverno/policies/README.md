@@ -1,7 +1,7 @@
 # Kyverno policies — guardrails for a shared cluster
 
-30 ClusterPolicies that let several tenants share this cluster without being
-able to reach, starve or impersonate each other. One more is provided but not
+33 ClusterPolicies that let several tenants share this cluster without being
+able to reach, starve or impersonate each other. Two more are provided but not
 enabled ([optional/](optional/)).
 
 > **Status (2026-11-15):** written and checked offline — `kustomize build`,
@@ -67,7 +67,10 @@ namespace. The mode is `validate.failureAction` in each rule.
 | Policy | Mode | What it does |
 |---|---|---|
 | `tenant-pod-security-baseline` | Enforce | Pod Security Standard *baseline*: no privileged, host namespaces, hostPath, host ports, extra capabilities |
-| `tenant-pod-security-restricted` | Audit | Pod Security Standard *restricted*, checked on pods after SCC admission |
+| `tenant-pod-security-restricted` | Audit | Pod Security Standard *restricted*, background scan of existing pods after SCC admission |
+| `tenant-pod-security-restricted-enforce` | Enforce | The same *restricted* profile as a gate on new pods: non-root, no privilege escalation, all capabilities dropped, seccomp |
+| `require-user-namespaces` | Enforce | Pods must set `hostUsers: false`, so root in the container is nobody on the node (GPU pods exempt) |
+| `restrict-build-strategies` | Enforce | Only S2I builds; no Docker, Custom or JenkinsPipeline builds, which run tenant-controlled steps in a privileged pod |
 | `restrict-node-name` | Enforce | No `spec.nodeName` (bypasses the scheduler and taints) |
 | `restrict-control-plane-scheduling` | Enforce | No tolerations for control-plane / infra taints, no tolerate-everything |
 | `restrict-priority-classes` | Enforce | No `system-*`, `openshift-*`, `kubevirt-*` PriorityClasses (they preempt other tenants) |
@@ -106,6 +109,7 @@ namespace. The mode is `validate.failureAction` in each rule.
 
 | Policy | What it does |
 |---|---|
+| `require-sandboxed-runtime` | Every tenant pod must run under the `kata` / `kata-remote` RuntimeClass, giving each pod its own kernel. Needs the OpenShift sandboxed containers Operator and nodes that can run VMs — read the file header. |
 | `tenant-egress-isolation` | Default-deny egress with allows for DNS, same tenant, outside the cluster and labelled platform namespaces. Breaks builds and calls to shared services until those namespaces are labelled — read the file header. |
 
 `kyverno-rbac.yaml` is not a policy: it lets Kyverno's reports controller read
@@ -196,6 +200,13 @@ entries in the policy. To use PolicyExceptions instead, set
 
 ## Known interactions
 
+- **Tenant workloads must opt in to user namespaces.** `require-user-namespaces`
+  rejects any Deployment, StatefulSet, Job or Pod whose pod spec lacks
+  `hostUsers: false`. Nothing fills that field in, so off-the-shelf Helm charts
+  and operators installed into a tenant namespace need it set. Volumes on NFS
+  may not work in a user namespace.
+- **Workloads that need root or an `anyuid` grant** are blocked by
+  `tenant-pod-security-restricted-enforce`, whatever SCC they were given.
 - **OpenShift builds.** Build pods are privileged. `tenant-pod-security-baseline`
   exempts the build controller, as OpenShift's own Pod Security Admission does.
   They still count against the tenant's quota.
@@ -216,6 +227,11 @@ entries in the policy. To use PolicyExceptions instead, set
 
 ## Limits
 
+- **Tenants still share the node's kernel.** The pod-security policies remove
+  the known ways out of a container and make an escape land without host
+  privileges, but they cannot stop a kernel vulnerability reachable through
+  the allowed system calls. Only a sandboxed runtime does
+  (`optional/require-sandboxed-runtime.yaml`).
 - **Egress is not restricted** unless the optional policy is enabled. Tenant
   pods can connect to platform namespaces that have no NetworkPolicy of their
   own.

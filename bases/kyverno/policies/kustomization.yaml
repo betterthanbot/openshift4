@@ -15,6 +15,7 @@ resources:
 - ./rbac/
 # Not enabled — read the file header first:
 # - ./optional/tenant-egress-isolation.yaml
+# - ./optional/require-sandboxed-runtime.yaml
 
 commonAnnotations:
   # ClusterPolicy is a CRD that the same Argo CD Application installs. Without

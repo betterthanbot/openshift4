@@ -1,0 +1,69 @@
+# Enforces the "restricted" Pod Security Standard on tenant pods at admission.
+# This is the profile designed to stop container breakouts:
+#
+#   runs as non-root              a root process is what most escapes start from
+#   allowPrivilegeEscalation:     setuid binaries and file capabilities cannot
+#     false                       raise privileges inside the container
+#   capabilities: drop ALL        nothing left to abuse against the kernel
+#                                 (only NET_BIND_SERVICE may be added back)
+#   seccomp RuntimeDefault        the rarely-used, bug-prone syscalls are
+#                                 unreachable
+#   no host namespaces, ports,    (baseline) no direct view of the node
+#     hostPath, privileged
+#   safe volume types only        no path onto the node's filesystem
+#
+# It is the same check as pod-security-restricted.yaml. The two have different
+# jobs: this one is the gate (admission only, blocks), that one is the scanner
+# (background, reports on pods that already exist — for example in a namespace
+# that was labelled as a tenant after its workloads were running).
+#
+# Checked on Pods only, after OpenShift's SCC admission has filled in the
+# defaults. A workload whose template sets none of these still passes when it
+# runs under restricted-v2 / restricted-v3, which is every tenant workload
+# unless a stronger SCC was granted. What this blocks is exactly that case: a
+# tenant service account given anyuid or a custom SCC. A blocked pod shows up
+# as a FailedCreate event on its ReplicaSet / StatefulSet / Job, not as an
+# error on `oc apply`.
+#
+# To go back to report-only, remove this file from kustomization.yaml.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: tenant-pod-security-restricted-enforce
+  annotations:
+    policies.kyverno.io/title: Pod Security Standard - Restricted (enforced)
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    pod-policies.kyverno.io/autogen-controllers: none
+    policies.kyverno.io/description: >-
+      Blocks pods in tenant namespaces that do not meet the restricted Pod
+      Security Standard after OpenShift's SCC admission: non-root, no privilege
+      escalation, all capabilities dropped, RuntimeDefault seccomp and safe
+      volume types only.
+spec:
+  # The subject exclusion below only exists at admission time.
+  background: false
+  rules:
+  - name: restricted
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    exclude:
+      any:
+      # OpenShift build pods, same reasoning as in pod-security-baseline.yaml.
+      - subjects:
+        - kind: ServiceAccount
+          name: build-controller
+          namespace: openshift-infra
+    validate:
+      failureAction: Enforce
+      podSecurity:
+        level: restricted
+        version: latest

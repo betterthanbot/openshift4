@@ -1,0 +1,86 @@
+# Requires tenant pods to run in their own Linux user namespace
+# (spec.hostUsers: false).
+#
+# Why this matters for breakouts: without a user namespace, UID 0 in the
+# container IS UID 0 on the node, and a capability in the container is a
+# capability on the node's kernel. The only things in the way are seccomp,
+# SELinux and the dropped capabilities — so a container-runtime or kernel bug
+# that gets a process out of its container lands it on the host with a real
+# host identity. With a user namespace the container's UIDs map to an
+# unprivileged, per-pod range on the host, and its capabilities are only valid
+# inside the namespace. A process that escapes is nobody on the node.
+#
+# Why Kyverno has to require it: OpenShift's restricted-v3 SCC is restricted-v2
+# plus exactly this one requirement, but every authenticated user is also
+# granted restricted-v2. A pod that leaves hostUsers out is simply admitted
+# under restricted-v2. The SCC offers the protection; this policy makes tenants
+# take it.
+#
+# Checked on the workload (Deployment, StatefulSet, Job, ...) as well as the
+# Pod, because nothing fills this field in: it has to be in the template.
+#
+#   spec:
+#     template:
+#       spec:
+#         hostUsers: false
+#
+# Known limits — pods that cannot run in a user namespace:
+#   * volumes on a filesystem without ID-mapped mount support. NFS is the
+#     common one; the pod is admitted and may then hit permission errors.
+#   * hostNetwork / hostPID / hostIPC pods (already blocked for tenants).
+#   * GPU pods: NVIDIA documents that its device plugin does not support
+#     pod-level user namespaces yet. They are exempted below.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-user-namespaces
+  annotations:
+    policies.kyverno.io/title: Require Linux User Namespaces
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Blocks pods in tenant namespaces that do not set spec.hostUsers to false.
+      A user namespace maps the container's users, including root, to
+      unprivileged IDs on the node, so a process that escapes its container has
+      no privileges on the host.
+spec:
+  # The subject exclusion below only exists at admission time.
+  background: false
+  rules:
+  - name: require-host-users-false
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    exclude:
+      any:
+      # OpenShift build pods, same reasoning as in pod-security-baseline.yaml.
+      - subjects:
+        - kind: ServiceAccount
+          name: build-controller
+          namespace: openshift-infra
+    preconditions:
+      all:
+      # GPU EXEMPTION — pods that request an NVIDIA GPU are not checked. A
+      # tenant cannot use this to opt out on its own: the default quota gives
+      # tenant namespaces zero GPUs (tenancy/default-resourcequota.yaml), so it
+      # only applies where a cluster-admin has raised that quota. Delete this
+      # block once the GPU stack supports user namespaces.
+      - key: "{{ request.object.spec.containers[?resources.limits.\"nvidia.com/gpu\"] || `[]` | length(@) }}"
+        operator: Equals
+        value: 0
+    validate:
+      failureAction: Enforce
+      message: >-
+        Pods in tenant namespaces must run in a user namespace. Set
+        hostUsers: false in the pod spec (spec.template.spec.hostUsers for a
+        Deployment, StatefulSet, DaemonSet or Job).
+      pattern:
+        spec:
+          hostUsers: false

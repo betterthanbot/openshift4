@@ -35,7 +35,10 @@ pod-to-pod traffic across namespaces. These policies close those gaps.
 | Policy | Mode | What it does | Why it belongs on a shared cluster |
 |---|---|---|---|
 | `tenant-pod-security-baseline` | Enforce | Applies the Pod Security *baseline* profile: no privileged containers, host namespaces, hostPath, host ports or extra capabilities. | A privileged or host-level pod can read other tenants' data on the node and escape to it. OpenShift's SCCs normally prevent this, but the namespaces here only have Pod Security *audit/warn* labels, so this is the second lock if someone is granted a stronger SCC. |
-| `tenant-pod-security-restricted` | Audit | Reports pods that fall short of the *restricted* profile after SCC admission (non-root, dropped capabilities, seccomp). | Shows which workloads run with more than the strictest profile, typically through an `anyuid` grant, so you can fix them before enforcing. |
+| `tenant-pod-security-restricted` | Audit | Reports pods that fall short of the *restricted* profile after SCC admission (non-root, dropped capabilities, seccomp). | Shows which workloads run with more than the strictest profile, typically through an `anyuid` grant, so existing workloads can be fixed. Covers namespaces onboarded after their pods were already running. |
+| `tenant-pod-security-restricted-enforce` | Enforce | Blocks new pods that fail the *restricted* profile after SCC admission: must be non-root, no privilege escalation, all capabilities dropped, RuntimeDefault seccomp, safe volume types. | This is the profile built to stop container breakouts. Most escapes start from root, a capability or an unfiltered syscall. Enforcing it means a stronger SCC grant (`anyuid`, custom) cannot reopen those paths in a tenant namespace. |
+| `require-user-namespaces` | Enforce | Requires `hostUsers: false` on tenant pods and workloads. GPU pods are exempt. | Without a user namespace, root in a container is root on the node if it gets out. With one, container UIDs map to an unprivileged per-pod range on the host, so a runtime or kernel bug that escapes the container yields no host privileges. OpenShift's `restricted-v3` SCC offers this, but tenants can fall back to `restricted-v2`; this policy removes the fallback. |
+| `restrict-build-strategies` | Enforce | Allows only Source (S2I) builds; blocks Docker, Custom and JenkinsPipeline BuildConfigs and Builds. | Builds run in privileged pods and are exempt from the pod-security policies. Docker and Custom strategies let the tenant decide what executes inside that privileged pod on a shared node. |
 | `restrict-node-name` | Enforce | Blocks `spec.nodeName`. | Setting a node name bypasses the scheduler and node taints, which would let a tenant place pods on control-plane nodes. |
 | `restrict-control-plane-scheduling` | Enforce | Blocks tolerations for control-plane, master and infra taints, and tolerate-everything tolerations. | Keeps tenant workloads off nodes that run the API server, etcd and platform services, where compromise would affect everyone. |
 | `restrict-priority-classes` | Enforce | Blocks `system-*`, `openshift-*` and `kubevirt-*` PriorityClasses. | A high-priority pod can preempt (evict) other tenants' pods and platform components to make room for itself. |
@@ -80,11 +83,14 @@ pod-to-pod traffic across namespaces. These policies close those gaps.
 
 | Policy | Category | What it does | Why you might want it |
 |---|---|---|---|
+| `require-sandboxed-runtime` | Pod Security | Requires tenant pods to use the `kata` or `kata-remote` RuntimeClass. | Every other control still leaves tenants on a shared kernel. A sandboxed runtime runs each pod in a lightweight VM with its own kernel, which is the only defence against a kernel vulnerability. Off by default because it needs the OpenShift sandboxed containers Operator and VM-capable nodes. |
 | `tenant-egress-isolation` | Multi-Tenancy | Default-deny egress with allows for DNS, the same tenant, destinations outside the cluster and labelled platform namespaces. | Ingress isolation already keeps tenants apart. Egress control also stops tenant pods reaching platform namespaces that have no NetworkPolicy of their own, and limits what a compromised pod can contact. Off by default because it breaks builds and shared-service calls until those namespaces are labelled. |
 
 ---
 
-**Not covered:** these policies assume tenants are separated by namespace only.
-They do not give separate nodes, a separate control plane or protection against
-a kernel-level container escape. If tenants are mutually untrusted at that
-level, a shared cluster is the wrong boundary regardless of policy.
+**Not covered:** the enabled policies assume tenants share nodes and a kernel.
+They remove the known ways out of a container and take away host privileges
+from a process that does get out, but they do not give separate nodes or a
+separate control plane, and they cannot stop a kernel vulnerability reachable
+through the allowed system calls. If tenants are mutually untrusted at that
+level, enable `require-sandboxed-runtime` or use separate clusters.

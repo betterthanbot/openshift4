@@ -1,0 +1,73 @@
+# OpenShift builds run in PRIVILEGED pods, and the pod-security policies in
+# this folder have to exempt them or no build would ever start. That makes
+# builds the one place where tenant-supplied input is processed inside a
+# privileged container on a shared node.
+#
+# How much the tenant controls depends on the strategy:
+#   Source (S2I)     the tenant supplies source code; a builder image assembles
+#                    it. Left allowed.
+#   Docker           the tenant supplies a Dockerfile, so arbitrary RUN steps
+#                    execute during the build. Red Hat's guidance is to be
+#                    cautious with it: a flaw in Dockerfile processing could
+#                    grant privileges on the node.
+#   Custom           the tenant supplies the build image itself, which then
+#                    runs privileged. Off by default in OpenShift.
+#   JenkinsPipeline  deprecated.
+#
+# By default every authenticated user may use the Docker and Source strategies.
+# This blocks Docker, Custom and JenkinsPipeline in tenant namespaces and
+# leaves S2I. Tenants who need to build from a Dockerfile can build outside the
+# cluster and push the image to a registry.
+#
+# No cluster-admin exemption: Build objects are created by OpenShift
+# controllers on the user's behalf, so the requester is not a reliable signal.
+# To allow Docker builds for one tenant, exclude its namespaces here.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-build-strategies
+  annotations:
+    policies.kyverno.io/title: Restrict OpenShift Build Strategies
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: BuildConfig, Build
+    policies.kyverno.io/description: >-
+      Blocks BuildConfigs and Builds in tenant namespaces that use the Docker,
+      Custom or JenkinsPipeline strategy. Builds run in privileged pods, and
+      these strategies let the tenant choose what executes inside them.
+spec:
+  background: true
+  rules:
+  - name: allow-source-strategy-only
+    match:
+      any:
+      - resources:
+          kinds:
+          - build.openshift.io/v1/BuildConfig
+          - build.openshift.io/v1/Build
+          namespaceSelector:
+            matchExpressions:
+            - key: platform/tenant
+              operator: Exists
+    validate:
+      failureAction: Enforce
+      message: >-
+        Only the Source (S2I) build strategy is allowed in tenant namespaces.
+        Docker, Custom and JenkinsPipeline builds run tenant-controlled steps
+        in a privileged pod.
+      deny:
+        conditions:
+          any:
+          - key: "{{ request.object.spec.strategy.type || '' }}"
+            operator: AnyIn
+            value:
+            - Docker
+            - Custom
+            - JenkinsPipeline
+          # the strategy can also be given by its key alone
+          - key: "{{ keys(request.object.spec.strategy || `{}`) }}"
+            operator: AnyIn
+            value:
+            - dockerStrategy
+            - customStrategy
+            - jenkinsPipelineStrategy

@@ -10,7 +10,9 @@
 # workload; checking the pods flags exactly the ones that really run with more
 # than "restricted" — typically because of an anyuid or custom SCC grant.
 #
-# To enforce: set failureAction to Enforce once the PolicyReports are clean.
+# This is the scanner: it runs in the background and reports on pods that
+# already exist. The same check is enforced on new pods by
+# pod-security-restricted-enforce.yaml.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
